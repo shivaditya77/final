@@ -2,18 +2,19 @@ require("dotenv").config();
 
 // Global Error Handlers for Vercel Debugging
 process.on('uncaughtException', (err) => {
+require("dotenv").config();
+
+// Global Error Handlers for Vercel Debugging
+process.on('uncaughtException', (err) => {
     console.error('🔥 CRITICAL UNCAUGHT EXCEPTION:', err);
 });
 process.on('unhandledRejection', (reason, promise) => {
     console.error('🔥 CRITICAL UNHANDLED REJECTION:', reason);
 });
 
-const express = require("express");
-const cors = require("cors");
-const session = require("express-session");
-const { MongoStore } = require("connect-mongo");
-// Fallback for different import styles
-const actualMongoStore = MongoStore || require("connect-mongo");
+const connectMongo = require("connect-mongo");
+// This is the most bulletproof way to get the class in any Node version
+const actualMongoStore = connectMongo.MongoStore || connectMongo;
 
 const path = require("path");
 const fs = require("fs");
@@ -601,5 +602,3 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 module.exports = app;
-   
- 
