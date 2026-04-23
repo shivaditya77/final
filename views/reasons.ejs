@@ -1,0 +1,295 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="reasons">
+    <link rel="stylesheet" href="/css/Reasons.css">
+    <div class="reasons-body">
+        <div class="reasons-netflix-intro" id="reasons-intro">
+            <div class="reasons-netflix-logo">
+                100 Reasons ❤️
+                <span>FOR YOU, BHONDU</span>
+            </div>
+        </div>
+
+        <div class="reasons-vignette"></div>
+        <div class="reasons-grain"></div>
+
+        <div class="nav-container">
+            <a href="/" class="nav-btn" style="text-decoration: none;">
+                <span>🏠</span><span class="nav-text">Home</span>
+            </a>
+            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
+                <span>💋</span><span class="nav-text">Logout</span>
+            </a>
+        </div>
+
+        <div class="reasons-music-control" id="music-toggle-btn">
+            <div class="music-icon" id="reasons-music-icon">🎶</div>
+        </div>
+
+        <div class="reasons-container">
+            <div class="cinematic-title">
+                <h1>100 Reasons Why I Love You 💕</h1>
+                <div class="reasons-subtitle">Scroll to unlock each reason... ❤️</div>
+            </div>
+
+            <div class="unlock-counter">
+                🔓 <span id="unlock-count">0</span> / 100 Reasons Unlocked
+            </div>
+
+            <div class="reasons-progress-container">
+                <div class="reasons-progress-fill" id="reasons-progress" style="width: 0%"></div>
+            </div>
+
+            <div class="reasons-grid" id="reasons-grid">
+                <% 
+                const reasonsList = [
+                    "Because you're my Bhondu, and that name is only yours 💕",
+                    "For the way you smile when you think I'm not looking",
+                    "Because you make the ordinary days feel special",
+                    "For the way you say my name",
+                    "Because you understand me without me having to explain",
+                    "For the million little things you do that you don't even realize",
+                    "Because you're the first thought in my mind every morning",
+                    "For the way you laugh at my stupid jokes",
+                    "Because you make me want to be a better person",
+                    "For the peace I feel when I'm with you",
+                    "Because you're my home, Bhondu",
+                    "For the way you look at me like I matter",
+                    "Because you forgive my mistakes",
+                    "For the way you hold my hand",
+                    "Because you believe in me when I don't believe in myself",
+                    "For the way you get excited about small things",
+                    "Because you're my best friend and my love",
+                    "For the way you make me feel safe",
+                    "Because you never give up on us",
+                    "For the way you care without expecting anything back",
+                    "Because you're the most beautiful person I know, inside and out",
+                    "For the way you make even silence comfortable",
+                    "Because you're my peace in this chaotic world",
+                    "For the way you love me despite my flaws",
+                    "Because you're my Bhondu, forever and always",
+                    "For the way you support my dreams",
+                    "Because you make me feel seen",
+                    "For the way you remember the little things",
+                    "Because you're my favorite notification",
+                    "For the way you make every day feel like an adventure",
+                    "Because you're honest with me, even when it's hard",
+                    "For the way you make me feel like I'm enough",
+                    "Because you're my safe space",
+                    "For the way you make even my worst days better",
+                    "Because you're my biggest cheerleader",
+                    "For the way you never judge me",
+                    "Because you're my partner in everything",
+                    "For the way you make me feel loved without saying a word",
+                    "Because you're my strength when I'm weak",
+                    "For the way you always choose us",
+                    "Because you're my favorite hello and hardest goodbye",
+                    "For the way you make me feel like the luckiest person alive",
+                    "Because you're my Bhondu, my love, my everything",
+                    "For the way you make me laugh until my stomach hurts",
+                    "Because you're my sunshine on cloudy days",
+                    "For the way you believe in our future",
+                    "Because you're my favorite person to do nothing with",
+                    "For the way you make me feel at home anywhere",
+                    "Because you're my happy place",
+                    "For the way you love me unconditionally",
+                    "Because you're my best mistake",
+                    "For the way you make me want to be my best self",
+                    "Because you're my partner in crime",
+                    "For the way you make even Mondays feel like Fridays",
+                    "Because you're my favorite distraction",
+                    "For the way you make me feel like I'm enough, just as I am",
+                    "Because you're my Bhondu, my forever person",
+                    "For the way you make every love song make sense",
+                    "Because you're my favorite place to be",
+                    "For the way you make me want to be better every day",
+                    "Because you're my Bhondu, and I'll never stop loving you",
+                    "For the way you make even the hardest days bearable",
+                    "Because you're my favorite reason to wake up",
+                    "For the way you make me feel like I've won the lottery of life",
+                    "Because you're my Bhondu, my heart, my soul",
+                    "For the way you make me believe in forever",
+                    "Because you're my favorite story to tell",
+                    "For the way you make me feel like I'm exactly where I belong",
+                    "Because you're my Bhondu, my love, my life",
+                    "For the way you make me want to shout from the rooftops",
+                    "Because you're my favorite chapter of my life",
+                    "For the way you make me feel like the luckiest person alive",
+                    "Because you're my Bhondu, and this is just the beginning",
+                    "For the way you make me believe in fairy tales",
+                    "Because you're my favorite person to grow old with",
+                    "For the way you make me feel like I'm home, wherever you are",
+                    "Because you're my Bhondu... and I love you more than words can ever say ❤️",
+                    "Because every single day with you feels like a blessing I never want to end. You're my past, my present, and my forever, Bhondu. I love you. 💕",
+                    "For the way you make my heart skip a beat every time I see your name on my screen 💓",
+                    "Because you are the only one who truly knows the real me, and you love me anyway 🥺",
+                    "For the way you make me feel like I can conquer the world as long as you're by my side 💪❤️",
+                    "Because your voice is my favorite sound in the entire world 🎙️✨",
+                    "For the way you make even the simplest moments feel like a grand adventure 🗺️💕",
+                    "Because you are the missing piece I never knew I was looking for 🧩❤️",
+                    "For the way you look at me with so much love that I feel like the only person in the room ✨",
+                    "Because you make me believe in soulmates and destiny 💫",
+                    "For the way you handle my moods with so much patience and grace 🌸",
+                    "Because you are my rock, my anchor, and my safe harbor ⚓❤️",
+                    "For the way you challenge me to be the best version of myself every single day ✨",
+                    "Because your kindness and compassion inspire me more than you know 💖",
+                    "For the way you make me feel like I'm home, no matter where we are 🏠💕",
+                    "Because you are the person I want to share all my secrets and dreams with 🤫❤️",
+                    "For the way you make me laugh until I can't breathe 😂💖",
+                    "Because you are my partner in everything, from small tasks to big dreams 🤝",
+                    "For the way you always know exactly what to say to make me feel better 🗣️❤️",
+                    "Because your love is the greatest gift I have ever received 🎁✨",
+                    "For the way you make me feel like the most special person in the world 🌍💕",
+                    "Because you are my everything, my Bhondu, and I love you more than words can express ❤️",
+                    "For the way you make me look forward to the future with so much excitement 🌅✨",
+                    "Because every day with you is a new reason to fall in love all over again. Happy Birthday, Bhondu! ❤️🎂💕"
+                ];
+                %>
+
+                <% reasonsList.forEach((reason, index) => { %>
+                    <div class="reason-card locked" id="reason-<%= index %>">
+                        <div class="lock-icon">🔒</div>
+                        <div class="reason-number">
+                            <span class="heart-icon">❤️</span> REASON <%= index + 1 %>/<%= reasonsList.length %>
+                        </div>
+                        <div class="reason-text" style="filter: blur(5px)"><%= reason %></div>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+
+        <a href="/voice-memory" class="reasons-next-btn" id="next-btn" style="display: none; text-decoration: none;">
+            <span>🎤 Continue to Voice Message</span>
+            <span>→</span>
+        </a>
+
+        <div class="reasons-scroll-progress" id="scroll-pct">0%</div>
+
+        <!-- POPUP -->
+        <div class="reason-popup-overlay" id="popup-overlay" style="display:none">
+            <div class="reason-popup-content">
+                <div class="popup-heart-anim">❤️</div>
+                <h2 class="popup-title">I LOVE YOU BHONDU! 💕</h2>
+                <p class="popup-text">You are my everything. Thank you for giving me 100 reasons, and a million more, to love you every single day. ✨</p>
+                <button class="popup-close-btn" id="popup-close">I Love You Too! 💖</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== INTRO ==========
+            const intro = document.getElementById('reasons-intro');
+            if (intro) {
+                setTimeout(() => {
+                    if (intro) {
+                        intro.style.opacity = '0';
+                        setTimeout(() => intro.remove(), 1000);
+                    }
+                }, 2500);
+            }
+
+            // ========== SCROLL LOGIC ==========
+            const actualReasons = document.querySelectorAll('.reason-card').length;
+            let unlockedUpTo = 0;
+            const progressFill = document.getElementById('reasons-progress');
+            const scrollPctText = document.getElementById('scroll-pct');
+            const unlockCountText = document.getElementById('unlock-count');
+            const nextBtn = document.getElementById('next-btn');
+            const popupOverlay = document.getElementById('popup-overlay');
+
+            function handleScroll() {
+                if (!progressFill) return;
+                const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                const scrolled = (winScroll / height) * 100;
+                const pct = Math.round(scrolled);
+
+                if (progressFill) progressFill.style.width = pct + '%';
+                if (scrollPctText) scrollPctText.innerText = pct + '%';
+
+                const targetUnlocked = Math.min(actualReasons, Math.max(1, Math.floor((scrolled / 100) * actualReasons)));
+                
+                if (targetUnlocked > unlockedUpTo) {
+                    for (let i = unlockedUpTo; i < targetUnlocked; i++) {
+                        const card = document.getElementById('reason-' + i);
+                        if (card && card.classList.contains('locked')) {
+                            card.classList.remove('locked');
+                            card.classList.add('unlocked');
+                            const lock = card.querySelector('.lock-icon');
+                            if (lock) lock.remove();
+                            const txt = card.querySelector('.reason-text');
+                            if (txt) txt.style.filter = 'none';
+                            const badge = document.createElement('div');
+                            badge.className = 'new-badge';
+                            badge.innerText = 'NEW';
+                            card.appendChild(badge);
+                            setTimeout(() => badge.remove(), 5000);
+                        }
+                    }
+                    unlockedUpTo = targetUnlocked;
+                    if (unlockCountText) unlockCountText.innerText = unlockedUpTo;
+                }
+
+                if (pct > 85 && nextBtn) {
+                    nextBtn.style.display = 'flex';
+                    nextBtn.classList.add('show');
+                }
+
+                if (unlockedUpTo >= actualReasons && popupOverlay && popupOverlay.style.display === 'none') {
+                    setTimeout(() => {
+                        if (popupOverlay) {
+                            popupOverlay.style.display = 'flex';
+                            createHeartExplosion();
+                        }
+                    }, 1000);
+                }
+            }
+
+            window.addEventListener('scroll', handleScroll);
+            handleScroll();
+
+            const popupClose = document.getElementById('popup-close');
+            if (popupClose) {
+                popupClose.addEventListener('click', () => {
+                    if (popupOverlay) popupOverlay.style.display = 'none';
+                });
+            }
+
+            function createHeartExplosion() {
+                const emojis = ['❤️', '💖', '💕', '💗', '💓'];
+                for (let i = 0; i < 50; i++) {
+                    setTimeout(() => {
+                        const h = document.createElement('div');
+                        h.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
+                        h.style.cssText = `position:fixed;left:${Math.random()*100}%;top:${Math.random()*100}%;font-size:${Math.random()*25+15}px;pointer-events:none;z-index:3000;animation:floatHeartEffect 1.5s ease-out forwards;`;
+                        document.body.appendChild(h);
+                        setTimeout(() => h.remove(), 1500);
+                    }, i * 30);
+                }
+            }
+
+            // ========== MUSIC TOGGLE ==========
+            const rMusicIcon = document.getElementById('reasons-music-icon');
+            const musicBtn = document.getElementById('music-toggle-btn');
+            if (musicBtn) {
+                musicBtn.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (rMusicIcon) rMusicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                });
+            }
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                window.removeEventListener('scroll', handleScroll);
+            });
+        })();
+    </script>
+
+    <style>
+    @keyframes floatHeartEffect {
+        0% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-50px); opacity: 0; }
+    }
+    </style>
+</div>
+<%- include('partials/footer') %>

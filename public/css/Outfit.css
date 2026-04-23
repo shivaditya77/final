@@ -1,0 +1,248 @@
+/* Outfit.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.outfit-body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0b0f 50%, #0a0a0a 100%);
+  font-family: 'Poppins', sans-serif;
+  padding: 40px 20px;
+  color: white;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+}
+
+.outfit-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+  position: relative;
+  z-index: 5;
+}
+
+.outfit-body h1 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  font-family: 'Dancing Script', cursive;
+  color: #ff4d6d;
+}
+
+.outfit-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  margin-bottom: 30px;
+}
+
+.outfit-unlock-counter {
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ff4d6d;
+}
+
+.outfit-progress-container {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto 50px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.outfit-progress-fill {
+  height: 100%;
+  background: #ff4d6d;
+  transition: width 0.5s ease;
+}
+
+.outfit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 60px;
+}
+
+.outfit-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 77, 109, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.outfit-card.locked {
+  filter: grayscale(0.8);
+}
+
+.outfit-card.unlocked {
+  filter: none;
+}
+
+.outfit-card:hover {
+  transform: translateY(-10px);
+  border-color: #ff4d6d;
+}
+
+.video-container {
+  width: 100%;
+  aspect-ratio: 9/16;
+  max-height: 400px;
+  overflow: hidden;
+  background: #000;
+  position: relative;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 5;
+}
+
+.lock-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+
+.lock-text {
+  font-size: 0.8rem;
+  color: white;
+}
+
+.card-content {
+  padding: 20px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.outfit-date {
+  font-size: 0.8rem;
+  color: #ff4d6d;
+  margin-bottom: 10px;
+}
+
+.outfit-title {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  color: white;
+}
+
+.outfit-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.question-section {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.question-text {
+  font-size: 0.9rem;
+  font-style: italic;
+  margin-bottom: 15px;
+}
+
+.answer-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.answer-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.answer-yes {
+  background: #ff4d6d;
+  color: white;
+}
+
+.answer-no {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.outfit-continue-btn {
+  display: inline-block;
+  padding: 15px 40px;
+  background: linear-gradient(135deg, #ff4d6d, #ff1e4d);
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.outfit-skip-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 20px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  z-index: 100;
+}
+
+.outfit-music-control {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 45px;
+  height: 45px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 100;
+  border: 1px solid rgba(255, 77, 109, 0.3);
+}
+
+@media (max-width: 600px) {
+  .outfit-body h1 { font-size: 1.8rem; }
+  .outfit-grid { grid-template-columns: 1fr; }
+}

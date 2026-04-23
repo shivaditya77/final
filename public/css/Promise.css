@@ -1,0 +1,223 @@
+/* Promise.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.promise-body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0b0f 50%, #0a0a0a 100%);
+  font-family: 'Poppins', sans-serif;
+  overflow-x: hidden;
+  color: white;
+  position: relative;
+}
+
+.promise-vignette {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.bg-hearts {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.heart-bg {
+  position: absolute;
+  font-size: 30px;
+  opacity: 0.1;
+  animation: floatBg 15s linear infinite;
+}
+
+@keyframes floatBg {
+  0% { transform: translateY(105vh) rotate(0deg); }
+  100% { transform: translateY(-10vh) rotate(360deg); }
+}
+
+.promise-grid {
+  position: relative;
+  z-index: 10;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 20px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+}
+
+.promise-header {
+  padding: 120px 20px 80px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+.header-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(255, 77, 109, 0.15);
+  border: 1px solid rgba(255, 77, 109, 0.3);
+  border-radius: 50px;
+  color: #ff8fa3;
+  font-size: 0.8rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.promise-main-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  background: linear-gradient(to right, #fff, #ff4d6d, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 15px;
+  font-style: italic;
+}
+
+.promise-intro {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.1rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.promise-card {
+  width: 100%;
+  transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.promise-card-inner {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  padding: 40px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  transition: all 0.4s ease;
+}
+
+.promise-card:hover .promise-card-inner {
+  background: rgba(255, 77, 109, 0.05);
+  border-color: rgba(255, 77, 109, 0.3);
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.promise-icon-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.promise-icon {
+  font-size: 2.5rem;
+  z-index: 2;
+}
+
+.icon-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: #ff4d6d;
+  filter: blur(20px);
+  opacity: 0.1;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.promise-card:hover .icon-glow {
+  opacity: 0.3;
+  transform: scale(1.2);
+}
+
+.promise-number {
+  font-size: 0.8rem;
+  color: #ff4d6d;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.promise-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  margin-bottom: 15px;
+  color: #fff;
+}
+
+.promise-text {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Animations */
+.hidden-anim { opacity: 0; }
+
+.reveal-left { transform: translateX(-100px); }
+.reveal-right { transform: translateX(100px); }
+
+.promise-card.show-anim {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.promise-header.show-anim {
+  opacity: 1;
+  animation: fadeInUp 1s ease forwards;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.promise-next-btn {
+  display: flex;
+  margin: 50px auto 100px;
+  padding: 20px 60px;
+  background: linear-gradient(135deg, #ff4d6d, #ff1e4d);
+  color: white;
+  text-decoration: none;
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 1.2rem;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(255, 77, 109, 0.4);
+  width: fit-content;
+}
+
+.promise-next-btn:hover {
+  transform: scale(1.05) translateY(-5px);
+  box-shadow: 0 15px 40px rgba(255, 77, 109, 0.6);
+}
+
+@media (max-width: 768px) {
+  .promise-main-title { font-size: 2.5rem; }
+  .promise-card-inner { flex-direction: column; text-align: center; gap: 20px; align-items: center; }
+  .promise-grid { gap: 40px; }
+}

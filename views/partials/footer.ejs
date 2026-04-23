@@ -1,0 +1,61 @@
+    </div> <!-- end #app-root -->
+    
+    <!-- Music Player -->
+    <%- include('music') %>
+
+    <!-- Global Scripts -->
+    <script src="/js/music-player.js"></script>
+    <script>
+        // ========== BARBA.JS INITIALIZATION ==========
+        barba.use(barbaPrefetch);
+
+        barba.init({
+            prefetch: true,
+            transitions: [{
+                name: 'opacity-transition',
+                leave(data) {
+                    gsap.set('.transition-overlay', { visibility: 'visible' });
+                    return gsap.to('.transition-overlay', {
+                        duration: 0.6,
+                        scaleY: 1,
+                        transformOrigin: 'bottom',
+                        ease: 'power2.inOut'
+                    });
+                },
+                enter(data) {
+                    // Scroll to top on new page
+                    window.scrollTo(0, 0);
+                    
+                    // Update Background Music Track
+                    if (window.updateMusicTrack) {
+                        window.updateMusicTrack(window.location.pathname);
+                    }
+                    
+                    // Re-run any scripts found in the new container
+                    const scripts = data.next.container.querySelectorAll('script');
+                    scripts.forEach(script => {
+                        const newScript = document.createElement('script');
+                        Array.from(script.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                        newScript.appendChild(document.createTextNode(script.innerHTML));
+                        script.parentNode.replaceChild(newScript, script);
+                    });
+
+                    gsap.set('.transition-overlay', { transformOrigin: 'top' });
+                    return gsap.to('.transition-overlay', {
+                        duration: 0.6,
+                        scaleY: 0,
+                        ease: 'power2.inOut',
+                        delay: 0.2,
+                        onComplete: () => {
+                            gsap.set('.transition-overlay', { visibility: 'hidden' });
+                        }
+                    });
+                }
+            }]
+        });
+
+        // Ensure initial page scripts run (Barba doesn't handle the very first load)
+        // document.addEventListener('DOMContentLoaded', () => { ... }); // Browser does this naturally
+    </script>
+</body>
+</html>

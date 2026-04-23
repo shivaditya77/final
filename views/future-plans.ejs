@@ -1,0 +1,95 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="future-plans">
+    <link rel="stylesheet" href="/css/FuturePlans.css">
+    <div class="future-plans-body">
+        <div class="future-plans-vignette"></div>
+        
+        <div class="nav-container">
+            <a href="/" class="nav-btn" style="text-decoration: none;">
+                <span>🏠</span><span class="nav-text">Home</span>
+            </a>
+            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
+                <span>💋</span><span class="nav-text">Logout</span>
+            </a>
+        </div>
+
+        <div class="future-plans-music-control" id="music-toggle-btn">
+            <div class="music-icon" id="future-music-icon">🎶</div>
+        </div>
+
+        <div class="future-plans-container">
+            <h1>Our Future Together ✨</h1>
+            <div class="future-plans-subtitle">Dreams I want to make true with you...</div>
+
+            <div class="dream-grid">
+                <% 
+                const dreamsList = [
+                    { icon: '✈️', title: 'Travel the World', text: 'I want to travel the world with you—Paris, Maldives, Switzerland… I want to go everywhere with you. I want your face in every selfie.' },
+                    { icon: '🏠', title: 'Our Dream Home', text: 'I want to build a home where your smile lives on every wall. A place where we create memories and relive them forever.' },
+                    { icon: '🌅', title: 'Every Sunrise', text: 'I want to wake up to your eyes every morning. I want to spend every evening with you. I want every day to belong to you.' },
+                    { icon: '🎄', title: 'All Celebrations', text: 'I want to celebrate every festival, every occasion, every special day with you. Without you, no celebration feels complete.' },
+                    { icon: '👨‍👩‍👧', title: 'Our Family', text: 'When the time is right, I want to build a small, beautiful family with you. I want to live every phase of life with you.' },
+                    { icon: '💍', title: 'Forever Together', text: 'I want to hold your hand forever. For a lifetime… and beyond. You are mine, and I am yours.' }
+                ];
+                %>
+
+                <% dreamsList.forEach(dream => { %>
+                    <div class="dream-card">
+                        <div class="dream-icon"><%= dream.icon %></div>
+                        <div class="dream-title"><%= dream.title %></div>
+                        <div class="dream-text"><%= dream.text %></div>
+                    </div>
+                <% }) %>
+            </div>
+
+            <div class="final-message-box">
+                <p>💕 These are just dreams... but with you, they become reality. 💕</p>
+                <p>With you, every dream feels real. Every future feels bright.</p>
+                <p>I can't wait to start this journey with you...</p>
+                <a href="/final" class="future-plans-next-btn" style="text-decoration: none;">Ready for the Final Surprise? →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== SPARKLE EFFECT ==========
+            const sparkleInterval = setInterval(() => {
+                if (!document.querySelector('.future-plans-body')) {
+                    clearInterval(sparkleInterval);
+                    return;
+                }
+                const s = document.createElement('div');
+                s.className = 'sparkle-voice';
+                s.innerHTML = ['✨', '⭐', '💫', '🌟'][Math.floor(Math.random() * 4)];
+                s.style.cssText = `position:fixed;left:${Math.random()*100}%;top:${Math.random()*100}%;font-size:${Math.random()*15+10}px;pointer-events:none;z-index:9999;animation:sparkleEffect 2s linear forwards;`;
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 2000);
+            }, 300);
+
+            // ========== MUSIC TOGGLE ==========
+            const fMusicIcon = document.getElementById('future-music-icon');
+            const musicBtn = document.getElementById('music-toggle-btn');
+            if (musicBtn) {
+                musicBtn.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (fMusicIcon) fMusicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                });
+            }
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                clearInterval(sparkleInterval);
+            });
+        })();
+    </script>
+
+    <style>
+    @keyframes sparkleEffect {
+        0% { transform: scale(0) rotate(0deg); opacity: 0; }
+        50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+        100% { transform: scale(0) rotate(360deg); opacity: 0; }
+    }
+    </style>
+</div>
+<%- include('partials/footer') %>

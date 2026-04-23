@@ -1,0 +1,276 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="journal">
+    <link rel="stylesheet" href="/css/Journal.css">
+    <div class="journal-body">
+        <div class="journal-bg"></div>
+        <div class="journal-vignette"></div>
+
+        <!-- Navigation -->
+        <div class="nav-container">
+            <a href="/" class="nav-btn" style="text-decoration: none;">
+                <span>🏠</span><span class="nav-text">Home</span>
+            </a>
+            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
+                <span>💋</span><span class="nav-text">Logout</span>
+            </a>
+        </div>
+
+        <div class="journal-header">
+            <div class="header-left">
+                <span class="header-title">Journal</span>
+                <button class="add-btn" id="add-memory-btn" style="padding: 8px 16px; fontSize: 0.8rem; marginLeft: 15px;">+ Add Memory</button>
+            </div>
+        </div>
+
+        <main class="journal-main">
+            <div class="journal-hero">
+                <div class="hero-badge">PRIVATE DIARY</div>
+                <h1>Our Memory Journal</h1>
+                <p>Every moment we cherish, saved forever</p>
+            </div>
+
+            <div id="journal-grid-container">
+                <% if (entries.length === 0) { %>
+                    <div class="empty-state">
+                        <span class="empty-icon">📖</span>
+                        <h3>No memories yet...</h3>
+                        <p>Click "+ Add Memory" above to add your first one!</p>
+                    </div>
+                <% } else { %>
+                    <div class="journal-grid">
+                        <% entries.forEach(entry => { %>
+                            <div class="journal-card <%= !entry.filename ? 'text-only' : '' %>" id="entry-<%= entry._id %>">
+                                <% if (entry.filename) { %>
+                                    <div class="card-media-wrap">
+                                        <% if (entry.type === 'image') { %>
+                                            <img class="card-media" src="<%= entry.filename.startsWith('http') ? entry.filename : '/uploads/journal/' + entry.filename %>" alt="memory" loading="lazy">
+                                        <% } else { %>
+                                            <div class="video-thumb" onclick="playVideo('<%= entry.filename.startsWith('http') ? entry.filename : '/uploads/journal/' + entry.filename %>')">
+                                                <span class="play-icon">▶️</span>
+                                                <span class="play-text">Tap to play video</span>
+                                            </div>
+                                        <% } %>
+                                        <div class="card-type-badge">
+                                            <%= entry.type === 'image' ? '🖼️ Photo' : '🎬 Video' %>
+                                        </div>
+                                    </div>
+                                <% } %>
+                                <div class="card-body">
+                                    <div class="card-date">📅 <%= new Date(entry.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) %></div>
+                                    <div class="card-desc"><%= entry.description %></div>
+                                    <div class="card-actions">
+                                        <button class="edit-btn" onclick="editEntry('<%= entry._id %>', '<%= entry.description %>', '<%= entry.date %>', '<%= entry.filename %>', '<%= entry.type %>')">✏️ Edit</button>
+                                        <button class="del-btn" onclick="deleteEntry('<%= entry._id %>')">🗑️ Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </div>
+        </main>
+
+        <!-- MODAL -->
+        <div class="journal-overlay" id="journal-modal-overlay">
+            <div class="journal-modal" id="journal-modal">
+                <div class="modal-title" id="modal-title">✨ Add New Memory</div>
+                <form id="journal-form">
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label class="form-label" id="media-label">📎 Upload Photo or Video (Optional)</label>
+                        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+                            <input type="file" id="file-input" style="display:none" accept="image/*,video/*">
+                            <span class="upload-icon" id="upload-icon">📸</span>
+                            <div class="upload-text" id="upload-text">Click to add a photo / video (or leave empty for text-only)</div>
+                            <div class="upload-hint">JPG, PNG, MP4, MOV supported</div>
+                        </div>
+                        <div class="preview-box" id="preview-box" style="display:none">
+                            <img id="preview-img" style="display:none">
+                            <video id="preview-video" style="display:none" controls></video>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">💬 Description</label>
+                        <textarea class="form-textarea" id="description-input" placeholder="Write something about this memory..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">📅 Date</label>
+                        <input type="date" class="form-input" id="date-input" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="cancel-btn">Cancel</button>
+                        <button type="submit" class="btn-save" id="save-btn">💾 Save Memory</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- VIDEO MODAL -->
+        <div class="journal-overlay" id="video-modal-overlay">
+            <div class="journal-modal" style="max-width: 700px; padding: 16px;">
+                <button class="btn-cancel" style="margin-bottom: 12px;" onclick="closeVideoModal()">✕ Close</button>
+                <video id="active-video" controls style="width: 100%; border-radius: 12px; max-height: 70vh;" autoplay playsinline></video>
+            </div>
+        </div>
+
+        <div class="journal-toast" id="journal-toast"></div>
+    </div>
+
+    <script>
+        (function() {
+            let isEditMode = false;
+            let mediaFile = null;
+
+            const modalOverlay = document.getElementById('journal-modal-overlay');
+            const journalForm = document.getElementById('journal-form');
+            const fileInput = document.getElementById('file-input');
+            const previewBox = document.getElementById('preview-box');
+            const previewImg = document.getElementById('preview-img');
+            const previewVideo = document.getElementById('preview-video');
+            const toast = document.getElementById('journal-toast');
+
+            const addBtn = document.getElementById('add-memory-btn');
+            if (addBtn) {
+                addBtn.addEventListener('click', () => {
+                    isEditMode = false;
+                    document.getElementById('modal-title').innerText = '✨ Add New Memory';
+                    document.getElementById('save-btn').innerText = '💾 Save Memory';
+                    document.getElementById('edit-id').value = '';
+                    journalForm.reset();
+                    document.getElementById('date-input').value = new Date().toISOString().split('T')[0];
+                    previewBox.style.display = 'none';
+                    mediaFile = null;
+                    modalOverlay.classList.add('open');
+                });
+            }
+
+            const cancelBtn = document.getElementById('cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => modalOverlay.classList.remove('open'));
+            }
+
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        mediaFile = file;
+                        const url = URL.createObjectURL(file);
+                        previewBox.style.display = 'block';
+                        if (file.type.startsWith('video/')) {
+                            previewImg.style.display = 'none';
+                            previewVideo.style.display = 'block';
+                            previewVideo.src = url;
+                        } else {
+                            previewVideo.style.display = 'none';
+                            previewImg.style.display = 'block';
+                            previewImg.src = url;
+                        }
+                        document.getElementById('upload-text').innerText = '✅ ' + file.name;
+                    }
+                });
+            }
+
+            if (journalForm) {
+                journalForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const saveBtn = document.getElementById('save-btn');
+                    saveBtn.disabled = true;
+                    saveBtn.innerText = 'Saving...';
+
+                    const formData = new FormData();
+                    formData.append('description', document.getElementById('description-input').value);
+                    formData.append('date', document.getElementById('date-input').value);
+                    if (mediaFile) formData.append('media', mediaFile);
+
+                    const id = document.getElementById('edit-id').value;
+                    const url = isEditMode ? `/api/journal/edit/${id}` : '/api/journal/add';
+                    const method = isEditMode ? 'PUT' : 'POST';
+
+                    try {
+                        const res = await fetch(url, { method, body: formData });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(isEditMode ? '✅ Memory updated!' : '✨ Memory saved!');
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (err) {
+                        alert('Error saving memory');
+                    } finally {
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = isEditMode ? '💾 Update' : '💾 Save Memory';
+                    }
+                });
+            }
+
+            window.editEntry = (id, desc, date, filename, type) => {
+                isEditMode = true;
+                const title = document.getElementById('modal-title');
+                const saveBtn = document.getElementById('save-btn');
+                if (title) title.innerText = '✏️ Edit Memory';
+                if (saveBtn) saveBtn.innerText = '💾 Update';
+                document.getElementById('edit-id').value = id;
+                document.getElementById('description-input').value = desc;
+                document.getElementById('date-input').value = date.substring(0,10);
+                
+                    const fullUrl = filename.startsWith('http') ? filename : '/uploads/journal/' + filename;
+                    if (type === 'video') {
+                        previewImg.style.display = 'none';
+                        previewVideo.style.display = 'block';
+                        previewVideo.src = fullUrl;
+                    } else {
+                        previewVideo.style.display = 'none';
+                        previewImg.style.display = 'block';
+                        previewImg.src = fullUrl;
+                    }
+                } else {
+                    previewBox.style.display = 'none';
+                }
+                
+                modalOverlay.classList.add('open');
+            };
+
+            window.deleteEntry = async (id) => {
+                if (!confirm('Delete this memory? 💔')) return;
+                try {
+                    const res = await fetch(`/api/journal/delete/${id}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    if (data.success) {
+                        const el = document.getElementById('entry-' + id);
+                        if (el) el.remove();
+                        showToast('Memory deleted 💔');
+                    }
+                } catch (err) {
+                    alert('Error deleting memory');
+                }
+            };
+
+            window.playVideo = (filename) => {
+                const activeVideo = document.getElementById('active-video');
+                const overlay = document.getElementById('video-modal-overlay');
+                if (activeVideo && overlay) {
+                    activeVideo.src = filename.startsWith('http') ? filename : '/uploads/journal/' + filename;
+                    overlay.classList.add('open');
+                }
+            };
+
+            window.closeVideoModal = () => {
+                const activeVideo = document.getElementById('active-video');
+                const overlay = document.getElementById('video-modal-overlay');
+                if (activeVideo && overlay) {
+                    overlay.classList.remove('open');
+                    activeVideo.pause();
+                }
+            };
+
+            function showToast(msg) {
+                if (!toast) return;
+                toast.innerText = msg;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            }
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

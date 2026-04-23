@@ -1,0 +1,243 @@
+/* ========== BASE STYLES ========== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.login-body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a0b0f 0%, #0a0a0a 50%, #1a0b0f 100%);
+    font-family: 'Poppins', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+#particleCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* ========== MAIN CONTAINER ========== */
+.container {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 420px;
+    padding: 40px 30px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== HEARTBEAT ICON ========== */
+.heartbeat-icon {
+    margin-bottom: 20px;
+}
+
+.heart {
+    font-size: 60px;
+    display: inline-block;
+    animation: heartbeat 1.5s ease infinite;
+    filter: drop-shadow(0 0 10px #ff4d6d);
+}
+
+@keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+/* ========== DATE DISPLAY ========== */
+.date-display {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 20px;
+}
+
+/* ========== HEADING ========== */
+.login-title {
+    font-size: 2rem;
+    font-family: 'Dancing Script', cursive;
+    color: #ff4d6d;
+    margin-bottom: 20px;
+}
+
+/* ========== EMOTIONAL MESSAGE ========== */
+.emotional-message {
+    margin-bottom: 20px;
+    color: #ffb3c1;
+    font-style: italic;
+    font-size: 0.9rem;
+    min-height: 24px;
+}
+
+/* ========== LOVE NOTE ========== */
+.love-note {
+    background: rgba(255, 77, 109, 0.1);
+    padding: 15px;
+    border-radius: 15px;
+    margin-bottom: 25px;
+    border-left: 3px solid #ff4d6d;
+}
+
+.love-note-text {
+    font-size: 0.85rem;
+    color: #ffc1cd;
+}
+
+/* ========== FORM ========== */
+.input-group {
+    position: relative;
+    margin-bottom: 25px;
+    text-align: left;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 15px 15px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s;
+}
+
+.input-group input:focus {
+    border-color: #ff4d6d;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.input-group label {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s;
+    pointer-events: none;
+}
+
+.input-group.focused label {
+    top: -10px;
+    left: 10px;
+    font-size: 0.75rem;
+    color: #ff4d6d;
+    background: #1a0b0f;
+    padding: 0 8px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ========== BUTTON ========== */
+.romantic-btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #ff4d6d, #ff1e4d);
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 10px;
+}
+
+.romantic-btn:hover {
+    transform: scale(1.03);
+    box-shadow: 0 10px 20px rgba(255, 77, 109, 0.4);
+}
+
+/* ========== EXTRAS ========== */
+.love-counter {
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}
+
+.counter-digits {
+    color: #ff4d6d;
+    font-weight: bold;
+}
+
+.hint-wrapper {
+    margin-top: 20px;
+}
+
+.hint {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+}
+
+.error-message {
+    margin-top: 20px;
+    color: #ff4d6d;
+    font-size: 0.85rem;
+}
+
+.profile-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #ff4d6d;
+    margin: 0 auto 20px;
+    overflow: hidden;
+    display: none;
+}
+
+.profile-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.whisper {
+    margin-top: 15px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.whisper.show {
+    opacity: 1;
+}
+
+.whisper-text {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 30px 20px;
+    }
+    .login-title {
+        font-size: 1.6rem;
+    }
+}

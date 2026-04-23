@@ -1,0 +1,233 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="voice-memory">
+    <link rel="stylesheet" href="/css/VoiceMemory.css">
+    <div class="voice-memory-body">
+        <div class="voice-memory-vignette"></div>
+        <div class="nav-container">
+            <a href="/" class="nav-btn" style="text-decoration: none;">
+                <span>🏠</span><span class="nav-text">Home</span>
+            </a>
+            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
+                <span>💋</span><span class="nav-text">Logout</span>
+            </a>
+        </div>
+
+        <div class="voice-memory-music-control" id="music-toggle-btn">
+            <div class="music-icon" id="voice-music-icon">🎶</div>
+        </div>
+
+        <div class="voice-memory-container">
+            <div class="slideshow-card">
+                <div class="photo-container">
+                    <img id="memory-photo" src="/assets/p1.jpeg" alt="Memory">
+                </div>
+
+                <div class="shayari-container">
+                    <div class="shayari-text" id="shayari-text"></div>
+                    <span class="typing-cursor" id="typing-cursor"></span>
+                </div>
+
+                <div class="waveform" id="waveform">
+                    <% for(let i=0; i<12; i++) { %>
+                        <div class="wave-bar"></div>
+                    <% } %>
+                </div>
+
+                <div class="voice-progress-container" id="voice-progress-click">
+                    <div class="voice-progress-fill" id="voice-progress-fill">
+                        <span class="progress-heart" id="progress-heart">❤️</span>
+                    </div>
+                </div>
+
+                <div class="voice-controls">
+                    <div class="ctrl-btn" id="prev-btn">⏮</div>
+                    <div class="ctrl-btn" id="play-btn">▶</div>
+                    <div class="ctrl-btn" id="next-btn">⏭</div>
+                </div>
+
+                <div class="voice-slide-counter">
+                    <span id="current-slide">1</span> / 9
+                </div>
+
+                <a href="/outfit" class="voice-memory-next-btn" style="text-decoration: none;">Continue to Outfit Check →</a>
+            </div>
+        </div>
+        <div id="hearts-container"></div>
+    </div>
+
+    <script>
+        (function() {
+            let currentSlide = 1;
+            let isPlayingVoice = false;
+            let typingInterval = null;
+            const voiceAudio = new Audio();
+
+            const shayariList = {
+                1: "💕 जी भरकर देखने बैठ जाऊँ उसे एक शाम, तो पूरी उम्र भी कम लगती है। वह इतनी ख़ूबसूरत है कि दुनिया की सारी ख़ूबसूरती मुझे बस एक भ्रम लगती है ❤️ ✨ ...",
+                2: "🌸 तेरे जैसा कोई मिला ही नहीं, कैसे मिलता — कहीं था ही नहीं… तू जहाँ तक दिखाई देती है, उसके आगे मैं देखता ही नहीं ❤️ ✨",
+                3: "💖 लोग बसते हैं समंदर में, लेकिन हम तुम्हारी आँखों में डूबने को तैयार हैं… किसको देखने की चाहत करें — तुम्हें एक बार देख लिया तो सब फीका लगता है ✨ तुम्हारी ज़ुल्फ़ों की गहराई बहुत है, और हमें तो वही किनारा पसंद है 🌙 लोग कहते हैं तुम चाँद का टुकड़ा हो, और हम कहते हैं — चाँद तुम्हारा टुकड़ा है ❤️ 🌙 ✨",
+                4: "✨ तुम्हें देखने के बाद मैंने कुछ नहीं देखा… तुम्हें देखा, तुम्हें देखा — फिर कुछ भी नहीं देखा ❤️ ✨ यूँ तो कितने दिलकश चेहरे थे सामने, मगर हम तुम्हारी ज़ुल्फ़ों के साए में बैठे… और फिर कुछ भी नहीं देखा 🌙 💕",
+                5: "💫 चाँद में दाग हैं, ये सब जानते हैं… पर तुम्हारी रौशनी में कोई कमी नहीं आती ✨ 🌙 वह आसमान में रहकर भी अधूरा सा लगता है, और तुम पास हो तो ज़िंदगी ही पूरी नज़र आती है ❤️ ✨",
+                6: "🌙 किसने कहा इश्क़ एक बार होता है… किसने कहा इश्क़ एक बार होता है… मैं तुम्हें जितनी बार देखता हूँ, उतनी बार इश्क़ हो जाता है ❤️ ✨",
+                7: "💕 अगर तलाश करूँ तो कोई मिल ही जाएगा… मगर तुम्हारी तरह कौन मुझे चाहेगा ❤️ तुम्हें ज़रूर कोई चाहत से देखता होगा, मगर वो आँखें हमारी कहाँ से लाएगा ✨ 💕",
+                8: "🌟 Malmal resham khaddar accha lagta hain ✨ kuch bhi pahno tum par sab accha lagta hain ❤️ aur mujhko yuhi acchi lagti rahna tum 💕 kyuki accha lagna tumpar accha lagta hain 🌙 ✨",
+                9: "❤️ तुम मेरी मोहब्बत का आख़िरी ख़्वाब हो… अब ना कोई और चाह है, ना कोई हिसाब है ❤️ ✨ जो सुकून मिला है तुममें आकर, लगता है तुम ही मेरी आख़िरी किताब हो 📖 💕 🌙"
+            };
+
+            const photo = document.getElementById('memory-photo');
+            const shayariEl = document.getElementById('shayari-text');
+            const cursor = document.getElementById('typing-cursor');
+            const progressFill = document.getElementById('voice-progress-fill');
+            const progressHeart = document.getElementById('progress-heart');
+            const playBtn = document.getElementById('play-btn');
+            const waveBars = document.querySelectorAll('.wave-bar');
+
+            function loadSlide(num) {
+                isPlayingVoice = false;
+                if (playBtn) playBtn.innerHTML = '▶';
+                if (shayariEl) shayariEl.innerText = '';
+                if (progressFill) progressFill.style.width = '0%';
+                if (progressHeart) progressHeart.classList.remove('show');
+                clearInterval(typingInterval);
+                if (cursor) cursor.style.display = 'none';
+                
+                if (photo) {
+                    photo.classList.add('slide-transition');
+                    setTimeout(() => {
+                        photo.src = `/assets/p${num}.jpeg`;
+                        photo.classList.remove('slide-transition');
+                    }, 500);
+                }
+                
+                voiceAudio.src = `/assets/s${num}.ogg`;
+                voiceAudio.load();
+                
+                const currentEl = document.getElementById('current-slide');
+                if (currentEl) currentEl.innerText = num;
+                waveBars.forEach(b => b.classList.remove('active'));
+            }
+
+            function startTyping(text) {
+                if (!shayariEl || !cursor) return;
+                clearInterval(typingInterval);
+                cursor.style.display = 'inline-block';
+                let i = 0;
+                shayariEl.innerText = '';
+                const chars = Array.from(text);
+                typingInterval = setInterval(() => {
+                    if (i < chars.length) {
+                        shayariEl.textContent += chars[i];
+                        i++;
+                    } else {
+                        clearInterval(typingInterval);
+                        cursor.style.display = 'none';
+                    }
+                }, 35);
+            }
+
+            if (playBtn) {
+                playBtn.addEventListener('click', () => {
+                    if (isPlayingVoice) {
+                        voiceAudio.pause();
+                        isPlayingVoice = false;
+                        playBtn.innerHTML = '▶';
+                        waveBars.forEach(b => b.classList.remove('active'));
+                    } else {
+                        voiceAudio.play().catch(e => console.log("Audio play failed", e));
+                        isPlayingVoice = true;
+                        playBtn.innerHTML = '⏸';
+                        waveBars.forEach(b => b.classList.add('active'));
+                        if (shayariEl && shayariEl.innerText === '') {
+                            startTyping(shayariList[currentSlide]);
+                        }
+                    }
+                });
+            }
+
+            const prevBtn = document.getElementById('prev-btn');
+            if (prevBtn) {
+                prevBtn.addEventListener('click', () => {
+                    if (currentSlide > 1) {
+                        currentSlide--;
+                        loadSlide(currentSlide);
+                    }
+                });
+            }
+
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => {
+                    if (currentSlide < 9) {
+                        currentSlide++;
+                        loadSlide(currentSlide);
+                    }
+                });
+            }
+
+            voiceAudio.addEventListener('timeupdate', () => {
+                if (!progressFill) return;
+                const pct = (voiceAudio.currentTime / voiceAudio.duration) * 100;
+                progressFill.style.width = pct + '%';
+                if (progressHeart) {
+                    if (pct > 95) progressHeart.classList.add('show'); else progressHeart.classList.remove('show');
+                }
+            });
+
+            voiceAudio.addEventListener('ended', () => {
+                isPlayingVoice = false;
+                if (playBtn) playBtn.innerHTML = '▶';
+                if (currentSlide < 9) {
+                    currentSlide++;
+                    setTimeout(() => loadSlide(currentSlide), 500);
+                }
+            });
+
+            const progClick = document.getElementById('voice-progress-click');
+            if (progClick) {
+                progClick.addEventListener('click', (e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const pct = x / rect.width;
+                    if (voiceAudio.duration) {
+                        voiceAudio.currentTime = pct * voiceAudio.duration;
+                    }
+                });
+            }
+
+            // ========== BG HEARTS ==========
+            const heartsContainer = document.getElementById('hearts-container');
+            if (heartsContainer) {
+                const emojis = ['❤️', '💖', '💕', '💗', '💓'];
+                for (let i = 0; i < 30; i++) {
+                    const h = document.createElement('div');
+                    h.className = 'floating-heart-voice';
+                    h.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                    h.style.left = Math.random() * 100 + '%';
+                    h.style.fontSize = (Math.random() * 30 + 15) + 'px';
+                    h.style.animationDuration = (Math.random() * 10 + 8) + 's';
+                    h.style.animationDelay = Math.random() * 5 + 's';
+                    heartsContainer.appendChild(h);
+                }
+            }
+
+            // ========== MUSIC TOGGLE ==========
+            const vMusicIcon = document.getElementById('voice-music-icon');
+            const musicBtn = document.getElementById('music-toggle-btn');
+            if (musicBtn) {
+                musicBtn.addEventListener('click', () => {
+                    const isPlayingBg = window.toggleMusic();
+                    if (vMusicIcon) vMusicIcon.innerText = isPlayingBg ? '🎶' : '🎵';
+                });
+            }
+
+            loadSlide(1);
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                voiceAudio.pause();
+                voiceAudio.src = "";
+            });
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

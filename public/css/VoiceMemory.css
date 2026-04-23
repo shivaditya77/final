@@ -1,0 +1,223 @@
+/* VoiceMemory.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.voice-memory-body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0b0f 50%, #0a0a0a 100%);
+  font-family: 'Poppins', sans-serif;
+  color: white;
+  padding: 40px 20px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.floating-heart-voice {
+  position: absolute;
+  bottom: -50px;
+  opacity: 0.2;
+  pointer-events: none;
+  animation: floatUpVoice 10s linear infinite;
+  z-index: 1;
+}
+
+@keyframes floatUpVoice {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.2; }
+  90% { opacity: 0.2; }
+  100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
+}
+
+.voice-memory-vignette {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.voice-memory-container {
+  position: relative;
+  z-index: 10;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.voice-memory-body h1 {
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+  font-family: 'Dancing Script', cursive;
+  color: #ff4d6d;
+}
+
+.slideshow-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 30px;
+  border: 1px solid rgba(255, 77, 109, 0.2);
+  transition: all 0.3s ease;
+  margin-bottom: 40px;
+}
+
+.photo-container {
+  width: 100%;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  border-radius: 15px;
+  background: #000;
+  margin-bottom: 20px;
+}
+
+.photo-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: 0.5s;
+}
+
+.shayari-container {
+  margin-top: 30px;
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 150px;
+  text-align: left;
+}
+
+.shayari-text {
+  font-size: 1.2rem;
+  line-height: 2;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre-wrap;
+  word-spacing: 6px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 20px;
+  background: #ff4d6d;
+  margin-left: 5px;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.waveform {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  height: 40px;
+  margin: 20px 0;
+}
+
+.wave-bar {
+  width: 4px;
+  height: 10px;
+  background: #ff4d6d;
+  border-radius: 5px;
+}
+
+.wave-bar.active {
+  animation: wave 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes wave { from { height: 10px; } to { height: 40px; } }
+
+.voice-progress-container {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  margin: 20px 0;
+  cursor: pointer;
+}
+
+.voice-progress-fill {
+  height: 100%;
+  background: #ff4d6d;
+  width: 0%;
+  border-radius: 10px;
+}
+
+.voice-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+}
+
+.ctrl-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: 0.3s;
+}
+
+.ctrl-btn:hover { background: #ff4d6d; }
+
+#play-btn { width: 60px; height: 60px; font-size: 1.5rem; background: #ff4d6d; }
+
+.voice-slide-counter { margin-top: 20px; color: rgba(255, 255, 255, 0.6); }
+
+.voice-memory-next-btn {
+  display: inline-block;
+  margin-top: 40px;
+  padding: 15px 40px;
+  background: linear-gradient(135deg, #ff4d6d, #ff1e4d);
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.voice-memory-music-control {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 45px;
+  height: 45px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 100;
+  border: 1px solid rgba(255, 77, 109, 0.3);
+}
+
+@media (max-width: 600px) {
+  .voice-memory-body h1 { font-size: 1.8rem; }
+  .shayari-text { font-size: 1rem; }
+}
+
+.photo-container img {
+    transition: opacity 0.5s ease-in-out, transform 0.8s ease-in-out;
+}
+
+.photo-container img.slide-transition {
+    opacity: 0;
+    transform: scale(1.05);
+}

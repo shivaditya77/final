@@ -1,0 +1,337 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="chat">
+    <link rel="stylesheet" href="/css/Chat.css">
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <div class="chat-body" id="chat-page-root">
+        <canvas id="heartParticles"></canvas>
+
+        <!-- HEADER -->
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <h1>Private Space ❤️</h1>
+                <div class="chat-status-dot" id="status-dot"></div>
+                <span class="chat-status-text" id="status-text">Connecting...</span>
+            </div>
+            <div class="chat-header-right">
+                <a href="/" class="chat-nav-btn" style="text-decoration: none;">🏠 Home</a>
+                <a href="/logout" class="chat-nav-btn chat-logout-btn" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">💋 Logout</a>
+            </div>
+        </div>
+
+        <!-- UPLOAD PROGRESS -->
+        <div class="upload-progress-bar-container" id="upload-progress-container" style="display:none">
+            <div class="upload-progress-bar-fill" id="upload-progress-fill"></div>
+            <span class="upload-progress-label" id="upload-progress-label">Uploading...</span>
+        </div>
+
+        <!-- MESSAGES -->
+        <div class="chat-messages" id="messages-container">
+            <% if (history.length === 0) { %>
+                <div class="chat-empty" id="chat-empty">
+                    <div class="chat-empty-icon">💌</div>
+                    <p>No messages yet... say something sweet! ❤️</p>
+                </div>
+            <% } %>
+
+            <% history.forEach(msg => { %>
+                <div class="chat-message <%= msg.sender === username ? 'sent' : 'received' %>" id="msg-<%= msg._id %>">
+                    <div class="msg-options" onclick="toggleDropdown('<%= msg._id %>')">⋮</div>
+                    <div class="msg-dropdown" id="dropdown-<%= msg._id %>">
+                        <button onclick="deleteForMe('<%= msg._id %>')">🗑 Delete for me</button>
+                        <% if (msg.sender === username) { %>
+                            <button onclick="deleteForEveryone('<%= msg._id %>')">🚫 Delete for everyone</button>
+                        <% } %>
+                    </div>
+
+                    <div class="sender-name"><%= msg.sender %></div>
+
+                    <% if (msg.fileUrl) { %>
+                        <% if (msg.fileType === 'image') { %>
+                            <img src="<%= msg.fileUrl %>" class="chat-media-img" onclick="window.open('<%= msg.fileUrl %>')">
+                        <% } else if (msg.fileType === 'video') { %>
+                            <video src="<%= msg.fileUrl %>" class="chat-media-video" controls playsinline></video>
+                        <% } else if (msg.fileType === 'audio') { %>
+                            <audio src="<%= msg.fileUrl %>" class="chat-media-audio" controls></audio>
+                        <% } %>
+                    <% } %>
+
+                    <% if (msg.text) { %>
+                        <div class="text"><%= msg.text %></div>
+                    <% } %>
+
+                    <div class="msg-time"><%= new Date(msg.timestamp || msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) %></div>
+                </div>
+            <% }) %>
+            <div id="messages-end"></div>
+        </div>
+
+        <!-- INPUT AREA -->
+        <form class="chat-input-area" id="chat-form">
+            <div class="media-btns">
+                <button type="button" class="chat-media-btn" title="Attach file" id="attach-btn">📎</button>
+                <button type="button" class="chat-media-btn" title="Voice message" id="voice-btn">🎤</button>
+            </div>
+
+            <input type="file" id="chat-file-input" hidden accept="image/*,video/*,audio/*">
+
+            <input class="chat-input-field" id="chat-input" autocomplete="off" placeholder="Say something sweet...">
+
+            <button type="submit" class="chat-send-btn" id="send-btn">❤️</button>
+        </form>
+
+        <div class="chat-toast" id="chat-toast"></div>
+    </div>
+
+    <script>
+        (function() {
+            if (typeof Pusher === 'undefined') return;
+
+            // Initialize Pusher
+            const pusher = new Pusher('<%= process.env.PUSHER_KEY %>', {
+                cluster: '<%= process.env.PUSHER_CLUSTER %>',
+                forceTLS: true
+            });
+
+            const channel = pusher.subscribe('bhondu-chat');
+            const username = "<%= username %>";
+            const container = document.getElementById('messages-container');
+            const msgEnd = document.getElementById('messages-end');
+            const chatForm = document.getElementById('chat-form');
+            const chatInput = document.getElementById('chat-input');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            if (msgEnd) msgEnd.scrollIntoView();
+
+            // Status indication
+            pusher.connection.bind('connected', () => {
+                if (statusDot) statusDot.style.background = '#4caf50';
+                if (statusText) {
+                    statusText.innerText = 'Connected';
+                    statusText.style.color = '#4caf50';
+                }
+            });
+
+            pusher.connection.bind('disconnected', () => {
+                if (statusDot) statusDot.style.background = '#f44336';
+                if (statusText) {
+                    statusText.innerText = 'Disconnected';
+                    statusText.style.color = '#f44336';
+                }
+            });
+
+            // Listen for new messages
+            channel.bind('new-message', (msg) => {
+                const empty = document.getElementById('chat-empty');
+                if (empty) empty.remove();
+
+                // If this is our own message and we already added it optimistically, just update the ID
+                if (msg.tempId && document.getElementById('msg-' + msg.tempId)) {
+                    const el = document.getElementById('msg-' + msg.tempId);
+                    el.id = 'msg-' + msg._id;
+                    el.classList.remove('optimistic');
+                    
+                    // Update dropdown buttons with real ID
+                    const dropdown = document.getElementById('dropdown-' + msg.tempId);
+                    if (dropdown) {
+                        dropdown.id = 'dropdown-' + msg._id;
+                        dropdown.innerHTML = `
+                            <button onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
+                            <button onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>
+                        `;
+                    }
+                    const options = el.querySelector('.msg-options');
+                    if (options) options.setAttribute('onclick', `toggleDropdown('${msg._id}')`);
+                    
+                    return;
+                }
+
+                appendMessage(msg);
+                if (msg.sender !== username) createHeartBurst();
+                if (msgEnd) msgEnd.scrollIntoView({ behavior: 'smooth' });
+            });
+
+            // Listen for deletions
+            channel.bind('message-deleted', (msgId) => {
+                const el = document.getElementById('msg-' + msgId);
+                if (el) el.remove();
+            });
+
+            if (chatForm) {
+                chatForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const text = chatInput.value.trim();
+                    if (!text) return;
+
+                    const tempId = 'temp_' + Date.now();
+                    const msgData = {
+                        sender: username,
+                        text,
+                        tempId,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    appendMessage(msgData, true);
+                    chatInput.value = '';
+                    if (msgEnd) msgEnd.scrollIntoView({ behavior: 'smooth' });
+                    createHeartBurst();
+
+                    try {
+                        const res = await fetch('/api/chat/send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text, tempId })
+                        });
+                        if (!res.ok) throw new Error('Send failed');
+                    } catch (err) {
+                        console.error("Send error:", err);
+                        const el = document.getElementById('msg-' + tempId);
+                        if (el) el.style.opacity = '0.5';
+                        alert('Failed to send message 💔');
+                    }
+                });
+            }
+
+            function appendMessage(msg, isOptimistic = false) {
+                if (!container || !msgEnd) return;
+                const div = document.createElement('div');
+                div.className = `chat-message ${msg.sender === username ? 'sent' : 'received'} ${isOptimistic ? 'optimistic' : ''}`;
+                div.id = 'msg-' + (msg._id || msg.tempId);
+                
+                const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                
+                let mediaHtml = '';
+                if (msg.fileUrl) {
+                    if (msg.fileType === 'image') mediaHtml = `<img src="${msg.fileUrl}" class="chat-media-img" onclick="window.open('${msg.fileUrl}')">`;
+                    else if (msg.fileType === 'video') mediaHtml = `<video src="${msg.fileUrl}" class="chat-media-video" controls playsinline></video>`;
+                    else if (msg.fileType === 'audio') mediaHtml = `<audio src="${msg.fileUrl}" class="chat-media-audio" controls></audio>`;
+                }
+
+                div.innerHTML = `
+                    <div class="msg-options" onclick="toggleDropdown('${msg._id || msg.tempId}')">⋮</div>
+                    <div class="msg-dropdown" id="dropdown-${msg._id || msg.tempId}">
+                        <button onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
+                        ${msg.sender === username ? `<button onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>` : ''}
+                    </div>
+                    <div class="sender-name">${msg.sender}</div>
+                    ${mediaHtml}
+                    ${msg.text ? `<div class="text">${msg.text}</div>` : ''}
+                    <div class="msg-time">${time}</div>
+                `;
+                container.insertBefore(div, msgEnd);
+            }
+
+            window.toggleDropdown = (id) => {
+                const el = document.getElementById('dropdown-' + id);
+                if (!el) return;
+                const isOpen = el.classList.contains('show');
+                document.querySelectorAll('.msg-dropdown').forEach(d => d.classList.remove('show'));
+                if (!isOpen) el.classList.add('show');
+            };
+
+            window.deleteForMe = async (id) => {
+                try {
+                    await fetch('/api/chat/delete-me', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ msgId: id })
+                    });
+                    const el = document.getElementById('msg-' + id);
+                    if (el) el.remove();
+                } catch (err) {
+                    alert('Delete failed');
+                }
+            };
+
+            window.deleteForEveryone = async (id) => {
+                if (confirm('Delete this message for everyone?')) {
+                    try {
+                        await fetch('/api/chat/delete-everyone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ msgId: id })
+                        });
+                    } catch (err) {
+                        alert('Delete failed');
+                    }
+                }
+            };
+
+            const fileInput = document.getElementById('chat-file-input');
+            const attachBtn = document.getElementById('attach-btn');
+            if (attachBtn && fileInput) attachBtn.addEventListener('click', () => fileInput.click());
+
+            if (fileInput) {
+                fileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const progress = document.getElementById('upload-progress-container');
+                    if (progress) progress.style.display = 'block';
+
+                    try {
+                        const res = await fetch('/api/chat/upload', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        
+                        // Send via API
+                        await fetch('/api/chat/send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                fileUrl: data.fileUrl, 
+                                fileType: data.fileType 
+                            })
+                        });
+                    } catch (err) {
+                        alert('Upload failed');
+                    } finally {
+                        if (progress) progress.style.display = 'none';
+                    }
+                });
+            }
+
+            // ========== HEART PARTICLES ==========
+            const canvas = document.getElementById('heartParticles');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                let particles = [];
+                function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                window.addEventListener('resize', resize); resize();
+
+                function animate() {
+                    if (!document.getElementById('heartParticles')) return;
+                    ctx.clearRect(0,0,canvas.width,canvas.height);
+                    particles = particles.filter(p => p.opacity > 0);
+                    particles.forEach(p => {
+                        p.y += p.speedY; p.x += p.speedX; p.opacity -= 0.012;
+                        ctx.globalAlpha = p.opacity; ctx.font = `${p.size}px Arial`;
+                        ctx.fillText('❤️', p.x, p.y);
+                    });
+                    requestAnimationFrame(animate);
+                }
+                animate();
+
+                window.createHeartBurst = () => {
+                    for(let i=0; i<12; i++) {
+                        particles.push({
+                            x: Math.random() * canvas.width,
+                            y: canvas.height + 10,
+                            size: Math.random() * 18 + 8,
+                            speedY: Math.random() * -4 - 2,
+                            speedX: Math.random() * 2.4 - 1.2,
+                            opacity: 1
+                        });
+                    }
+                }
+            }
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                pusher.disconnect();
+            });
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>
