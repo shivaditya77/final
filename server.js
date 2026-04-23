@@ -12,6 +12,9 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('🔥 CRITICAL UNHANDLED REJECTION:', reason);
 });
 
+const express = require("express");
+const cors = require("cors");
+const session = require("express-session");
 const connectMongo = require("connect-mongo");
 // This is the most bulletproof way to get the class in any Node version
 const actualMongoStore = connectMongo.MongoStore || connectMongo;
