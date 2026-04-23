@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
@@ -84,6 +85,11 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db",
+        ttl: 14 * 24 * 60 * 60, // 14 days
+        autoRemove: 'native'
+    }),
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
@@ -431,7 +437,12 @@ app.get("/chat", isAuth, async (req, res) => {
             .sort({ timestamp: 1 })
             .limit(100);
 
-        res.render("chat", { history, username });
+        res.render("chat", { 
+            history, 
+            username,
+            pusherKey: process.env.PUSHER_KEY,
+            pusherCluster: process.env.PUSHER_CLUSTER
+        });
     } catch (err) {
         console.error("Chat error:", err);
         res.status(500).send("Chat system error");

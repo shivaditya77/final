@@ -87,8 +87,8 @@
             if (typeof Pusher === 'undefined') return;
 
             // Initialize Pusher
-            const pusher = new Pusher('<%= process.env.PUSHER_KEY %>', {
-                cluster: '<%= process.env.PUSHER_CLUSTER %>',
+            const pusher = new Pusher('<%= pusherKey %>', {
+                cluster: '<%= pusherCluster %>',
                 forceTLS: true
             });
 
