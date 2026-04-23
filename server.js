@@ -51,17 +51,24 @@ mongoose.connect(MONGODB_URI)
 // ========== MIDDLEWARE ==========
 const allowedOrigins = [
     process.env.FRONTEND_URL, 
+    "https://bhondu.me",
     "http://localhost:3000",
     "http://127.0.0.1:3000"
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
+        
         const isVercel = origin.endsWith('.vercel.app');
-        if (allowedOrigins.indexOf(origin) !== -1 || isVercel || origin.includes('localhost')) {
+        const isCustomDomain = origin.includes('bhondu.me');
+        const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+
+        if (allowedOrigins.indexOf(origin) !== -1 || isVercel || isCustomDomain || isLocal) {
             return callback(null, true);
         }
+        console.error(`🚫 CORS Blocked Origin: ${origin}`);
         callback(new Error('CORS not allowed'), false);
     },
     credentials: true
@@ -87,10 +94,10 @@ app.use(session({
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
-        secure: true,
+        secure: true, // Required for HTTPS on Vercel
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24,
-        sameSite: 'none'
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        sameSite: 'lax' // Better for same-domain sessions than 'none'
     },
     name: 'loveSessionId'
 }));
