@@ -8,18 +8,12 @@
         "includeFiles": [
           "views/**",
           "models/**",
-          "routes/**",
-          "public/css/**",
-          "public/js/**"
+          "routes/**"
         ]
       }
     }
   ],
   "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/public/assets/$1"
-    },
     {
       "src": "/(.*)",
       "dest": "server.js"
