@@ -97,7 +97,8 @@ const allowedOrigins = [
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('localhost:3000') || origin.includes('127.0.0.1:3000')) {
+        const isVercel = origin.endsWith('.vercel.app');
+        if (allowedOrigins.indexOf(origin) !== -1 || isVercel || origin.includes('localhost') || origin.includes('127.0.0.1')) {
             return callback(null, true);
         } else {
             var msg = 'The CORS policy for this site does not allow access from the specified Origin: ' + origin;
