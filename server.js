@@ -11,9 +11,9 @@ process.on('unhandledRejection', (reason, promise) => {
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
-const MongoStore = require("connect-mongo");
-// Note: In some versions of connect-mongo v6, you might need require("connect-mongo").MongoStore
-const actualMongoStore = MongoStore.MongoStore || MongoStore;
+const { MongoStore } = require("connect-mongo");
+// Fallback for different import styles
+const actualMongoStore = MongoStore || require("connect-mongo");
 
 const path = require("path");
 const fs = require("fs");
@@ -123,6 +123,12 @@ app.use(express.static(path.join(__dirname, "public")));
 // Set EJS as view engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+
+// ========== DEBUG ENV (Vercel) ==========
+console.log("🛠️ ENV DIAGNOSTICS:");
+console.log("- MONGODB_URI exists:", !!process.env.MONGODB_URI);
+console.log("- SESSION_SECRET exists:", !!process.env.SESSION_SECRET);
+console.log("- NODE_ENV:", process.env.NODE_ENV);
 
 // ========== SESSION ==========
 // When running behind a proxy (Render, Heroku), trust the first proxy
