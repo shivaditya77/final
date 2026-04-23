@@ -1,4 +1,13 @@
 require("dotenv").config();
+
+// Global Error Handlers for Vercel Debugging
+process.on('uncaughtException', (err) => {
+    console.error('🔥 CRITICAL UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🔥 CRITICAL UNHANDLED REJECTION:', reason);
+});
+
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -31,11 +40,20 @@ requiredEnvs.forEach(env => {
 
 // Health check endpoint for Vercel monitoring
 app.get("/api/health", (req, res) => {
+    const viewsPath = path.join(__dirname, "views");
+    const publicPath = path.join(__dirname, "public");
+    
     res.json({ 
         status: "alive", 
         timestamp: new Date().toISOString(),
         mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-        env: process.env.NODE_ENV || "development"
+        env: process.env.NODE_ENV || "development",
+        filesystem: {
+            viewsExists: fs.existsSync(viewsPath),
+            publicExists: fs.existsSync(publicPath),
+            dirname: __dirname,
+            filesInDir: fs.readdirSync(__dirname).slice(0, 10) // list first 10 files
+        }
     });
 });
 
@@ -63,7 +81,10 @@ cloudinary.config({
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db";
 mongoose.connect(MONGODB_URI)
     .then(() => console.log("🍃 Connected to MongoDB"))
-    .catch(err => console.error("❌ MongoDB connection error:", err));
+    .catch(err => {
+        console.error("❌ MongoDB connection error:", err);
+        // Do not crash the app, just log it. Mongoose will retry.
+    });
 
 
 // ========== MIDDLEWARE ==========
@@ -104,15 +125,23 @@ app.set("views", path.join(__dirname, "views"));
 // When running behind a proxy (Render, Heroku), trust the first proxy
 app.set('trust proxy', 1);
 
+let sessionStore;
+try {
+    sessionStore = MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db",
+        ttl: 14 * 24 * 60 * 60, // 14 days
+        autoRemove: 'native'
+    });
+} catch (e) {
+    console.error("❌ Failed to create MongoStore:", e);
+    // Fallback to memory store if MongoStore fails to prevent boot crash
+}
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'fallback-secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db",
-        ttl: 14 * 24 * 60 * 60, // 14 days
-        autoRemove: 'native'
-    }),
+    store: sessionStore,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,

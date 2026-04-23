@@ -177,10 +177,6 @@ router.get("/hint", (req, res) => {
     res.json({ hint: randomHint });
 });
 
-// ========== CLEAN UP FAILED ATTEMPTS ==========
-setInterval(() => {
-    failedAttempts.clear();
-    console.log("\x1b[34m🧹 Cleaned up old login attempts\x1b[0m");
-}, 3600000);
+// Note: Cleanup handled by serverless lifecycle (instance restarts)
 
 module.exports = router;
