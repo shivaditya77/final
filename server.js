@@ -16,6 +16,29 @@ const Message = require("./models/Message");
 
 const app = express();
 
+// ========== VERCEL DEBUGGING & ENV VALIDATION ==========
+const requiredEnvs = [
+    'MONGODB_URI', 'SESSION_SECRET', 'PUSHER_APP_ID', 
+    'PUSHER_KEY', 'PUSHER_SECRET', 'PUSHER_CLUSTER',
+    'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'
+];
+
+requiredEnvs.forEach(env => {
+    if (!process.env[env]) {
+        console.warn(`⚠️ WARNING: Environment variable ${env} is missing!`);
+    }
+});
+
+// Health check endpoint for Vercel monitoring
+app.get("/api/health", (req, res) => {
+    res.json({ 
+        status: "alive", 
+        timestamp: new Date().toISOString(),
+        mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        env: process.env.NODE_ENV || "development"
+    });
+});
+
 // Pusher Configuration
 const Pusher = require("pusher");
 const pusher = new Pusher({
