@@ -5,7 +5,13 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["views/**", "models/**", "routes/**"]
+        "includeFiles": [
+          "views/**",
+          "models/**",
+          "routes/**",
+          "public/css/**",
+          "public/js/**"
+        ]
       }
     }
   ],
