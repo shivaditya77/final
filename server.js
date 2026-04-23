@@ -12,6 +12,9 @@ const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
+// Note: In some versions of connect-mongo v6, you might need require("connect-mongo").MongoStore
+const actualMongoStore = MongoStore.MongoStore || MongoStore;
+
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
@@ -127,7 +130,7 @@ app.set('trust proxy', 1);
 
 let sessionStore;
 try {
-    sessionStore = MongoStore.create({
+    sessionStore = actualMongoStore.create({
         mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db",
         ttl: 14 * 24 * 60 * 60, // 14 days
         autoRemove: 'native'
