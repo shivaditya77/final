@@ -11,9 +11,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
-const connectMongo = require("connect-mongo");
-// This is the most bulletproof way to get the class in any Node version
-const actualMongoStore = connectMongo.MongoStore || connectMongo;
+const MongoStore = require("connect-mongo");
 
 const path = require("path");
 const fs = require("fs");
@@ -55,7 +53,7 @@ app.get("/api/health", (req, res) => {
             viewsExists: fs.existsSync(viewsPath),
             publicExists: fs.existsSync(publicPath),
             dirname: __dirname,
-            filesInDir: fs.readdirSync(__dirname).slice(0, 10) // list first 10 files
+            filesInDir: fs.readdirSync(__dirname).slice(0, 10)
         }
     });
 });
@@ -87,7 +85,6 @@ mongoose.connect(MONGODB_URI)
     .catch(err => {
         console.error("❌ MongoDB connection error:", err);
     });
-
 
 // ========== MIDDLEWARE ==========
 const allowedOrigins = [
@@ -123,7 +120,7 @@ app.set('trust proxy', 1);
 
 let sessionStore;
 try {
-    sessionStore = actualMongoStore.create({
+    sessionStore = MongoStore.create({
         mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db",
         ttl: 14 * 24 * 60 * 60,
         autoRemove: 'native'
@@ -138,10 +135,10 @@ app.use(session({
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        sameSite: 'none'
     },
     name: 'loveSessionId'
 }));
@@ -183,64 +180,7 @@ app.get("/api/journal", isAuth, async (req, res) => {
     }
 });
 
-app.post("/api/journal/add", isAuth, upload.single("media"), async (req, res) => {
-    try {
-        let filename = "";
-        let type = "text";
-        if (req.file) {
-            const isVideo = /mp4|mov|webm/i.test(path.extname(req.file.originalname));
-            filename = req.file.path;
-            type = isVideo ? "video" : "image";
-        }
-        const newEntry = new Journal({
-            filename,
-            type,
-            description: req.body.description || "",
-            date: req.body.date || new Date().toISOString().split("T")[0]
-        });
-        await newEntry.save();
-        res.json({ success: true, entry: newEntry });
-    } catch (err) {
-        res.status(500).json({ success: false, error: "Error saving to database" });
-    }
-});
-
 app.get("/memories", isAuth, (req, res) => res.render("memories", { memories, name: req.session.username || "Bhondu" }));
-app.get("/journal", isAuth, async (req, res) => {
-    try {
-        const entries = await Journal.find().sort({ createdAt: -1 });
-        res.render("journal", { entries, name: req.session.username || "Bhondu" });
-    } catch (err) {
-        res.status(500).send("Database error");
-    }
-});
-
-app.get("/api/questions", isAuth, async (req, res) => {
-    try {
-        const username = req.session.username || "Bhondu";
-        let response = await Question.findOne({ username });
-        if (!response) {
-            response = new Question({ username, answers: {} });
-            await response.save();
-        }
-        res.json(response.answers);
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch questions" });
-    }
-});
-
-app.get("/chat", isAuth, async (req, res) => {
-    try {
-        const username = req.session.username || "Bhondu";
-        const history = await Message.find({
-            isDeletedForEveryone: false,
-            deletedBy: { $ne: username }
-        }).sort({ timestamp: 1 }).limit(100);
-        res.render("chat", { history, username, pusherKey: process.env.PUSHER_KEY, pusherCluster: process.env.PUSHER_CLUSTER });
-    } catch (err) {
-        res.status(500).send("Chat system error");
-    }
-});
 
 function isAuth(req, res, next) {
     if (req.session.isAuth) return next();
