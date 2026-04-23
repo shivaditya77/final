@@ -131,7 +131,7 @@ app.get("/login", (req, res) => {
     req.session.error = null;
 });
 
-// Journal
+// Journal API
 app.get("/journal", isAuth, async (req, res) => {
     try {
         const entries = await Journal.find().sort({ createdAt: -1 });
@@ -154,10 +154,32 @@ app.post("/api/journal/add", isAuth, upload.single("media"), async (req, res) =>
         });
         await newEntry.save();
         res.json({ success: true, entry: newEntry });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// Chat
+app.put("/api/journal/edit/:id", isAuth, upload.single("media"), async (req, res) => {
+    try {
+        const updateData = {
+            description: req.body.description,
+            date: req.body.date
+        };
+        if (req.file) {
+            updateData.filename = req.file.path;
+            updateData.type = /mp4|mov|webm/i.test(path.extname(req.file.originalname)) ? "video" : "image";
+        }
+        await Journal.findByIdAndUpdate(req.params.id, updateData);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.delete("/api/journal/delete/:id", isAuth, async (req, res) => {
+    try {
+        await Journal.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// Chat API
 app.get("/chat", isAuth, async (req, res) => {
     const username = req.session.username || "Bhondu";
     const history = await Message.find({ isDeletedForEveryone: false, deletedBy: { $ne: username } }).sort({ timestamp: 1 }).limit(100);
@@ -165,11 +187,19 @@ app.get("/chat", isAuth, async (req, res) => {
 });
 
 app.post("/api/chat/send", isAuth, async (req, res) => {
-    const { text, fileUrl, fileType, tempId } = req.body;
-    const newMessage = new Message({ sender: req.session.username || "Bhondu", text: text || "", fileUrl: fileUrl || "", fileType: fileType || 'text' });
-    const savedMsg = await newMessage.save();
-    await pusher.trigger("bhondu-chat", "new-message", { ...savedMsg.toObject(), tempId: tempId || null });
-    res.json({ success: true, message: savedMsg });
+    try {
+        const { text, fileUrl, fileType, tempId } = req.body;
+        const newMessage = new Message({ 
+            sender: req.session.username || "Bhondu", 
+            text: text || "", 
+            fileUrl: fileUrl || "", 
+            fileType: fileType || 'text',
+            timestamp: new Date()
+        });
+        const savedMsg = await newMessage.save();
+        await pusher.trigger("bhondu-chat", "new-message", { ...savedMsg.toObject(), tempId: tempId || null });
+        res.json({ success: true, message: savedMsg });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post("/api/chat/upload", isAuth, chatUpload.single("file"), (req, res) => {
@@ -180,17 +210,38 @@ app.post("/api/chat/upload", isAuth, chatUpload.single("file"), (req, res) => {
     res.json({ fileUrl: req.file.path, fileType: type });
 });
 
+app.post("/api/chat/delete-me", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        await Message.findByIdAndUpdate(req.body.msgId, { $addToSet: { deletedBy: username } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/delete-everyone", isAuth, async (req, res) => {
+    try {
+        const msg = await Message.findById(req.body.msgId);
+        if (msg.sender === (req.session.username || "Bhondu")) {
+            await Message.findByIdAndUpdate(req.body.msgId, { isDeletedForEveryone: true });
+            await pusher.trigger("bhondu-chat", "message-deleted", req.body.msgId);
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ success: false, error: "Not authorized" });
+        }
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // Memories & Others
 const memories = [
-    { id: '01', icon: '💕', title: 'Chapter 1: The Beginning', img: '/assets/chapter1.jpeg', text: '“You know… this was the very first day after our confession, when you went to the mall. You clicked this photo for me, and ever since then, it has become one of the most special memories I hold close to my heart.” ❤️' },
-    { id: '02', icon: '✨', title: 'Chapter 2: Your First Accidental Masterpiece', img: '/assets/chapter2.jpeg', text: '“Do you remember this? 📸 The first photo of yours you sent me—by mistake. 🤭 For a moment, I was so happy, thinking you were already sharing something so special with me. 💖 Even though it was unintentional, it became one of those early memories I’ll always treasure. ✨❤️”' },
-    { id: '03', icon: '💖', title: 'Chapter 3: Falling for You', img: '/assets/chapter3.jpeg', text: '“Ahh… that Holi photo 🎨🌸 from our early days… oh my God, you looked so beautiful that day. 🥺✨ That was the moment I realized I have the most beautiful girlfriend in the entire world. 💖🌍”' },
-    { id: '04', icon: '💑', title: 'Chapter 4: You opened up about your past so honestly', img: '/assets/chapter4.jpeg', text: '“This photo is from the day you opened up about your past so honestly. 🤍 That honesty made me love you even more… because you’re not only beautiful by face, but by heart too. 💖✨”' },
-    { id: '05', icon: '😊', title: 'Chapter 5: Innocence', img: '/assets/chapter5.jpeg', text: '“In this photo, you look so innocent… 🥺 Anyone could fall in love with you at just one glance. You’re so beautiful, so pure—it’s all visible right on your face. 💖✨”' },
-    { id: '06', icon: '💪', title: 'Chapter 6: Endlessly obsessed with your photo.', img: '/assets/chapter6.jpeg', text: '“I don’t know why, but I’m so obsessed with this photo of yours… 😍 Those beautiful eyes pull me in like a magnet. 🧲✨ And those specs—oh my God, they suit your face so perfectly. 🤓💖 Your lips are just perfectly shaped… everything about this picture has me completely, deeply obsessed. ✨❤️”' },
-    { id: '07', icon: '🎵', title: 'Chapter 7: Hot Bhondu', img: '/assets/chapter7.jpeg', text: '“In this photo, you look so hot and incredibly attractive… 😍 And that’s when I realized—you’re not just innocent and cute… you’re a whole different level. 😏✨ You’re a complete package, honestly. 💖 Just thinking about it makes me realize how lucky I am to have you. ❤️”' },
-    { id: '08', icon: '🌟', title: 'Chapter 8: Just one photo of us, yet it means everything to me.✨', img: '/assets/chapter8.jpeg', text: '“Even if this is the only photo we have together, and even if we don’t look perfect in it… the memory behind it means more to me than a thousand beautiful pictures. 🥺💖 This photo was taken at a moment when I truly felt we might never meet again… but today, here I am, making a whole website just for you and expressing everything I couldn’t say back then. ✨❤️ Thank God for this journey… and thank you, my dearest bhondu, for being in my life. 💫💕”' },
-    { id: '09', icon: '💘', title: 'Chapter 9: Maybe unnoticed… but never unmeant.', video: '/assets/chapter9.mp4', text: '“Yes, bhondu… I truly loved that you sent me a cake 🎂 and brownies 🍫, it meant a lot to me. But that doesn’t mean I only valued the material things you did for me. 🥺🤍 That video and playlist you made for me are just as special—just as meaningful as everything else. 🎶💖 I’m really sorry I never expressed it before… so I’m saying it here, directly to you. I’m sorry, bhondu. 💔✨ And honestly, more than anything… it was you being there for me on my birthday that became the most beautiful gift of my life. 🎁❤️ It’s a memory I’ll carry with me forever. 💫 Once again, I’m sorry I never mentioned it… but please remember—those efforts may have gone unnoticed, but they were never unmeant. 🤍✨ I love you, my dearest bhondu. ❤️💖”' }
+    { id: '01', icon: '💕', title: 'Chapter 1: The Beginning', img: '/assets/chapter1.jpeg', text: '“You know… this was the very first day after our confession...”' },
+    { id: '02', icon: '✨', title: 'Chapter 2: Your First Accidental Masterpiece', img: '/assets/chapter2.jpeg', text: '“Do you remember this? 📸 The first photo of yours you sent me...”' },
+    { id: '03', icon: '💖', title: 'Chapter 3: Falling for You', img: '/assets/chapter3.jpeg', text: '“Ahh… that Holi photo 🎨🌸 from our early days...”' },
+    { id: '04', icon: '💑', title: 'Chapter 4: You opened up about your past so honestly', img: '/assets/chapter4.jpeg', text: '“This photo is from the day you opened up about your past so honestly. 🤍”' },
+    { id: '05', icon: '😊', title: 'Chapter 5: Innocence', img: '/assets/chapter5.jpeg', text: '“In this photo, you look so innocent… 🥺”' },
+    { id: '06', icon: '💪', title: 'Chapter 6: Endlessly obsessed with your photo.', img: '/assets/chapter6.jpeg', text: '“I don’t know why, but I’m so obsessed with this photo of yours… 😍”' },
+    { id: '07', icon: '🎵', title: 'Chapter 7: Hot Bhondu', img: '/assets/chapter7.jpeg', text: '“In this photo, you look so hot and incredibly attractive… 😍”' },
+    { id: '08', icon: '🌟', title: 'Chapter 8: Just one photo of us, yet it means everything to me.✨', img: '/assets/chapter8.jpeg', text: '“Even if this is the only photo we have together...”' },
+    { id: '09', icon: '💘', title: 'Chapter 9: Maybe unnoticed… but never unmeant.', video: '/assets/chapter9.mp4', text: '“Yes, bhondu… I truly loved that you sent me a cake 🎂...”' }
 ];
 
 app.get("/memories", isAuth, (req, res) => res.render("memories", { memories, name: req.session.username || "Bhondu" }));
@@ -203,7 +254,7 @@ app.post("/api/questions/save", isAuth, async (req, res) => {
     res.json({ success: true });
 });
 
-// Legacy Pages
+// Other Pages
 app.get("/promise", isAuth, (req, res) => res.render("promise"));
 app.get("/love-letter", isAuth, (req, res) => res.render("love-letter"));
 app.get("/questions", isAuth, (req, res) => res.render("questions"));
@@ -214,7 +265,7 @@ app.get("/outfit", isAuth, (req, res) => res.render("outfit"));
 app.get("/future-plans", isAuth, (req, res) => res.render("future-plans"));
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
-// Error
+// Error & Health
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).send("Something went wrong! 💔"); });
 
