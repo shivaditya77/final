@@ -218,6 +218,33 @@
         scrollToBottom(true);
     });
 
+    channel.bind('message-deleted', (msgId) => {
+        const el = document.getElementById('msg-' + msgId);
+        if (el) {
+            el.style.transform = 'scale(0.8)';
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 300);
+        }
+    });
+
+    channel.bind('message-edited', (data) => {
+        const el = document.getElementById('msg-' + data.msgId);
+        if (el) {
+            const textEl = el.querySelector('.text');
+            if (textEl) {
+                textEl.innerText = data.newText;
+                textEl.classList.add('edited-pulse');
+                setTimeout(() => textEl.classList.remove('edited-pulse'), 1000);
+                
+                // Add edited tag if not present
+                let timeEl = el.querySelector('.msg-time');
+                if (timeEl && !timeEl.innerHTML.includes('(edited)')) {
+                    timeEl.innerHTML = '<span style="font-size:0.7em;opacity:0.7;margin-right:4px;">(edited)</span>' + timeEl.innerHTML;
+                }
+            }
+        }
+    });
+
     function refreshDropdown(el, msg) {
         const dropdown = document.getElementById('dropdown-' + msg._id);
         if (!dropdown) return;
@@ -289,6 +316,7 @@
     // ========== GLOBAL LISTENERS ==========
     // ========== LONG PRESS (WHATSAPP STYLE) ==========
     let pressTimer;
+    let autoHideTimer;
     function startPress(e, id) {
         if (e.type === 'click') return;
         pressTimer = setTimeout(() => {
@@ -298,6 +326,12 @@
                 // Hide all other pickers
                 document.querySelectorAll('.reaction-picker').forEach(p => p.classList.remove('show'));
                 picker.classList.add('show');
+                
+                // Auto-hide after 4 seconds
+                if (autoHideTimer) clearTimeout(autoHideTimer);
+                autoHideTimer = setTimeout(() => {
+                    picker.classList.remove('show');
+                }, 4000);
             }
         }, 600); // 600ms hold
     }

@@ -16,7 +16,7 @@
                 </div>
             </div>
             <div class="chat-header-right">
-                <button class="chat-nav-btn" onclick="openDebug()" title="Connection Debug">📡</button>
+
                 <button class="chat-nav-btn" onclick="toggleMediaView()">📁 <span>Media</span></button>
                 <button class="chat-nav-btn" onclick="toggleSearchView()">🔍 <span>Search</span></button>
                 <button class="chat-nav-btn" onclick="toggleWallpaperPicker()">🎨 <span>Wallpaper</span></button>
@@ -26,19 +26,7 @@
             </div>
         </div>
 
-        <!-- DEBUG POPUP -->
-        <div id="debug-popup" class="settings-modal" style="display:none; z-index: 10000;">
-            <div class="settings-content" style="max-width: 90%; width: 400px;">
-                <div class="settings-header">
-                    <h3>📡 Connection Debug</h3>
-                    <button onclick="closeDebug()">&times;</button>
-                </div>
-                <div id="debug-logs" style="background:#000; color:#0f0; padding:10px; font-family:monospace; font-size:12px; height:200px; overflow-y:auto; margin-bottom:10px; border-radius:8px;">
-                    Waiting for logs...
-                </div>
-                <button class="chat-nav-btn" style="width:100%" onclick="location.reload()">🔄 Hard Reload App</button>
-            </div>
-        </div>
+
 
         <!-- UPLOAD PROGRESS -->
         <div class="upload-progress-bar-container" id="upload-progress-container" style="display:none">
@@ -257,5 +245,122 @@
 
     <!-- PROFESSIONAL CHAT ENGINE -->
     <script src="/js/ChatEngine.js?v=1.1.0"></script>
+    <script>
+        // UI Toggles
+        window.toggleMediaView = () => {
+            const view = document.getElementById('media-view');
+            if (view.style.display === 'flex') {
+                view.style.display = 'none';
+            } else {
+                document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+                view.style.display = 'flex';
+                // Render media items here
+            }
+        };
+        window.toggleSearchView = () => {
+            const view = document.getElementById('search-view');
+            if (view.style.display === 'flex') {
+                view.style.display = 'none';
+            } else {
+                document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+                view.style.display = 'flex';
+                document.getElementById('search-input').focus();
+            }
+        };
+        window.toggleStarredView = () => {
+            const view = document.getElementById('starred-view');
+            if (view.style.display === 'flex') {
+                view.style.display = 'none';
+            } else {
+                document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+                view.style.display = 'flex';
+            }
+        };
+        window.toggleWallpaperPicker = () => {
+            const view = document.getElementById('wallpaper-picker');
+            if (view.style.display === 'flex') {
+                view.style.display = 'none';
+            } else {
+                document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+                view.style.display = 'flex';
+            }
+        };
+        window.setWallpaper = async (url) => {
+            const root = document.getElementById('chat-page-root');
+            if (url) {
+                root.style.backgroundImage = `url('${url}')`;
+                root.style.backgroundSize = 'cover';
+                root.style.backgroundPosition = 'center';
+            } else {
+                root.style.backgroundImage = '';
+            }
+            try {
+                await fetch('/api/user/wallpaper', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallpaper: url })
+                });
+            } catch (err) {
+                console.error('Failed to save wallpaper', err);
+            }
+        };
+        window.handleWallpaperUpload = async (input) => {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('media', file);
+            
+            try {
+                const res = await fetch('/api/chat/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.fileUrl) {
+                    setWallpaper(data.fileUrl);
+                }
+            } catch (err) {
+                alert('Failed to upload wallpaper.');
+            }
+        };
+        window.toggleSettings = () => {
+            // Optional: Implement a generic settings menu
+            alert("Settings coming soon! ❤️");
+        };
+        window.closeLightbox = () => {
+            const lb = document.getElementById('lightbox');
+            lb.style.display = 'none';
+            document.getElementById('lightbox-video').pause();
+        };
+        
+        window.handleSearch = (query) => {
+            // Basic frontend search implementation
+            const q = query.toLowerCase();
+            const msgs = document.querySelectorAll('.message-bubble');
+            const results = document.getElementById('search-results');
+            results.innerHTML = '';
+            
+            if (!q) {
+                results.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">Type something to search... ❤️</p>';
+                return;
+            }
+            
+            let found = 0;
+            msgs.forEach(el => {
+                const textEl = el.querySelector('.message-text');
+                if (textEl && textEl.innerText.toLowerCase().includes(q)) {
+                    found++;
+                    const clone = el.cloneNode(true);
+                    // Remove dropdown button from clone
+                    const btn = clone.querySelector('.msg-options');
+                    if (btn) btn.remove();
+                    results.appendChild(clone);
+                }
+            });
+            if (found === 0) {
+                results.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">No matching messages found 😢</p>';
+            }
+        };
+    </script>
 </div>
 <%- include('partials/footer') %>
