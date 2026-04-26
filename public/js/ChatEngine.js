@@ -8,12 +8,7 @@
         return;
     }
 
-    // SINGLETON PATTERN: Don't initialize if already running
-    if (window.chatEngineInitialized) {
-        console.warn("Chat Engine already active. Skipping duplicate init.");
-        return;
-    }
-    window.chatEngineInitialized = true;
+    // Singleton check removed to allow Barba.js re-initialization of DOM elements
 
     // ========== CONFIGURATION ==========
     const config = {
@@ -148,18 +143,6 @@
     }
 
     // ========== PUSHER BINDINGS ==========
-    let connectionTimeout;
-    function startConnectionCheck() {
-        if (connectionTimeout) clearTimeout(connectionTimeout);
-        connectionTimeout = setTimeout(() => {
-            if (pusher.connection.state === 'connecting') {
-                console.log("Chat Engine: Connection taking too long, retrying...");
-                if (statusText) statusText.innerText = 'Retrying... 🔄';
-                pusher.disconnect();
-                setTimeout(() => pusher.connect(), 1000);
-            }
-        }, 8000); // 8 seconds retry
-    }
 
     // MANUAL RECONNECT
     if (statusText) {
@@ -173,16 +156,13 @@
         };
     }
 
+    pusher.connection.unbind('state_change');
     pusher.connection.bind('state_change', (sc) => {
         updateConnectionUI(sc.current);
         console.log(`Chat Engine: State changed to ${sc.current}`);
-        if (sc.current === 'connecting') startConnectionCheck();
-        else if (connectionTimeout) clearTimeout(connectionTimeout);
-        
-        // Force refresh status on reconnect
-        if (sc.current === 'connected') checkOtherUserStatus();
     });
 
+    pusher.connection.unbind('error');
     pusher.connection.bind('error', (err) => {
         console.error('Chat Engine: Pusher Error', err);
         if (statusText) {
@@ -192,12 +172,19 @@
     });
     
     updateConnectionUI(pusher.connection.state);
-    if (pusher.connection.state === 'connecting') startConnectionCheck();
 
+    channel.unbind('pusher:subscription_succeeded');
     channel.bind('pusher:subscription_succeeded', (members) => {
         updateStatusUI(members.count > 1);
         scrollToBottom(false);
     });
+
+    // Catch-up if already subscribed
+    if (channel.subscribed) {
+        updateStatusUI(channel.members.count > 1);
+        scrollToBottom(false);
+        updateConnectionUI('connected');
+    }
 
     channel.bind('pusher:member_added', (member) => {
         if (member.id !== username.toLowerCase()) updateStatusUI(true);
@@ -623,7 +610,10 @@
                             await fetch('/api/chat/send', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                    text: '' 
+                                body: JSON.stringify({
+                                    fileUrl: data.fileUrl,
+                                    fileType: 'audio',
+                                    text: ''
                                 })
                             });
                         }

@@ -48,20 +48,23 @@
                 const cluster = window.PUSHER_CLUSTER || 'ap2';
 
                 window.globalPusher = new Pusher(window.PUSHER_KEY, {
-                    cluster: cluster,
+                    cluster: window.PUSHER_CLUSTER || 'ap2',
                     forceTLS: true,
-                    enabledTransports: ['ws', 'xhr_polling'],
                     authEndpoint: '/pusher/auth'
                 });
 
+                window.globalPusher.connection.bind('error', function(err) {
+                    console.error('Pusher Connection Error:', err);
+                });
+
                 window.globalChannel = window.globalPusher.subscribe('presence-soul-connect');
+                
+                window.globalChannel.bind('pusher:subscription_error', function(status) {
+                    console.error('Pusher Auth Error Status:', status);
+                });
 
                 window.globalPusher.connection.bind('state_change', (states) => {
                     console.log(`📡 Pusher State: ${states.previous} -> ${states.current}`);
-                    if (states.current === 'unavailable' || states.current === 'failed') {
-                        console.warn("Connection failing, attempting rescue...");
-                        setTimeout(() => window.globalPusher.connect(), 2000);
-                    }
                 });
 
                 window.addEventListener('focus', () => {

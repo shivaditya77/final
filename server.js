@@ -133,7 +133,9 @@ app.use(async (req, res, next) => {
 
 const isAuth = (req, res, next) => {
     if (req.session.isAuth) return next();
-    if (req.xhr || req.path.startsWith('/api')) return res.status(401).json({ error: "Please login" });
+    if (req.xhr || req.path.startsWith('/api') || req.path.startsWith('/pusher')) {
+        return res.status(401).json({ error: "Please login" });
+    }
     res.redirect("/login");
 };
 
@@ -383,6 +385,7 @@ app.post("/pusher/auth", isAuth, (req, res) => {
         };
         
         const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
+        console.log("📡 Auth Response Generated:", authResponse);
         res.setHeader('Content-Type', 'application/json');
         res.status(200).send(JSON.stringify(authResponse));
     } catch (err) {
