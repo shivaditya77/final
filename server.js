@@ -22,10 +22,10 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 
 // ========== MODELS ==========
-const Journal = require("./_src/models/Journal");
-const Question = require("./_src/models/Question");
-const Message = require("./_src/models/Message");
-const User = require("./_src/models/User");
+const Journal = require("./models/Journal");
+const Question = require("./models/Question");
+const Message = require("./models/Message");
+const User = require("./models/User");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -86,12 +86,12 @@ app.use(express.json());
 // Static assets are handled by Vercel routes in production.
 // We only serve them manually for local development.
 if (process.env.NODE_ENV !== 'production') {
-    const publicDir = "../public"; // Hidden from Vercel tracer
+    const publicDir = "public"; // Direct access at root
     app.use(express.static(path.join(__dirname, publicDir)));
 }
 
 app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "_src/views"));
+app.set("views", path.join(__dirname, "views"));
 app.set('trust proxy', 1);
 
 // ========== SESSION ==========
@@ -155,7 +155,7 @@ const chatStorage = new CloudinaryStorage({
 const chatUpload = multer({ storage: chatStorage });
 
 // ========== ROUTES ==========
-const authRoutes = require("./_src/routes/auth");
+const authRoutes = require("./routes/auth");
 app.use("/", authRoutes);
 
 app.get("/", isAuth, (req, res) => {
@@ -524,7 +524,7 @@ app.post("/api/reels/comment", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-const reelsRouter = require('./_src/routes/reels');
+const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
 
 app.get("/api/chat/search", isAuth, async (req, res) => {
@@ -625,7 +625,7 @@ app.get("/future-plans", isAuth, (req, res) => res.render("future-plans"));
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
 // Error & Health
-app.get("/api/ping", (req, res) => res.send("pong " + (process.env.NODE_ENV || "development")));
+app.get("/api/ping", (req, res) => res.send("pong root " + (process.env.NODE_ENV || "development")));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).send("Something went wrong! 💔"); });
 
