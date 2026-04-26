@@ -2,20 +2,16 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const { isAuth } = require('../middleware/auth');
+const isAuth = require('../middleware/auth');
 
-router.get('/reels', (req, res) => {
+router.get('/reels', isAuth, (req, res) => {
     const username = req.session.username || "Bhondu";
-    const listPath = path.join(__dirname, '../reels_list.json');
     
     let reels = [];
-
     try {
-        if (fs.existsSync(listPath)) {
-            reels = JSON.parse(fs.readFileSync(listPath, 'utf8'));
-        }
+        reels = require('../reels_list.json');
     } catch (err) {
-        console.error("Error reading reels_list.json:", err);
+        console.error("Error loading reels_list.json:", err);
     }
 
     // Shuffle for variety

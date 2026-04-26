@@ -250,3 +250,55 @@
 
 .decline-btn:hover { transform: scale(1.1); background: #ff5e6c; }
 
+@media (max-width: 480px) {
+    .call-header {
+        top: 25px;
+    }
+    .call-status {
+        font-size: 1rem;
+    }
+    .call-timer {
+        font-size: 1.2rem;
+    }
+    #local-video {
+        width: 100px;
+        bottom: 120px;
+        right: 15px;
+    }
+    .call-controls {
+        bottom: 40px;
+        gap: 15px;
+        width: 100%;
+        justify-content: center;
+        padding: 0 10px;
+    }
+    .control-btn {
+        width: 54px;
+        height: 54px;
+        font-size: 20px;
+    }
+    .incoming-call-modal {
+        width: 92%;
+        padding: 12px 15px;
+        gap: 10px;
+        justify-content: space-between;
+        border-radius: 20px; /* More rectangular on mobile for info space */
+    }
+    .caller-avatar {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+    .caller-info h3 {
+        font-size: 0.95rem;
+    }
+    .caller-info p {
+        font-size: 0.75rem;
+    }
+    .call-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+}

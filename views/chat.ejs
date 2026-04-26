@@ -17,12 +17,12 @@
                 <span class="typing-indicator" id="typing-indicator"></span>
             </div>
             <div class="chat-header-right">
-                <button class="chat-nav-btn" onclick="toggleMediaView()">📁 Media</button>
-                <button class="chat-nav-btn" onclick="toggleSearchView()">🔍 Search</button>
-                <button class="chat-nav-btn" onclick="toggleWallpaperPicker()">🎨 Wallpaper</button>
-                <button class="chat-nav-btn" onclick="toggleStarredView()">⭐ Starred</button>
-                <a href="/" class="chat-nav-btn" style="text-decoration: none;">🏠 Home</a>
-                <a href="/logout" class="chat-nav-btn chat-logout-btn" style="text-decoration: none;" onclick="confirmLogout(event)" data-barba-prevent="true">💋 Logout</a>
+                <button class="chat-nav-btn" onclick="toggleMediaView()">📁 <span>Media</span></button>
+                <button class="chat-nav-btn" onclick="toggleSearchView()">🔍 <span>Search</span></button>
+                <button class="chat-nav-btn" onclick="toggleWallpaperPicker()">🎨 <span>Wallpaper</span></button>
+                <button class="chat-nav-btn" onclick="toggleStarredView()">⭐ <span>Starred</span></button>
+                <a href="/" class="chat-nav-btn" style="text-decoration: none;">🏠 <span>Home</span></a>
+                <a href="/logout" class="chat-nav-btn chat-logout-btn" style="text-decoration: none;" onclick="confirmLogout(event)" data-barba-prevent="true">💋 <span>Logout</span></a>
             </div>
         </div>
 
@@ -168,8 +168,6 @@
 
         <div class="chat-toast" id="chat-toast"></div>
 
-        <div class="chat-toast" id="chat-toast"></div>
-
         <!-- MEDIA GALLERY VIEW -->
         <div class="starred-view" id="media-view">
             <div class="starred-header">
@@ -266,20 +264,25 @@
             // Improved Auto-scroll to bottom
             function scrollToBottom(smooth = false) {
                 if (!container) return;
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: smooth ? 'smooth' : 'auto'
-                });
+                const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
+                
+                if (isAtBottom || !smooth) {
+                    container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: smooth ? 'smooth' : 'auto'
+                    });
+                }
             }
 
             // Multiple triggers for 1000% reliability
             scrollToBottom(false); // Immediate
-            setTimeout(() => scrollToBottom(false), 50); // After small layout shift
-            setTimeout(() => scrollToBottom(false), 300); // Fail-safe for Barba sync
+            setTimeout(() => scrollToBottom(false), 100); // After layout shift
+            setTimeout(() => scrollToBottom(false), 500); // Fail-safe for Barba sync
 
             // If images load later, they might push the scroll up. Fix that:
-            container.querySelectorAll('img').forEach(img => {
-                img.onload = () => scrollToBottom(false);
+            container.querySelectorAll('img, video').forEach(el => {
+                el.addEventListener('load', () => scrollToBottom(false));
+                el.addEventListener('loadedmetadata', () => scrollToBottom(false));
             });
 
             // Status indication - Check initial state immediately
@@ -425,10 +428,11 @@
                 appendMessage(msg);
                 if (msg.sender !== username) {
                     createHeartBurst();
+                    if (navigator.vibrate) navigator.vibrate(50); // Subtle buzz for new message
                     // Mark as read immediately to trigger secret timers if any
                     fetch('/api/chat/mark-read', { method: 'POST' });
                 }
-                if (msgEnd) msgEnd.scrollIntoView({ behavior: 'smooth' });
+                scrollToBottom(true);
             });
 
             // Listen for deletions
@@ -611,8 +615,9 @@
 
                     appendMessage(msgData, true);
                     chatInput.value = '';
-                    if (msgEnd) msgEnd.scrollIntoView({ behavior: 'smooth' });
+                    scrollToBottom(true);
                     createHeartBurst();
+                    if (navigator.vibrate) navigator.vibrate(20); // Sending haptic
 
                     try {
                         const res = await fetch('/api/chat/send', {
@@ -816,11 +821,19 @@
                 };
 
                 // Desktop
-                voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startRecording(); });
+                voiceBtn.addEventListener('mousedown', (e) => { 
+                    e.preventDefault(); 
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    startRecording(); 
+                });
                 window.addEventListener('mouseup', stopRecording);
-
+                
                 // Mobile
-                voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, {passive: false});
+                voiceBtn.addEventListener('touchstart', (e) => { 
+                    e.preventDefault(); 
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    startRecording(); 
+                }, {passive: false});
                 window.addEventListener('touchend', stopRecording);
             }
 
@@ -1039,7 +1052,21 @@
 
 
             window.react = async (msgId, emoji) => {
-                // ... (existing code)
+                if (navigator.vibrate) navigator.vibrate(25);
+                
+                // Close picker immediately
+                const picker = document.getElementById('picker-' + msgId);
+                if (picker) picker.classList.remove('show');
+
+                try {
+                    await fetch('/api/chat/react', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ msgId, emoji })
+                    });
+                } catch (err) {
+                    console.error("Reaction failed:", err);
+                }
             };
 
             window.deleteForMe = async (msgId) => {
