@@ -627,7 +627,10 @@ app.get("/final", isAuth, (req, res) => res.render("final"));
 // Error & Health
 app.get("/api/ping", (req, res) => res.send("pong root " + (process.env.NODE_ENV || "development")));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
-app.use((err, req, res, next) => { console.error(err); res.status(500).send("Something went wrong! 💔"); });
+app.use((err, req, res, next) => { 
+    console.error("🔥 DETAILED ERROR LOG:", err);
+    res.status(500).send("Something went wrong! 💔 Error: " + err.message); 
+});
 
 
 module.exports = app;
