@@ -2,10 +2,10 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
+      "src": "server/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": "{views/**,reels_list.json}"
+        "includeFiles": "{views/**,server/reels_list.json}"
       }
     }
   ],
@@ -24,7 +24,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "server/index.js"
     }
   ]
 }
