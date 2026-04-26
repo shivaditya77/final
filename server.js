@@ -131,9 +131,13 @@ app.get("/chat", isAuth, async (req, res) => {
             isDeletedForEveryone: false 
         }).sort({ timestamp: 1 }).populate('replyTo');
         
+        const user = await User.findOne({ username: username.toLowerCase() });
+        const wallpaper = user ? user.chatWallpaper : '';
+
         res.render("chat", { 
             history, 
             username,
+            wallpaper,
             pusherKey: process.env.PUSHER_KEY, 
             pusherCluster: process.env.PUSHER_CLUSTER 
         });
