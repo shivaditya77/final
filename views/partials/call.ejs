@@ -46,7 +46,20 @@
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                // OpenRelay Free TURN servers for cross-network reliability
+                {
+                    urls: "turn:openrelay.metered.ca:80",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                }
             ]
         };
 
@@ -151,8 +164,13 @@
                 });
 
             } catch (err) {
-                console.error(err);
-                alert("Please enable camera/mic permissions to connect! 💔");
+                console.error("Media Error:", err);
+                let errorMsg = "Camera/Mic error! 💔";
+                if (err.name === 'NotAllowedError') errorMsg = "Permission Denied! Please allow camera/mic access in your browser settings. 🛡️";
+                else if (err.name === 'NotFoundError') errorMsg = "No camera or microphone detected! 🎙️";
+                else if (err.name === 'NotReadableError') errorMsg = "Camera/Mic is already in use by another app! 📱";
+                
+                alert(errorMsg);
                 endCall(false);
             }
         };
@@ -288,8 +306,12 @@
                     });
                 }
             } catch (err) {
-                console.error(err);
-                alert("Camera/Mic error! 💔");
+                console.error("Media Error:", err);
+                let errorMsg = "Camera/Mic error! 💔";
+                if (err.name === 'NotAllowedError') errorMsg = "Permission Denied! Please allow camera/mic access in your browser settings. 🛡️";
+                else if (err.name === 'NotReadableError') errorMsg = "Camera/Mic is already in use by another app! 📱";
+                
+                alert(errorMsg);
                 endCall();
             }
         };
