@@ -42,6 +42,14 @@ const romanticErrors = [
     "Should I just tell you? No... you got this! 💪"
 ];
 
+// ========== LOGIN PAGE ==========
+router.get("/login", (req, res) => {
+    if (req.session.isAuth) return res.redirect("/");
+    const error = req.session.error;
+    req.session.error = null;
+    res.render("login", { error });
+});
+
 // ========== LEGACY LOGIN PAGE ==========
 router.get("/legacy/login", (req, res) => {
     if (req.session.isAuth) {
