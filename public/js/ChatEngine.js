@@ -751,21 +751,21 @@ document.addEventListener('click', (e) => {
 
 window.toggleMediaView = () => {
     const view = document.getElementById('media-view');
-    if (view && view.style.display === 'flex') {
-        view.style.display = 'none';
+    if (view && view.classList.contains('show')) {
+        view.classList.remove('show');
     } else if (view) {
-        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
-        view.style.display = 'flex';
+        document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+        view.classList.add('show');
     }
 };
 
 window.toggleSearchView = () => {
     const view = document.getElementById('search-view');
-    if (view && view.style.display === 'flex') {
-        view.style.display = 'none';
+    if (view && view.classList.contains('show')) {
+        view.classList.remove('show');
     } else if (view) {
-        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
-        view.style.display = 'flex';
+        document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+        view.classList.add('show');
         const input = document.getElementById('search-input');
         if (input) input.focus();
     }
@@ -773,21 +773,21 @@ window.toggleSearchView = () => {
 
 window.toggleStarredView = () => {
     const view = document.getElementById('starred-view');
-    if (view && view.style.display === 'flex') {
-        view.style.display = 'none';
+    if (view && view.classList.contains('show')) {
+        view.classList.remove('show');
     } else if (view) {
-        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
-        view.style.display = 'flex';
+        document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+        view.classList.add('show');
     }
 };
 
 window.toggleWallpaperPicker = () => {
     const view = document.getElementById('wallpaper-picker');
-    if (view && view.style.display === 'flex') {
-        view.style.display = 'none';
+    if (view && view.classList.contains('show')) {
+        view.classList.remove('show');
     } else if (view) {
-        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
-        view.style.display = 'flex';
+        document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+        view.classList.add('show');
     }
 };
 
