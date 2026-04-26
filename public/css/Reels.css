@@ -57,9 +57,10 @@
     position: relative;
 }
 
-.yt-player {
+.yt-player, .reel-native-video {
     width: 100%;
     height: 100%;
+    object-fit: cover; /* This makes it look like Instagram */
     pointer-events: none;
 }
 

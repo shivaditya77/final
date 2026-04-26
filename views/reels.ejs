@@ -11,20 +11,22 @@
 
         <div class="reels-container" id="reels-container">
             <% 
-                // --- INFINITE LOOP CLONING ---
                 const totalReels = reels.length;
                 const displayReels = [reels[totalReels-1], ...reels, reels[0]]; 
             %>
             <% displayReels.forEach((reel, index) => { %>
-                <div class="reel-slide" id="reel-<%= index %>" data-video-id="<%= reel.url.split('/').pop() %>" data-real-index="<%= index-1 %>">
+                <div class="reel-slide" id="reel-<%= index %>" data-video-url="<%= reel.url %>" data-real-index="<%= index-1 %>">
                     <!-- Progress Bar -->
                     <div class="reel-progress-container">
                         <div class="reel-progress-bar" id="progress-<%= index %>"></div>
                     </div>
 
-                    <div class="reel-content" id="content-<%= index %>" onclick="handleReelClick(event, '<%= index %>')" ondblclick="handleDoubleTap(event, '<%= index %>')">
+                    <div class="reel-content" id="content-<%= index %>" onclick="handleInteraction(event, '<%= index %>')">
+                        <div class="reel-video-wrapper" id="video-wrapper-<%= index %>">
+                            <!-- Native Video will be injected here for performance -->
+                        </div>
+
                         <div class="reel-loader">❤️</div>
-                        <div class="reel-error-msg" style="display:none; position:absolute; color:white; z-index:10; text-align:center;">Video unavailable 💔</div>
                         
                         <!-- Tap to Unmute Indicator -->
                         <div class="tap-unmute-indicator" id="mute-indicator-<%= index %>">🔊</div>
@@ -36,10 +38,10 @@
                         <div id="comments-<%= index %>" class="reel-comments-container"></div>
                     </div>
                     
-                    <!-- Sidebar Actions (Right) -->
+                    <!-- Sidebar Actions -->
                     <div class="reel-sidebar">
                         <div class="sidebar-item">
-                            <button id="sync-btn-<%= index %>" class="sidebar-btn sync-btn" onclick="toggleSync()">👯‍♂️</button>
+                            <button id="sync-btn-<%= index %>" class="sidebar-btn sync-btn" onclick="toggleSync(event)">👯‍♂️</button>
                             <span class="sidebar-label" id="sync-label-<%= index %>">Together</span>
                         </div>
                         <div class="sidebar-item">
@@ -47,7 +49,7 @@
                             <span class="sidebar-label">Love</span>
                         </div>
                         <div class="sidebar-item">
-                            <button class="sidebar-btn comment-btn" onclick="openCommentInput('<%= index %>')">💬</button>
+                            <button class="sidebar-btn comment-btn" onclick="openCommentInput(event, '<%= index %>')">💬</button>
                             <span class="sidebar-label">Chat</span>
                         </div>
                         <div class="sidebar-item">
@@ -56,7 +58,7 @@
                         </div>
                     </div>
 
-                    <!-- Info Section (Bottom Left) -->
+                    <!-- Info Section -->
                     <div class="reel-info-section">
                         <div class="profile-line">
                             <div class="profile-avatar">❤️</div>
@@ -81,26 +83,24 @@
         </div>
     </main>
 
-    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         (function() {
-            const players = {}; 
+            const videoElements = {}; 
             let currentActive = -1;
             let isGlobalMuted = true;
-            let lastTap = 0;
+            let lastTapTime = 0;
             let isSyncEnabled = false;
             let isProcessingRemoteScroll = false;
             let activeCommentIndex = -1;
             let isTeleporting = false;
-            let progressInterval;
             
             const container = document.getElementById('reels-container');
             const myUsername = "<%= username %>";
             const totalItems = <%= totalReels %>;
-
             const pusher = window.globalPusher;
             const channel = window.globalChannel;
-            
+
+            // --- PUSHER SYNC ---
             if (channel) {
                 channel.bind('user-watching-reel', (data) => {
                     if (data.username !== myUsername && data.reelIndex == currentActive - 1) {
@@ -110,13 +110,11 @@
                         showTogetherIndicator(false);
                     }
                 });
-
                 channel.bind('user-hearted-reel', (data) => {
                     if (data.username !== myUsername && data.reelIndex == currentActive - 1) {
                         spawnHeart(window.innerWidth / 2, window.innerHeight / 2, true);
                     }
                 });
-
                 channel.bind('user-scrolled-reel', (data) => {
                     if (isSyncEnabled && data.username !== myUsername) {
                         isProcessingRemoteScroll = true;
@@ -124,11 +122,185 @@
                         setTimeout(() => { isProcessingRemoteScroll = false; }, 1000);
                     }
                 });
-
                 channel.bind('user-reel-comment', (data) => { if (data.username !== myUsername) showRemoteComment(data.reelIndex + 1, data.text, data.username); });
             }
 
-            window.openCommentInput = (index) => { activeCommentIndex = index; document.getElementById('comment-input-overlay').classList.add('visible'); document.getElementById('reel-comment-input').focus(); };
+            // --- INTERACTION HANDLING ---
+            window.handleInteraction = (event, index) => {
+                const now = Date.now();
+                const delta = now - lastTapTime;
+
+                if (delta < 300 && delta > 0) {
+                    // Double Tap: Love
+                    handleDoubleTap(event, index);
+                    lastTapTime = 0;
+                } else {
+                    // Single Tap: Mute Toggle
+                    lastTapTime = now;
+                    setTimeout(() => {
+                        if (Date.now() - lastTapTime >= 250) {
+                            toggleMute(index);
+                        }
+                    }, 300);
+                }
+            };
+
+            function toggleMute(index) {
+                isGlobalMuted = !isGlobalMuted;
+                
+                // Apply to current video
+                const video = videoElements[index];
+                if (video) {
+                    video.muted = isGlobalMuted;
+                    if (!isGlobalMuted && video.paused) video.play();
+                }
+
+                // Visual Indicator
+                const indicator = document.getElementById('mute-indicator-' + index);
+                if (indicator) {
+                    indicator.innerText = isGlobalMuted ? '🔇' : '🔊';
+                    indicator.classList.remove('visible');
+                    void indicator.offsetWidth; 
+                    indicator.classList.add('visible');
+                }
+            }
+
+            function handleDoubleTap(event, index) {
+                const bigHeart = document.getElementById('big-heart-' + index);
+                if (bigHeart) {
+                    bigHeart.classList.remove('animate');
+                    void bigHeart.offsetWidth;
+                    bigHeart.classList.add('animate');
+                }
+                const btn = document.getElementById(`heart-btn-${index}`);
+                triggerLove(btn, event, index);
+                notifyHearted(index);
+            }
+
+            window.triggerLove = (btn, event, index) => {
+                if(btn) { 
+                    btn.classList.toggle('heart-active');
+                    btn.innerText = btn.classList.contains('heart-active') ? '❤️' : '🤍';
+                }
+                const x = event ? (event.clientX || (event.touches && event.touches[0].clientX)) : window.innerWidth / 2;
+                const y = event ? (event.clientY || (event.touches && event.touches[0].clientY)) : window.innerHeight / 2;
+                spawnHeart(x, y);
+                if (!event) notifyHearted(currentActive);
+            };
+
+            // --- VIDEO CORE ---
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (isTeleporting) return;
+                    const index = parseInt(entry.target.id.split('-')[1]);
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                        if (index !== currentActive) handleReelVisible(index);
+                    } else {
+                        stopVideo(index);
+                    }
+                });
+            }, { root: container, threshold: 0.6 });
+
+            function handleReelVisible(index) {
+                currentActive = index;
+                if (index === 0) { teleportTo(totalItems); } 
+                else if (index === totalItems + 1) { teleportTo(1); } 
+                else {
+                    playVideo(index);
+                    notifyWatching(index);
+                    notifyScroll(index - 1);
+                    // Pre-load neighbors
+                    preLoadVideo(index + 1);
+                    preLoadVideo(index - 1);
+                }
+            }
+
+            function preLoadVideo(index) {
+                const slide = document.getElementById('reel-' + index);
+                if (!slide || videoElements[index]) return;
+                
+                const wrapper = document.getElementById('video-wrapper-' + index);
+                const videoUrl = slide.getAttribute('data-video-url');
+                
+                const video = document.createElement('video');
+                video.src = videoUrl;
+                video.className = 'reel-native-video';
+                video.loop = true;
+                video.muted = isGlobalMuted;
+                video.playsInline = true;
+                video.setAttribute('webkit-playsinline', 'true');
+                video.preload = 'auto';
+                
+                video.onplaying = () => {
+                    const loader = slide.querySelector('.reel-loader');
+                    if (loader) loader.classList.add('hidden');
+                };
+
+                video.ontimeupdate = () => {
+                    const progressBar = document.getElementById('progress-' + index);
+                    if (progressBar && video.duration) {
+                        progressBar.style.width = (video.currentTime / video.duration * 100) + '%';
+                    }
+                };
+
+                wrapper.appendChild(video);
+                videoElements[index] = video;
+            }
+
+            function playVideo(index) {
+                if (!videoElements[index]) preLoadVideo(index);
+                
+                const video = videoElements[index];
+                if (video) {
+                    video.muted = isGlobalMuted;
+                    video.play().catch(e => console.log("Autoplay blocked or failed", e));
+                }
+            }
+
+            function stopVideo(index) {
+                const video = videoElements[index];
+                if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }
+
+            function teleportTo(targetIndex) {
+                isTeleporting = true;
+                const itemHeight = window.innerHeight;
+                container.style.scrollSnapType = 'none';
+                container.scrollTop = targetIndex * itemHeight;
+                currentActive = targetIndex;
+                setTimeout(() => {
+                    container.style.scrollSnapType = 'y mandatory';
+                    isTeleporting = false;
+                    playVideo(targetIndex);
+                }, 50);
+            }
+
+            // --- UTILS ---
+            function scrollToIndex(index) {
+                const itemHeight = window.innerHeight;
+                container.scrollTo({ top: index * itemHeight, behavior: 'smooth' });
+            }
+
+            function spawnEmoji(emojiText) {
+                const el = document.createElement('div');
+                el.innerHTML = emojiText; el.className = 'floating-emoji'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.bottom = '-50px';
+                document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
+            }
+
+            function spawnHeart(x, y, isRemote = false) {
+                const heart = document.createElement('div'); heart.innerHTML = isRemote ? '💖' : '❤️'; heart.className = 'floating-heart'; heart.style.left = x + 'px'; heart.style.bottom = '80px'; heart.style.setProperty('--tx', (Math.random() * 200 - 100) + 'px');
+                if (isRemote) heart.style.filter = "hue-rotate(45deg) drop-shadow(0 0 10px white)"; document.body.appendChild(heart); setTimeout(() => heart.remove(), 2000);
+            }
+
+            function showTogetherIndicator(show) {
+                const el = document.getElementById('together-indicator');
+                if (show) el.classList.add('visible'); else el.classList.remove('visible');
+            }
+
+            window.openCommentInput = (e, index) => { e.stopPropagation(); activeCommentIndex = index; document.getElementById('comment-input-overlay').classList.add('visible'); document.getElementById('reel-comment-input').focus(); };
             window.closeCommentInput = () => { document.getElementById('comment-input-overlay').classList.remove('visible'); document.getElementById('reel-comment-input').value = ''; };
             window.handleCommentKey = (e) => { if (e.key === 'Enter') sendComment(); };
             window.sendComment = async () => {
@@ -151,39 +323,15 @@
                 setTimeout(() => { bubble.style.opacity = '0'; bubble.style.transform = 'translateY(-20px) scale(0.8)'; setTimeout(() => bubble.remove(), 500); }, 6000);
             }
 
-            window.toggleSync = () => {
+            window.toggleSync = (e) => {
+                e.stopPropagation();
                 isSyncEnabled = !isSyncEnabled;
-                
-                // Update all sync buttons in the sidebar
                 document.querySelectorAll('.sync-btn').forEach(btn => {
-                    if (isSyncEnabled) {
-                        btn.classList.add('sync-active');
-                        btn.style.color = '#ff4d6d';
-                        btn.style.filter = 'drop-shadow(0 0 8px rgba(255, 77, 109, 0.6))';
-                    } else {
-                        btn.classList.remove('sync-active');
-                        btn.style.color = 'white';
-                        btn.style.filter = 'none';
-                    }
+                    if (isSyncEnabled) { btn.classList.add('sync-active'); btn.style.color = '#ff4d6d'; } 
+                    else { btn.classList.remove('sync-active'); btn.style.color = 'white'; }
                 });
-
-                document.querySelectorAll('[id^="sync-label-"]').forEach(label => {
-                    label.innerText = isSyncEnabled ? 'Synced ❤️' : 'Together';
-                });
-
                 if (isSyncEnabled && currentActive !== -1) notifyScroll(currentActive - 1);
             };
-
-            window.spawnEmoji = (emojiText) => {
-                const el = document.createElement('div');
-                el.innerHTML = emojiText; el.className = 'floating-emoji'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.bottom = '-50px';
-                document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
-            };
-
-            function showTogetherIndicator(show) {
-                const el = document.getElementById('together-indicator');
-                if (show) el.classList.add('visible'); else el.classList.remove('visible');
-            }
 
             async function notifyWatching(index) { try { fetch('/api/reels/watching', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {} }
             async function notifyHearted(index) { try { fetch('/api/reels/heart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {} }
@@ -192,230 +340,18 @@
                 try { fetch('/api/reels/sync-scroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index }) }); } catch(e) {}
             }
 
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (isTeleporting) return;
-                    const index = parseInt(entry.target.id.split('-')[1]);
-                    if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-                        if (index !== currentActive) handleReelVisible(index);
-                    } else {
-                        pauseReel(index);
-                    }
-                });
-            }, { root: container, threshold: 0.5 });
-
-            function handleReelVisible(index) {
-                currentActive = index;
-                if (index === 0) { teleportTo(totalItems); } 
-                else if (index === totalItems + 1) { teleportTo(1); } 
-                else {
-                    playReel(index);
-                    notifyWatching(index);
-                    notifyScroll(index - 1);
-                    preLoadReel(index + 1);
-                    preLoadReel(index - 1);
-                }
-            }
-
-            function teleportTo(targetIndex) {
-                isTeleporting = true;
-                const itemHeight = window.innerHeight;
-                container.style.scrollSnapType = 'none';
-                container.scrollTop = targetIndex * itemHeight;
-                currentActive = targetIndex;
-                setTimeout(() => {
-                    container.style.scrollSnapType = 'y mandatory';
-                    isTeleporting = false;
-                    playReel(targetIndex);
-                }, 100);
-            }
-
-            function preLoadReel(index) {
-                const slide = document.getElementById('reel-' + index);
-                if (!slide || players[index]) return;
-                const content = document.getElementById('content-' + index);
-                const videoId = slide.getAttribute('data-video-id');
-                const playerDivId = 'player-' + index;
-                if (document.getElementById(playerDivId)) return;
-                
-                const playerDiv = document.createElement('div');
-                playerDiv.id = playerDivId; 
-                playerDiv.className = 'yt-player'; 
-                content.prepend(playerDiv);
-
-                players[index] = new YT.Player(playerDivId, {
-                    height: '100%', width: '100%', videoId: videoId,
-                    playerVars: { 
-                        autoplay: 1, 
-                        controls: 0, 
-                        loop: 1, 
-                        playlist: videoId, 
-                        modestbranding: 1, 
-                        rel: 0, 
-                        mute: 1, 
-                        playsinline: 1, 
-                        enablejsapi: 1, 
-                        origin: 'https://bhondu.me' // Secure origin for mobile
-                    },
-                    events: { 
-                        'onReady': (event) => { 
-                            if (index === currentActive) {
-                                hideLoader(index);
-                                event.target.playVideo();
-                            }
-                        },
-                        'onStateChange': (event) => {
-                            if (event.data === YT.PlayerState.PLAYING) {
-                                hideLoader(index);
-                                startProgressTracking(index);
-                            }
-                        }
-                    }
-                });
-            }
-
-            function startProgressTracking(index) {
-                stopProgressTracking();
-                const player = players[index];
-                const progressBar = document.getElementById('progress-' + index);
-                if (!player || !progressBar) return;
-                
-                progressInterval = setInterval(() => {
-                    if (player.getCurrentTime && player.getDuration) {
-                        const cur = player.getCurrentTime();
-                        const dur = player.getDuration();
-                        if (dur > 0) {
-                            const pct = (cur / dur) * 100;
-                            progressBar.style.width = pct + '%';
-                        }
-                    }
-                }, 100);
-            }
-
-            function stopProgressTracking() {
-                clearInterval(progressInterval);
-            }
-
-            function hideLoader(index) {
-                const slide = document.getElementById('reel-' + index);
-                if (slide) {
-                    const loader = slide.querySelector('.reel-loader');
-                    if (loader) loader.classList.add('hidden');
-                }
-            }
-
-            let lastTapTime = 0;
-            let tapTimeout;
-
-            window.handleReelClick = (event, index) => { 
-                const now = Date.now(); 
-                const delta = now - lastTapTime;
-
-                // 1. PRIME: Direct gesture for mobile audio trust
-                const p = players[index];
-                if (p && p.playVideo) { try { p.playVideo(); hideLoader(index); } catch(e) {} }
-
-                if (delta < 300 && delta > 0) {
-                    clearTimeout(tapTimeout);
-                    handleDoubleTap(event, index);
-                    lastTapTime = 0;
-                } else {
-                    lastTapTime = now;
-                    tapTimeout = setTimeout(() => {
-                        if (Date.now() - lastTapTime >= 250) {
-                            toggleMute(index);
-                        }
-                    }, 300);
-                }
-            };
-
-            function toggleMute(index) {
-                isGlobalMuted = !isGlobalMuted;
-                const p = players[index];
-                if (p && p.unMute) {
-                    try { 
-                        if (isGlobalMuted) { p.mute(); } 
-                        else { p.unMute(); p.playVideo(); }
-                    } catch(e) {} 
-                }
-                
-                const indicator = document.getElementById('mute-indicator-' + index);
-                if (indicator) {
-                    indicator.innerText = isGlobalMuted ? '🔇' : '🔊';
-                    indicator.classList.remove('visible');
-                    void indicator.offsetWidth; 
-                    indicator.classList.add('visible');
-                }
-            }
-
-            function playReel(index) {
-                if (!players[index]) preLoadReel(index);
-                Object.keys(players).forEach(idx => { if (parseInt(idx) !== index) pauseReel(idx); });
-                const player = players[index];
-                if (player && player.playVideo) {
-                    try {
-                        if (isGlobalMuted) { player.mute(); } else { player.unMute(); }
-                        player.playVideo();
-                        setTimeout(() => hideLoader(index), 1000);
-                    } catch(e) {}
-                }
-            }
-
-            function pauseReel(index) { const player = players[index]; if (player && player.pauseVideo) { try { player.pauseVideo(); } catch(e) {} } stopProgressTracking(); }
-            function scrollToIndex(index) { const itemHeight = window.innerHeight; container.scrollTo({ top: index * itemHeight, behavior: 'smooth' }); }
-
-            window.initReels = () => {
+            // --- INIT ---
+            function initReels() {
                 container.scrollTop = window.innerHeight;
-                document.querySelectorAll('.reel-slide').forEach((slide) => { observer.observe(slide); });
-                setTimeout(() => { if(currentActive === -1) handleReelVisible(1); }, 500);
-            };
-
-            window.onYouTubeIframeAPIReady = () => { initReels(); };
-            if (window.YT && window.YT.Player) initReels();
-
-            window.handleDoubleTap = (event, index) => {
-                if (event) event.preventDefault(); 
-                const btn = document.getElementById(`heart-btn-${index}`); 
-                triggerLove(btn, event, index); 
-                notifyHearted(index);
-                
-                const bigHeart = document.getElementById('big-heart-' + index);
-                if (bigHeart) {
-                    bigHeart.classList.remove('animate');
-                    void bigHeart.offsetWidth;
-                    bigHeart.classList.add('animate');
-                }
-            };
-
-            window.triggerLove = (btn, event, index) => {
-                if(btn) { 
-                    btn.classList.toggle('heart-active');
-                    btn.innerText = btn.classList.contains('heart-active') ? '❤️' : '🤍';
-                }
-                
-                let x, y;
-                if (event && event.changedTouches && event.changedTouches.length > 0) {
-                    x = event.changedTouches[0].clientX;
-                    y = event.changedTouches[0].clientY;
-                } else if (event) {
-                    x = event.clientX || event.pageX;
-                    y = event.clientY || event.pageY;
-                } else {
-                    x = window.innerWidth / 2;
-                    y = window.innerHeight / 2;
-                }
-                
-                spawnHeart(x, y);
-                if (!event) notifyHearted(currentActive);
-            };
-
-            function spawnHeart(x, y, isRemote = false) {
-                const heart = document.createElement('div'); heart.innerHTML = isRemote ? '💖' : '❤️'; heart.className = 'floating-heart'; heart.style.left = x + 'px'; heart.style.bottom = '80px'; heart.style.setProperty('--tx', (Math.random() * 200 - 100) + 'px');
-                if (isRemote) heart.style.filter = "hue-rotate(45deg) drop-shadow(0 0 10px white)"; document.body.appendChild(heart); setTimeout(() => heart.remove(), 2000);
+                document.querySelectorAll('.reel-slide').forEach(slide => observer.observe(slide));
             }
 
-            barba.hooks.after(() => { if (window.YT && window.YT.Player) initReels(); });
-            barba.hooks.before(() => { Object.values(players).forEach(p => { try { p.destroy(); } catch(e) {} }); stopProgressTracking(); });
+            initReels();
+            barba.hooks.after(() => initReels());
+            barba.hooks.before(() => {
+                Object.values(videoElements).forEach(v => v.pause());
+            });
+
         })();
     </script>
 </div>
