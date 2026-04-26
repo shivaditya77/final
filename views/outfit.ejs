@@ -1,0 +1,186 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="outfit">
+    <link rel="stylesheet" href="/css/Outfit.css">
+    <div class="outfit-body">
+        <%- include('partials/navbar') %>
+
+        <div class="outfit-music-control" id="music-toggle-btn">
+            <div class="music-icon" id="outfit-music-icon">🎶</div>
+        </div>
+
+        <div class="outfit-container">
+            <h1>👗 Outfit Check Gallery</h1>
+            <div class="outfit-subtitle">Every outfit you wore, every memory I kept ❤️</div>
+
+            <div class="outfit-unlock-counter">
+                🔓 <span id="unlock-count">0</span> / 8 Outfits Unlocked
+            </div>
+
+            <div class="outfit-progress-container">
+                <div class="outfit-progress-fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+
+            <div class="outfit-grid" id="outfit-grid">
+                <% 
+                const outfitList = [
+                    { id: 1, date: "24th February 2026", title: "✨ The First Impression ✨", video: "/assets/v1.mp4", song: "/assets/m1.mp3", description: "So this was the day when you sent me your very first outfit check… unintentionally, but it felt like fate had planned it just for me 💫❤️", question: "Do you remember what you wore when we first met? 👗" },
+                    { id: 2, date: "8th March 2026 ", title: "🌸 Women's Day 🌸", video: "/assets/v2.mp4", song: "/assets/m2.mp3", description: "This was from Women’s Day when you went out with Srishti—and unknowingly gave me the first glimpse of your beautiful expressions ❤️✨", question: "Do you love me more than you love colors? 🎨" },
+                    { id: 3, date: "24th March 2026", title: "💕 Worth the wait 💕", video: "/assets/v3.mp4", song: "/assets/m3.mp3", description: " Is outfit mein bhi aap queen lag rahe the. killing it!.It feels like this dress was only made for you 👑", question: "Do you feel happiest when you're with me? 😊" },
+                    { id: 4, date: "27th March 2026", title: "Stunning in ethnic", video: "/assets/v4.mp4", song: "/assets/m4.mp3", description: "You look unbelievably beautiful in Indian outfits, I swear 😍✨It’s like every time you wear one, my heart just melts a little more ❤️", question: "Do you know you're the best gift I ever got? 🎁" },
+                    { id: 5, date: "2nd April 2026", title: "🌟 Party Ready 🌟", video: "/assets/v5.mp4", song: "/assets/m5.mp3", description: "Everything you wear suits you perfectly, and that day when you danced to Salman Khan song and sent it to me… I couldn’t stop smiling 😍❤️And when you were heading back in the cab, asking me to stay on call as your “virtual bodyguard”… it honestly meant the world to me 🥹✨", question: "Do you promise to always be my Bhondu? 💕" },
+                    { id: 6, date: "16th April 2026", title: "🍂 Tired Bhondu 🍂", video: "/assets/v6.mp4", song: "/assets/m6.mp3", description: "You were so tired that day, yet just because I asked, you still made a fit check and sent it… it meant so much to me and one thing more that day u were looking like goddess❤️✨💖", question: "Do you feel loved every single day? 💖" },
+                    { id: 7, date: "17th April 2026", title: "💎 Shy but Stunning 💎", video: "/assets/v7.mp4", song: "/assets/m7.mp3", description: "I don’t know why you were underestimating your looks that day,to me you looked just as beautiful as always 😍❤️My Pyaare bhole bhaale golu molu se Bhondu", question: "Do you believe we're meant to be together? 💑" },
+                    { id: 8, date: "21st April 2026", title: "🎀 Prettier than Cinderella 🎀", video: "/assets/v8.mp4", song: "/assets/m8.mp3", description:"Sorry bhondu, I couldn’t compliment you much today—I was busy building the website… but let me say it now 💻❤️Even a thousand Cinderella and Barbie dolls would fail in front of you—you looked absolutely stunning today 😍✨💖❤️", question: "Do you love me? (Say YES, my Bhondu) ❤️" }
+                ];
+                %>
+
+                <% outfitList.forEach(o => { %>
+                    <div class="outfit-card locked" id="outfit-<%= o.id %>">
+                        <div class="video-container">
+                            <video src="<%= o.video %>" muted id="video-<%= o.id %>" playsinline controls></video>
+                            <div class="lock-overlay" id="lock-<%= o.id %>">
+                                <div class="lock-icon">🔒</div>
+                                <div class="lock-text">Answer YES to unlock this outfit ❤️</div>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="outfit-date">📅 <%= o.date %></div>
+                            <div class="outfit-title"><%= o.title %></div>
+                            <div class="outfit-description">💭 <%= o.description %></div>
+                            <div class="question-section">
+                                <div class="question-text">"<%= o.question %>"</div>
+                                <div class="answer-buttons" id="btns-<%= o.id %>">
+                                    <button class="answer-btn answer-yes" onclick="unlockOutfit(<%= o.id %>, '<%= o.song %>')">💖 YES</button>
+                                    <button class="answer-btn answer-no" onclick="alert('💔 Aww... try again! The answer is YES! 💔')">💔 NO</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="/future-plans" class="outfit-continue-btn" id="continue-btn" style="display: none; text-decoration: none;">💕 Continue to Future Plans 💕</a>
+            </div>
+        </div>
+
+        <a href="/future-plans" class="outfit-skip-btn" style="text-decoration: none;">⏩ Skip to Future Plans</a>
+    </div>
+
+    <script>
+        (function() {
+            let unlockedCount = 0;
+            const currentSongs = {};
+
+            window.unlockOutfit = (id, songUrl) => {
+                const card = document.getElementById('outfit-' + id);
+                const lock = document.getElementById('lock-' + id);
+                const btns = document.getElementById('btns-' + id);
+                const video = document.getElementById('video-' + id);
+
+                if (card) {
+                    card.classList.remove('locked');
+                    card.classList.add('unlocked');
+                }
+                if (lock) lock.remove();
+                if (btns) btns.innerHTML = `<button class="answer-btn answer-yes" style="width: 100%; cursor: default;">💖 Unlocked!</button>`;
+                
+                if (video) {
+                    video.controls = true;
+                    video.muted = true; // Keep muted by default
+                    video.play().catch(e => {
+                        console.log("Auto-play failed, user may need to click play manually", e);
+                    });
+
+                    video.onplay = () => {
+                        const globalAudio = document.getElementById('global-audio');
+                        if (globalAudio) globalAudio.pause();
+                        Object.values(currentSongs).forEach(s => s.pause());
+                        
+                        const song = new Audio(songUrl);
+                        song.volume = 0.5;
+                        song.loop = true;
+                        song.play().catch(() => {});
+                        currentSongs[id] = song;
+                    };
+
+                    video.onpause = () => {
+                        if (currentSongs[id]) currentSongs[id].pause();
+                    };
+                }
+
+                unlockedCount++;
+                const countEl = document.getElementById('unlock-count');
+                if (countEl) countEl.innerText = unlockedCount;
+                const progressEl = document.getElementById('progress-fill');
+                if (progressEl) progressEl.style.width = (unlockedCount / 8 * 100) + '%';
+                
+                if (unlockedCount === 8) {
+                    const contBtn = document.getElementById('continue-btn');
+                    if (contBtn) contBtn.style.display = 'inline-block';
+                }
+
+                createHearts();
+            };
+
+            function createHearts() {
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        const h = document.createElement('div');
+                        h.innerHTML = '❤️';
+                        h.style.cssText = `position:fixed;left:${Math.random()*100}%;top:${Math.random()*100}%;font-size:${Math.random()*20+15}px;pointer-events:none;z-index:9999;animation:floatHeartEffect 1s ease-out forwards;`;
+                        document.body.appendChild(h);
+                        setTimeout(() => h.remove(), 1000);
+                    }, i * 30);
+                }
+            }
+
+            // ========== MUSIC TOGGLE ==========
+            const oMusicIcon = document.getElementById('outfit-music-icon');
+            const musicBtn = document.getElementById('music-toggle-btn');
+            if (musicBtn) {
+                musicBtn.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (oMusicIcon) oMusicIcon.innerText = isPlaying ? '🎶' : '🔇';
+                });
+            }
+
+            // ========== FLEEING NO BUTTON ==========
+            const noBtns = document.querySelectorAll('.answer-no');
+            noBtns.forEach(btn => {
+                const moveBtn = () => {
+                    const x = Math.random() * 150 - 75; // Move relative to container
+                    const y = Math.random() * 150 - 75;
+                    btn.style.transform = `translate(${x}px, ${y}px)`;
+                    btn.style.transition = 'transform 0.2s ease-out';
+                };
+                btn.addEventListener('mouseover', moveBtn);
+                btn.addEventListener('touchstart', moveBtn);
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    moveBtn();
+                });
+            });
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                Object.values(currentSongs).forEach(s => {
+                    s.pause();
+                    s.src = "";
+                });
+                document.querySelectorAll('video').forEach(v => {
+                    v.pause();
+                    v.src = "";
+                });
+            });
+        })();
+    </script>
+
+    <style>
+    @keyframes floatHeartEffect {
+        0% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-80px); opacity: 0; }
+    }
+    </style>
+</div>
+<%- include('partials/footer') %>

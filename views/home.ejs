@@ -1,0 +1,228 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="home">
+    <link rel="stylesheet" href="/css/Home.css">
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <div class="home-body">
+        <div class="animated-bg"></div>
+        <div class="vignette"></div>
+        <div class="particles" id="particles-container"></div>
+
+        <%- include('partials/navbar', { showMusic: true }) %>
+
+        <div class="home-container">
+            <div class="intro-badge">
+                <span class="badge-text">A Love Story</span>
+                <span class="badge-heart">❤️</span>
+            </div>
+
+            <div class="heading-wrapper">
+                <h1 class="home-h1" id="typing-heading"></h1>
+                <span class="cursor" id="typing-cursor">|</span>
+            </div>
+
+            <div class="subtitle" id="subtitle">
+                <p>Choose your journey, my love... 💕</p>
+            </div>
+
+            <!-- THREE CARDS -->
+            <div class="cards-grid">
+                <!-- Card 1: Birthday -->
+                <a href="/memories" class="section-card card-birthday">
+                    <span class="card-tag">✨ New</span>
+                    <span class="card-icon">🎂</span>
+                    <div class="card-label">Birthday Special</div>
+                    <h2 class="card-title">Birthday 2026</h2>
+                    <div class="journey-steps">
+                        <span class="step-dot">Memories</span>
+                        <span class="step-arrow">→</span>
+                        <span class="step-dot">Promises</span>
+                        <span class="step-arrow">→</span>
+                        <span class="step-dot">Our Story</span>
+                        <span class="step-arrow">→</span>
+                        <span class="step-dot">Final ❤️</span>
+                    </div>
+                    <p class="card-desc">Relive every chapter of our story — from the first moment to forever.</p>
+                    <button class="card-btn">
+                        Begin <span class="card-btn-arrow">→</span>
+                    </button>
+                </a>
+
+                <!-- Card 2: Journal -->
+                <a href="/journal" class="section-card card-journal">
+                    <span class="card-tag">📓 Diary</span>
+                    <span class="card-icon card-icon-journal">📓</span>
+                    <div class="card-label">Our Journal</div>
+                    <h2 class="card-title">Memory Journal</h2>
+                    <p class="card-desc">Add photos, videos & memories. Our private diary — keep our moments forever. 💜</p>
+                    <button class="card-btn">
+                        Open <span class="card-btn-arrow">→</span>
+                    </button>
+                </a>
+
+                <!-- Card 3: Chat -->
+                <a href="/chat" class="section-card card-chat">
+                    <span class="card-tag">💌 Private</span>
+                    <span class="card-icon card-icon-chat">💬</span>
+                    <div class="card-label">Private Space</div>
+                    <h2 class="card-title">Love Chat</h2>
+                    <p class="card-desc">Our private corner to talk, share hearts, and whisper sweet things in real-time. 💛</p>
+                    <button class="card-btn">
+                        Chat <span class="card-btn-arrow">→</span>
+                    </button>
+                </a>
+
+                <!-- Card 4: Reels -->
+                <a href="/reels" class="section-card card-reels">
+                    <span class="card-tag">🔥 Trending</span>
+                    <span class="card-icon">📽️</span>
+                    <div class="card-label">The Feed</div>
+                    <h2 class="card-title">Bhondu Feed</h2>
+                    <p class="card-desc">A curated feed of reels that remind me of us. Swipe up to feel the love. ❤️</p>
+                    <button class="card-btn">
+                        Watch <span class="card-btn-arrow">→</span>
+                    </button>
+                </a>
+
+                <!-- Card 5: Soul Connect -->
+                <div class="section-card card-call">
+                    <span class="card-tag">📞 Live</span>
+                    <span class="card-icon">📞</span>
+                    <div class="card-label">Soul Connect</div>
+                    <h2 class="card-title">Heart Line</h2>
+                    <p class="card-desc">Call my heart anytime. Voice or Video — I'm always just one click away. 💖</p>
+                    <div class="card-status-indicator">
+                        <div class="status-dot-mini" id="home-status-dot"></div>
+                        <span id="home-status-text" style="color: rgba(255,255,255,0.4)">Checking...</span>
+                    </div>
+                    <div class="call-buttons-inline">
+                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(false)">📹 Video Call</button>
+                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(true)">📞 Voice Call</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== TYPING ANIMATION ==========
+        (function() {
+            const username = "<%= username %>";
+            const text = `Hey ${username} ❤️, I made something for you...`;
+            let i = 0;
+            const heading = document.getElementById('typing-heading');
+            const cursor = document.getElementById('typing-cursor');
+            const subtitle = document.getElementById('subtitle');
+
+            function typeWriter() {
+                if (i < text.length) {
+                    if (heading) heading.innerText = text.substring(0, i + 1);
+                    i++;
+                    setTimeout(typeWriter, 70);
+                } else {
+                    if (cursor) cursor.style.display = 'none';
+                    if (subtitle) subtitle.classList.add('show');
+                    initParticles();
+                }
+            }
+            setTimeout(typeWriter, 500);
+
+            // ========== PARTICLES ==========
+            function initParticles() {
+                const container = document.getElementById('particles-container');
+                if (!container) return;
+                container.innerHTML = '';
+                for (let j = 0; j < 50; j++) {
+                    const p = document.createElement('div');
+                    p.className = 'particle';
+                    const size = Math.random() * 4 + 2;
+                    p.style.width = `${size}px`;
+                    p.style.height = `${size}px`;
+                    p.style.left = `${Math.random() * 100}%`;
+                    p.style.animationDuration = `${Math.random() * 8 + 4}s`;
+                    p.style.animationDelay = `${Math.random() * 5}s`;
+                    p.style.opacity = Math.random() * 0.5 + 0.2;
+                    container.appendChild(p);
+                }
+            }
+
+            // ========== CLICK HEART EFFECT ==========
+            document.body.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
+                const heart = document.createElement('div');
+                heart.innerHTML = ['❤️', '💖', '💕', '💜'][Math.floor(Math.random() * 4)];
+                heart.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;font-size:20px;pointer-events:none;z-index:99999;animation:floatUpEffect 1s ease-out forwards;`;
+                document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 1000);
+            });
+
+            // ========== MUSIC TOGGLE ==========
+            const musicToggle = document.getElementById('music-toggle');
+            const musicIcon = document.getElementById('music-icon');
+            const musicStatus = document.getElementById('music-status');
+
+            if (musicToggle) {
+                musicToggle.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (musicIcon) musicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                    if (musicStatus) musicStatus.innerText = isPlaying ? 'On' : 'Off';
+                });
+            }
+
+            // Sync music UI with global state
+            function syncMusicUI() {
+                const audio = document.getElementById('global-audio');
+                if (!audio) return;
+                const isPlaying = !audio.paused;
+                if (musicIcon) musicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                if (musicStatus) musicStatus.innerText = isPlaying ? 'On' : 'Off';
+            }
+            setTimeout(syncMusicUI, 100);
+
+            // ========== PUSHER STATUS TRACKING ==========
+            const channel = window.globalChannel;
+            const homeStatusDot = document.getElementById('home-status-dot');
+            const homeStatusText = document.getElementById('home-status-text');
+
+            if (channel) {
+                // Initial check
+                if (channel.members) {
+                    updateHomeStatus(channel.members.count > 1);
+                }
+
+                channel.bind('pusher:subscription_succeeded', (members) => {
+                    updateHomeStatus(members.count > 1);
+                });
+
+                channel.bind('pusher:member_added', (member) => {
+                    if (member.id !== username.toLowerCase()) {
+                        updateHomeStatus(true);
+                    }
+                });
+
+                channel.bind('pusher:member_removed', (member) => {
+                    if (member.id !== username.toLowerCase()) {
+                        updateHomeStatus(false);
+                    }
+                });
+            }
+
+            function updateHomeStatus(isOnline) {
+                if (homeStatusDot) {
+                    homeStatusDot.classList.toggle('online', isOnline);
+                }
+                if (homeStatusText) {
+                    homeStatusText.innerText = isOnline ? 'Online now ❤️' : 'Offline right now 💔';
+                    homeStatusText.style.color = isOnline ? '#00ffcc' : 'rgba(255,255,255,0.4)';
+                }
+            }
+        })();
+    </script>
+
+    <style>
+    @keyframes floatUpEffect {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-80px) scale(0.5); }
+    }
+    </style>
+</div>
+<%- include('partials/footer') %>

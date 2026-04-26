@@ -1,0 +1,217 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="questions">
+    <link rel="stylesheet" href="/css/Questions.css">
+    <div class="questions-body">
+        <div class="questions-vignette"></div>
+        <div class="questions-floating-hearts" id="hearts-container"></div>
+
+        <%- include('partials/navbar') %>
+
+        <div class="questions-music-control" id="music-toggle-btn">
+            <div class="music-icon" id="questions-music-icon">🎶</div>
+        </div>
+
+        <div class="questions-container">
+            <h1>9 Questions 💕</h1>
+            <div class="questions-subtitle">Answer these from your heart... I'll read every word ❤️</div>
+            
+            <div class="questions-status-bar">
+                <div class="questions-progress-bar-container">
+                    <div class="questions-progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="save-status" class="save-status">Checking connection...</div>
+            </div>
+
+            <form id="questions-form">
+                <% 
+                const questionsListItems = [
+                    { id: 'q1', num: 1, icon: '💭', text: "What's your favorite memory of us?" },
+                    { id: 'q2', num: 2, icon: '💖', text: "When did you first realize you loved me?" },
+                    { id: 'q3', num: 3, icon: '😊', text: "What's something I do that always makes you smile?" },
+                    { id: 'q4', num: 4, icon: '💕', text: "What's your favorite thing about our relationship?" },
+                    { id: 'q5', num: 5, icon: '✨', text: "Where do you see us in 5 years?" },
+                    { id: 'q6', num: 6, icon: '🎵', text: "What song reminds you of us?" },
+                    { id: 'q7', num: 7, icon: '💑', text: "What's one thing you want us to do together?" },
+                    { id: 'q8', num: 8, icon: '🌟', text: "What's your favorite quality of mine?" },
+                    { id: 'q9', num: 9, icon: '💘', text: "When do you feel closest to me?" }
+                ];
+                %>
+
+                <% questionsListItems.forEach(q => { %>
+                    <div class="question-card">
+                        <div class="question-number"><%= q.icon %> QUESTION <%= q.num %> / 9</div>
+                        <div class="question-text"><%= q.text %></div>
+                        <textarea
+                            class="answer-input"
+                            id="<%= q.id %>"
+                            placeholder="Type your heartfelt answer here..."
+                            rows="2"
+                        ></textarea>
+                    </div>
+                <% }) %>
+            </form>
+
+            <div class="questions-button-group">
+                <button class="questions-save-btn" id="save-btn">💾 Save Now</button>
+                <button class="questions-final-btn" id="final-btn">💕 Continue to Timeline 💕</button>
+                <button class="questions-skip-btn" id="skip-btn">⏩ Skip</button>
+            </div>
+        </div>
+
+        <div class="questions-toast" id="questions-toast"></div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== BG HEARTS ==========
+            const heartsContainer = document.getElementById('hearts-container');
+            const emojis = ['❤️', '💖', '💕', '💗', '💓'];
+            if (heartsContainer) {
+                for (let i = 0; i < 25; i++) {
+                    const h = document.createElement('div');
+                    h.className = 'heart-floating';
+                    h.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                    h.style.left = Math.random() * 100 + '%';
+                    h.style.fontSize = (Math.random() * 25 + 15) + 'px';
+                    h.style.animationDuration = (Math.random() * 10 + 5) + 's';
+                    h.style.animationDelay = Math.random() * 10 + 's';
+                    heartsContainer.appendChild(h);
+                }
+            }
+
+            // ========== LOGIC ==========
+            const progressFill = document.getElementById('progress-fill');
+            const toast = document.getElementById('questions-toast');
+            const inputs = document.querySelectorAll('.answer-input');
+            const saveStatus = document.getElementById('save-status');
+
+            function updateProgress() {
+                if (!progressFill) return;
+                let filled = 0;
+                inputs.forEach(i => { if (i.value.trim() !== '') filled++; });
+                progressFill.style.width = (filled / 9 * 100) + '%';
+            }
+
+            let saveTimeout;
+            inputs.forEach(i => i.addEventListener('input', () => {
+                updateProgress();
+                if (saveStatus) saveStatus.innerText = 'Typing...';
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => saveAnswers(false), 2000); 
+            }));
+
+            async function fetchAnswers() {
+                try {
+                    const res = await fetch('/api/questions');
+                    const data = await res.json();
+                    if (data && Object.keys(data).length > 0) {
+                        Object.keys(data).forEach(id => {
+                            const input = document.getElementById(id);
+                            if (input) input.value = data[id];
+                        });
+                        updateProgress();
+                        if (saveStatus) saveStatus.innerText = 'Saved to database ✅';
+                    } else {
+                        if (saveStatus) saveStatus.innerText = 'Ready to start ❤️';
+                    }
+                } catch (err) {
+                    if (saveStatus) saveStatus.innerText = 'Offline ❌';
+                }
+            }
+            fetchAnswers();
+
+            async function saveAnswers(showMsg = true) {
+                if (saveStatus) saveStatus.innerText = 'Saving... 💾';
+                const answers = {};
+                inputs.forEach(i => answers[i.id] = i.value);
+                try {
+                    const res = await fetch('/api/questions/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ answers })
+                    });
+                    if (res.ok) {
+                        if (saveStatus) saveStatus.innerText = 'All changes saved ✅';
+                        if (showMsg) {
+                            let allFilled = true;
+                            inputs.forEach(i => { if (i.value.trim() === '') allFilled = false; });
+                            displayToast(allFilled ? '💕 All answers saved! Thank you my love! 💕' : '💾 Answers saved! (Empty ones can be filled later) 💾');
+                        }
+                    } else {
+                        if (saveStatus) saveStatus.innerText = 'Save failed ⚠️';
+                    }
+                } catch (err) {
+                    if (saveStatus) saveStatus.innerText = 'Connection error ❌';
+                }
+            }
+
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => saveAnswers(true));
+            }
+
+            const skipBtn = document.getElementById('skip-btn');
+            if (skipBtn) {
+                skipBtn.addEventListener('click', () => {
+                    if (confirm('Are you sure you want to skip these questions? 🥺 Your answers mean the world to me, but I respect your choice! ❤️')) {
+                        barba.go('/timeline');
+                    }
+                });
+            }
+
+            const finalBtn = document.getElementById('final-btn');
+            if (finalBtn) {
+                finalBtn.addEventListener('click', async () => {
+                    await saveAnswers(false);
+                    let allFilled = true;
+                    inputs.forEach(i => { if (i.value.trim() === '') allFilled = false; });
+                    if (allFilled) {
+                        createHeartExplosion();
+                        setTimeout(() => barba.go('/timeline'), 2000);
+                    } else {
+                        displayToast('💔 Please answer all questions first! 💔');
+                    }
+                });
+            }
+
+            function displayToast(msg) {
+                if (!toast) return;
+                toast.innerText = msg;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    if (toast) toast.classList.remove('show');
+                }, 3000);
+            }
+
+            function createHeartExplosion() {
+                for (let i = 0; i < 50; i++) {
+                    setTimeout(() => {
+                        const h = document.createElement('div');
+                        h.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
+                        h.style.cssText = `position:fixed;left:${Math.random()*100}%;top:${Math.random()*100}%;font-size:${Math.random()*25+15}px;pointer-events:none;z-index:2000;animation:floatHeartEffect 1s ease-out forwards;`;
+                        document.body.appendChild(h);
+                        setTimeout(() => h.remove(), 1000);
+                    }, i * 30);
+                }
+            }
+
+            // ========== MUSIC TOGGLE ==========
+            const qMusicIcon = document.getElementById('questions-music-icon');
+            const musicBtn = document.getElementById('music-toggle-btn');
+            if (musicBtn) {
+                musicBtn.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (qMusicIcon) qMusicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                });
+            }
+        })();
+    </script>
+
+    <style>
+    @keyframes floatHeartEffect {
+        0% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-50px); opacity: 0; }
+    }
+    </style>
+</div>
+<%- include('partials/footer') %>

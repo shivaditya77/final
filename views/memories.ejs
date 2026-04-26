@@ -1,0 +1,150 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="memories">
+    <link rel="stylesheet" href="/css/Memories.css">
+    <div class="memories-body">
+        <!-- Progress Bar -->
+        <div class="progress-bar" id="progress-bar"></div>
+        <div class="scroll-progress" id="scroll-progress">0%</div>
+
+        <%- include('partials/navbar') %>
+
+        <!-- Music Control -->
+        <div class="music-control" id="music-toggle-btn">
+            <div class="music-icon" id="mem-music-icon">🎶</div>
+        </div>
+
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">Our Story</div>
+                <h1 class="hero-title">A Journey Through<br />Our Beautiful Memories</h1>
+                <div class="hero-scroll">
+                    <span>Scroll to begin</span>
+                    <div class="scroll-arrow">↓</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chapters -->
+        <% memories.forEach((chapter, index) => { %>
+            <section class="memory-section">
+                <div class="memory-container hidden-anim">
+                    <div class="memory-media">
+                        <div class="media-wrapper">
+                            <% if (chapter.video) { %>
+                                <video class="memory-img" autoplay muted loop playsinline controls>
+                                    <source src="<%= chapter.video %>" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            <% } else { %>
+                                <img src="<%= chapter.img %>" loading="lazy" decoding="async" alt="Chapter <%= chapter.id %>" class="memory-img">
+                            <% } %>
+                        </div>
+                        <div class="memory-number">
+                            <span class="number text-white"><%= chapter.id %></span>
+                            <span class="total">/09</span>
+                        </div>
+                    </div>
+                    <div class="memory-caption">
+                        <div class="caption-icon"><%= chapter.icon %></div>
+                        <h3 class="caption-title"><%= chapter.title %></h3>
+                        <p class="caption-text"><%= chapter.text %></p>
+                    </div>
+                </div>
+            </section>
+        <% }) %>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <div class="cta-content">
+                <div class="cta-heart">❤️</div>
+                <h2>Ready for the Next Chapter?</h2>
+                <p>Let's make some promises... 💕</p>
+                <a href="/promise" class="next-btn" style="text-decoration: none;">
+                    <span class="btn-text">Continue to Promises →</span>
+                    <span class="btn-arrow">→</span>
+                </a>
+            </div>
+        </section>
+
+        <!-- Back to Top Button -->
+        <div class="back-to-top" id="back-to-top-btn">
+            <span>↑</span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const progressBar = document.getElementById('progress-bar');
+            const scrollProgress = document.getElementById('scroll-progress');
+            const backToTopBtn = document.getElementById('back-to-top-btn');
+
+            function handleScroll() {
+                if (!progressBar) return;
+                const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                const scrolled = (winScroll / height) * 100;
+                const scrollPct = Math.round(scrolled);
+
+                if (progressBar) progressBar.style.width = scrollPct + '%';
+                if (scrollProgress) {
+                    scrollProgress.innerText = scrollPct + '%';
+                    if (scrollPct > 0) scrollProgress.classList.add('show'); else scrollProgress.classList.remove('show');
+                }
+                
+                if (backToTopBtn) {
+                    if (winScroll > 300) backToTopBtn.classList.add('show'); else backToTopBtn.classList.remove('show');
+                }
+
+                // Reveal animations and play videos
+                const hiddenElements = document.querySelectorAll('.memory-container.hidden-anim');
+                hiddenElements.forEach((el) => {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.top < window.innerHeight * 0.8) {
+                        el.classList.add('show-anim');
+                        // Play video if present
+                        const video = el.querySelector('video');
+                        if (video && video.paused) {
+                            video.play().catch(() => {});
+                        }
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', handleScroll);
+            handleScroll();
+
+            if (backToTopBtn) {
+                backToTopBtn.addEventListener('click', () => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+
+            // ========== MUSIC TOGGLE ==========
+            const memMusicIcon = document.getElementById('mem-music-icon');
+            const musicToggleBtn = document.getElementById('music-toggle-btn');
+
+            if (musicToggleBtn) {
+                musicToggleBtn.addEventListener('click', () => {
+                    const isPlaying = window.toggleMusic();
+                    if (memMusicIcon) memMusicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                });
+            }
+
+            function syncMusicUI() {
+                const audio = document.getElementById('global-audio');
+                if (audio && memMusicIcon) {
+                    const isPlaying = !audio.paused;
+                    memMusicIcon.innerText = isPlaying ? '🎶' : '🎵';
+                }
+            }
+            setTimeout(syncMusicUI, 100);
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                window.removeEventListener('scroll', handleScroll);
+            });
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

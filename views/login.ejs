@@ -1,0 +1,244 @@
+<%- include('partials/header') %>
+<link rel="stylesheet" href="/css/Login.css">
+
+<div data-barba="container" data-barba-namespace="login">
+    <div class="login-body">
+        <canvas id="particleCanvas"></canvas>
+
+        <div class="container">
+            <div class="heartbeat-icon">
+                <span class="heart">❤️</span>
+            </div>
+
+            <div class="profile-preview" id="profilePreview">
+                <img src="/assets/chapter1.jpeg" alt="Profile" class="profile-img">
+            </div>
+            
+            <div class="date-display" id="currentDate"></div>
+            
+            <h1 class="login-title">Hey You My Love Bhondu</h1>
+            
+            <div class="emotional-message" id="emotionalText"></div>
+            
+            <div class="love-note">
+                <div class="love-note-text" id="loveNoteText"></div>
+            </div>
+
+            <div class="form-wrapper">
+                <form action="/login" method="POST" id="loginForm">
+                    <div class="input-group" id="usernameGroup">
+                        <input 
+                            type="text" 
+                            name="username"
+                            id="usernameInput"
+                            required 
+                            autoComplete="off" 
+                        />
+                        <label>🌸 Your beautiful name</label>
+                    </div>
+
+                    <div class="input-group" id="passwordGroup">
+                        <input 
+                            type="password" 
+                            name="password"
+                            id="passwordInput"
+                            required 
+                        />
+                        <label>💭 The day we became 'us'</label>
+                        <span class="password-toggle" id="passwordToggle">❤️</span>
+                    </div>
+
+                    <div class="love-counter">
+                        <div class="counter-label">Days since we became 'Us' ❤️</div>
+                        <div class="counter-digits" id="loveCounter">0d 0h 0m 0s</div>
+                    </div>
+
+                    <button type="submit" class="romantic-btn" id="loginBtn">
+                        <span class="btn-text">Open Your Heart 💌</span>
+                    </button>
+                </form>
+
+                <div class="hint-wrapper">
+                    <p class="hint" id="hintTrigger">
+                        ✨ Hint: The day that changed everything ❤️
+                    </p>
+                </div>
+
+                <% if (error) { %>
+                    <div class="error-message">
+                        <span class="error-text">😏 <%= error %></span>
+                    </div>
+                <% } %>
+            </div>
+            
+            <div class="whisper" id="whisper">
+                <span class="whisper-text">psst... it's our special date 💭</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== DATE DISPLAY ==========
+            const currentDate = document.getElementById('currentDate');
+            if (currentDate) {
+                const today = new Date();
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                currentDate.innerText = today.toLocaleDateString('en-US', options);
+            }
+
+            // ========== TYPING EFFECTS ==========
+            const emotionalQuotes = [
+                "Every love story is beautiful, but ours is my favorite...",
+                "You make my world brighter just by being in it...",
+                "I fall in love with you a little more every day...",
+                "You're not just my love, you're my home..."
+            ];
+            let eqIdx = 0, eqCharIdx = 0, eqDeleting = false;
+            function typeEQ() {
+                const el = document.getElementById('emotionalText');
+                if (!el) return;
+                const current = emotionalQuotes[eqIdx];
+                el.innerText = eqDeleting ? current.substring(0, eqCharIdx - 1) : current.substring(0, eqCharIdx + 1);
+                eqCharIdx = eqDeleting ? eqCharIdx - 1 : eqCharIdx + 1;
+                
+                if (!eqDeleting && eqCharIdx === current.length) {
+                    eqDeleting = true;
+                    setTimeout(typeEQ, 2000);
+                } else if (eqDeleting && eqCharIdx === 0) {
+                    eqDeleting = false;
+                    eqIdx = (eqIdx + 1) % emotionalQuotes.length;
+                    setTimeout(typeEQ, 500);
+                } else {
+                    setTimeout(typeEQ, eqDeleting ? 30 : 60);
+                }
+            }
+            typeEQ();
+
+            const loveMessages = [
+                "I made something just for you... 💕",
+                "Ready for a beautiful journey? 🎬",
+                "Your smile is my favorite view... 😊"
+            ];
+            let lmIdx = 0, lmCharIdx = 0;
+            function typeLM() {
+                const el = document.getElementById('loveNoteText');
+                if (!el) return;
+                const current = loveMessages[lmIdx];
+                el.innerText = current.substring(0, lmCharIdx + 1);
+                lmCharIdx++;
+                if (lmCharIdx < current.length) {
+                    setTimeout(typeLM, 70);
+                } else {
+                    setTimeout(() => {
+                        lmCharIdx = 0;
+                        lmIdx = (lmIdx + 1) % loveMessages.length;
+                        typeLM();
+                    }, 3000);
+                }
+            }
+            typeLM();
+
+            // ========== LOVE COUNTER ==========
+            function updateCounter() {
+                const counterEl = document.getElementById('loveCounter');
+                if (!counterEl) return;
+                const start = new Date('2026-02-21T00:00:00');
+                const now = new Date();
+                const diff = now - start;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                const mins = Math.floor((diff / (1000 * 60)) % 60);
+                const secs = Math.floor((diff / 1000) % 60);
+                counterEl.innerText = `${days}d ${hours}h ${mins}m ${secs}s`;
+            }
+            const counterInterval = setInterval(updateCounter, 1000);
+            updateCounter();
+
+            // ========== INPUT FOCUS EFFECTS ==========
+            const inputs = document.querySelectorAll('.input-group input');
+            inputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const group = e.target.parentElement;
+                    if (e.target.value) group.classList.add('focused'); else group.classList.remove('focused');
+                    
+                    if (e.target.id === 'usernameInput') {
+                        const val = e.target.value.toLowerCase();
+                        const profile = document.getElementById('profilePreview');
+                        if (profile) profile.style.display = (val.includes('bhondu') || val.includes('love')) ? 'block' : 'none';
+                    }
+                });
+            });
+
+            const passwordToggle = document.getElementById('passwordToggle');
+            const passwordInput = document.getElementById('passwordInput');
+            if (passwordToggle && passwordInput) {
+                passwordToggle.addEventListener('click', () => {
+                    passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+                });
+            }
+
+            // ========== HINT ==========
+            const hintTrigger = document.getElementById('hintTrigger');
+            if (hintTrigger) {
+                hintTrigger.addEventListener('click', () => {
+                    const whisper = document.getElementById('whisper');
+                    if (whisper) {
+                        whisper.classList.add('show');
+                        setTimeout(() => whisper.classList.remove('show'), 3000);
+                    }
+                });
+            }
+
+            // ========== FORM SUBMIT ==========
+            const loginForm = document.getElementById('loginForm');
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginForm && loginBtn) {
+                loginForm.addEventListener('submit', () => {
+                    loginBtn.innerText = 'Opening Your Heart...';
+                    loginBtn.style.opacity = '0.7';
+                    loginBtn.style.pointerEvents = 'none';
+                });
+            }
+
+            // ========== PETALS ANIMATION ==========
+            const canvas = document.getElementById('particleCanvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                let petals = [];
+                function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+                window.addEventListener('resize', resize); resize();
+
+                class Petal {
+                    constructor() { this.reset(); }
+                    reset() {
+                        this.x = Math.random() * canvas.width; this.y = -20;
+                        this.size = Math.random() * 8 + 4; this.speedY = Math.random() * 1 + 0.5;
+                        this.angle = Math.random() * Math.PI * 2; this.spin = (Math.random() - 0.5) * 0.02;
+                    }
+                    update() { this.y += this.speedY; this.angle += this.spin; if (this.y > canvas.height) this.reset(); }
+                    draw() {
+                        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                        ctx.fillStyle = '#ff4d6d'; ctx.globalAlpha = 0.4;
+                        ctx.beginPath(); ctx.ellipse(0, 0, this.size, this.size/2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                    }
+                }
+                for(let i=0; i<15; i++) petals.push(new Petal());
+                function animate() {
+                    if (!document.getElementById('particleCanvas')) return;
+                    ctx.clearRect(0,0,canvas.width,canvas.height);
+                    petals.forEach(p=>{p.update();p.draw();});
+                    requestAnimationFrame(animate);
+                }
+                animate();
+            }
+
+            // Barba cleanup
+            barba.hooks.before(() => {
+                clearInterval(counterInterval);
+            });
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>
