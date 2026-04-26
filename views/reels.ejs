@@ -22,7 +22,7 @@
                         <div class="reel-progress-bar" id="progress-<%= index %>"></div>
                     </div>
 
-                    <div class="reel-content" id="content-<%= index %>" onclick="handleReelClick(event, '<%= index %>')" ondblclick="handleDoubleTap(event, '<%= index %>')">
+                    <div class="reel-content" id="content-<%= index %>" ontouchstart="handleReelClick(event, '<%= index %>')" onclick="handleReelClick(event, '<%= index %>')" ondblclick="handleDoubleTap(event, '<%= index %>')">
                         <div class="reel-loader">❤️</div>
                         <div class="reel-error-msg" style="display:none; position:absolute; color:white; z-index:10; text-align:center;">Video unavailable 💔</div>
                         
@@ -237,16 +237,30 @@
                 const videoId = slide.getAttribute('data-video-id');
                 const playerDivId = 'player-' + index;
                 if (document.getElementById(playerDivId)) return;
+                
                 const playerDiv = document.createElement('div');
-                playerDiv.id = playerDivId; playerDiv.className = 'yt-player'; content.prepend(playerDiv);
+                playerDiv.id = playerDivId; 
+                playerDiv.className = 'yt-player'; 
+                content.prepend(playerDiv);
+
                 players[index] = new YT.Player(playerDivId, {
                     height: '100%', width: '100%', videoId: videoId,
-                    playerVars: { autoplay: 1, controls: 0, loop: 1, playlist: videoId, modestbranding: 1, rel: 0, mute: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: window.location.origin },
+                    playerVars: { 
+                        autoplay: 1, 
+                        controls: 0, 
+                        loop: 1, 
+                        playlist: videoId, 
+                        modestbranding: 1, 
+                        rel: 0, 
+                        mute: 1, 
+                        playsinline: 1, 
+                        enablejsapi: 1, 
+                        origin: 'https://bhondu.me' // Secure origin for mobile
+                    },
                     events: { 
                         'onReady': (event) => { 
                             if (index === currentActive) {
                                 hideLoader(index);
-                                isGlobalMuted ? event.target.mute() : event.target.unMute();
                                 event.target.playVideo();
                             }
                         },
@@ -254,8 +268,6 @@
                             if (event.data === YT.PlayerState.PLAYING) {
                                 hideLoader(index);
                                 startProgressTracking(index);
-                            } else {
-                                stopProgressTracking();
                             }
                         }
                     }
@@ -294,20 +306,26 @@
 
             function playReel(index) {
                 if (!players[index]) preLoadReel(index);
-                Object.keys(players).forEach(idx => { if (parseInt(idx) !== index) pauseReel(idx); });
+                
+                // Pause others silently
+                Object.keys(players).forEach(idx => { 
+                    if (parseInt(idx) !== index) pauseReel(idx); 
+                });
+
                 const player = players[index];
-                if (player && player.playVideo && typeof player.playVideo === 'function') {
+                if (player && player.playVideo) {
                     try {
-                        player.mute(); 
+                        // Respect Global Sound State (Instagram Style)
+                        if (isGlobalMuted) {
+                            player.mute(); 
+                        } else {
+                            player.unMute();
+                        }
+                        
                         player.playVideo();
                         
-                        setTimeout(() => {
-                            if (player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
-                                hideLoader(index);
-                            }
-                        }, 1000);
-                        
-                        setTimeout(() => hideLoader(index), 3000); 
+                        // Rapid loader clearance
+                        setTimeout(() => hideLoader(index), 300);
                     } catch(e) {}
                 }
             }
@@ -347,17 +365,13 @@
 
             function toggleMute(index) {
                 isGlobalMuted = !isGlobalMuted;
-                
-                Object.values(players).forEach(p => { 
+                const p = players[index];
+                if (p) {
                     try { 
-                        if (isGlobalMuted) {
-                            p.mute();
-                        } else {
-                            p.unMute();
-                            p.playVideo(); 
-                        }
+                        if (isGlobalMuted) { p.mute(); } 
+                        else { p.unMute(); p.playVideo(); }
                     } catch(e) {} 
-                });
+                }
                 
                 const indicator = document.getElementById('mute-indicator-' + index);
                 if (indicator) {
