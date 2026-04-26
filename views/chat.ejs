@@ -260,6 +260,26 @@
             const chatInput = document.getElementById('chat-input');
             const statusDot = document.getElementById('status-dot');
             const statusText = document.getElementById('status-text');
+            
+            // ========== NATIVE APP UTILITIES ==========
+            const haptic = (type) => {
+                if (!navigator.vibrate) return;
+                switch(type) {
+                    case 'click': navigator.vibrate(10); break;
+                    case 'success': navigator.vibrate([15, 30, 15]); break;
+                    case 'error': navigator.vibrate([50, 100, 50]); break;
+                    case 'longpress': navigator.vibrate(25); break;
+                }
+            };
+
+            // Keyboard/Viewport Adjustment for Native Feel
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', () => {
+                    const viewHeight = window.visualViewport.height;
+                    document.querySelector('.chat-body').style.height = `${viewHeight}px`;
+                    scrollToBottom(false);
+                });
+            }
 
             // Improved Auto-scroll to bottom
             function scrollToBottom(smooth = false) {
@@ -617,7 +637,7 @@
                     chatInput.value = '';
                     scrollToBottom(true);
                     createHeartBurst();
-                    if (navigator.vibrate) navigator.vibrate(20); // Sending haptic
+                    haptic('click'); // Sending haptic
 
                     try {
                         const res = await fetch('/api/chat/send', {
@@ -657,7 +677,7 @@
                 }
 
                 div.innerHTML = `
-                    <div class="msg-options" onclick="toggleDropdown('${msg._id || msg.tempId}')">⋮</div>
+                    <div class="msg-options" onclick="haptic('click'); toggleDropdown('${msg._id || msg.tempId}')">⋮</div>
                     <div class="msg-dropdown" id="dropdown-${msg._id || msg.tempId}">
                         <button onclick="showReplyPreview('${msg._id}', '${msg.sender}', '${(msg.text || "Media").replace(/'/g, "\\'")}')">⤴️ Reply</button>
                         ${msg.sender === username && msg.fileType === 'text' ? `<button onclick="startEditing('${msg._id}', '${msg.text.replace(/'/g, "\\'")}')">✏️ Edit</button>` : ''}
@@ -668,7 +688,7 @@
                         <button class="delete-btn" onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
                         ${msg.sender === username ? `<button class="delete-btn" onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>` : ''}
                     </div>
-                    <div class="reaction-picker-btn" onclick="showReactionPicker('${msg._id || msg.tempId}')">❤️+</div>
+                    <div class="reaction-picker-btn" onclick="haptic('click'); showReactionPicker('${msg._id || msg.tempId}')">❤️+</div>
                     <div class="reaction-picker" id="picker-${msg._id || msg.tempId}">
                         <span onclick="react('${msg._id || msg.tempId}', '❤️')">❤️</span>
                         <span onclick="react('${msg._id || msg.tempId}', '😂')">😂</span>
@@ -807,6 +827,7 @@
 
                         mediaRecorder.start();
                         voiceBtn.classList.add('recording');
+                        haptic('click');
                     } catch (err) {
                         console.error("Mic access error:", err);
                         alert("Microphone access denied! 💔");
@@ -817,6 +838,7 @@
                     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                         mediaRecorder.stop();
                         voiceBtn.classList.remove('recording');
+                        haptic('success');
                     }
                 };
 
@@ -1052,7 +1074,7 @@
 
 
             window.react = async (msgId, emoji) => {
-                if (navigator.vibrate) navigator.vibrate(25);
+                haptic('click');
                 
                 // Close picker immediately
                 const picker = document.getElementById('picker-' + msgId);
@@ -1216,9 +1238,34 @@
             };
             handleUrlAction();
 
+            // ========== LONG PRESS FOR NATIVE MENU ==========
+            let pressTimer;
+            document.addEventListener('mousedown', (e) => {
+                const msg = e.target.closest('.chat-message');
+                if (msg) {
+                    pressTimer = window.setTimeout(() => {
+                        haptic('longpress');
+                        const msgId = msg.id.replace('msg-', '');
+                        toggleMsgOptions(msgId);
+                    }, 600);
+                }
+            });
+            document.addEventListener('mouseup', () => clearTimeout(pressTimer));
+            document.addEventListener('touchstart', (e) => {
+                const msg = e.target.closest('.chat-message');
+                if (msg) {
+                    pressTimer = window.setTimeout(() => {
+                        haptic('longpress');
+                        const msgId = msg.id.replace('msg-', '');
+                        toggleMsgOptions(msgId);
+                    }, 600);
+                }
+            }, {passive: true});
+            document.addEventListener('touchend', () => clearTimeout(pressTimer));
+
             // Barba cleanup
             barba.hooks.before(() => {
-                // We don't disconnect global pusher
+                clearTimeout(pressTimer);
             });
         })();
     </script>
