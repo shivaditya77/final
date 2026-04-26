@@ -20,7 +20,18 @@ const cloudinary = require('cloudinary').v2;
 const helmet = require("helmet");
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
+const webpush = require("web-push");
+
 const app = express();
+
+// ========== WEB PUSH CONFIG ==========
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        process.env.VAPID_EMAIL || 'mailto:admin@bhondu.me',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+}
 
 // ========== MODELS ==========
 const Journal = require("./models/Journal");
@@ -28,6 +39,7 @@ const Question = require("./models/Question");
 const Message = require("./models/Message");
 const User = require("./models/User");
 const Notification = require("./models/Notification");
+const Subscription = require("./models/Subscription");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -322,6 +334,27 @@ app.post("/pusher/auth", isAuth, (req, res) => {
     res.send(authResponse);
 });
 
+// ========== PUSH NOTIFICATION UTILITY ==========
+async function sendWebPush(recipient, data) {
+    try {
+        const subscriptions = await Subscription.find({ username: recipient.toLowerCase() });
+        const payload = JSON.stringify(data);
+        
+        const pushPromises = subscriptions.map(sub => 
+            webpush.sendNotification(sub.subscription, payload)
+                .catch(async (err) => {
+                    if (err.statusCode === 410 || err.statusCode === 404) {
+                        // Expired or invalid subscription, remove it
+                        await Subscription.deleteOne({ _id: sub._id });
+                    }
+                })
+        );
+        await Promise.all(pushPromises);
+    } catch (err) {
+        console.error("WebPush Error:", err);
+    }
+}
+
 // ========== VIDEO CALL SIGNALING ==========
 app.post("/api/video/signal", isAuth, async (req, res) => {
     try {
@@ -339,6 +372,14 @@ app.post("/api/video/signal", isAuth, async (req, res) => {
             });
             await notif.save();
             await pusher.trigger("private-notifications-" + to.toLowerCase(), "new-notification", notif);
+            
+            // Send Background Push
+            sendWebPush(to, {
+                title: `Incoming Call 📞`,
+                content: `${from} is calling you...`,
+                link: '/chat',
+                sender: from
+            });
         }
 
         await pusher.trigger("presence-bhondu-chat", "video-signal", { from, to, ...req.body });
@@ -375,6 +416,20 @@ app.delete("/api/notifications/clear", isAuth, async (req, res) => {
     try {
         const username = req.session.username.toLowerCase();
         await Notification.deleteMany({ recipient: username });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/notifications/subscribe", isAuth, async (req, res) => {
+    try {
+        const { subscription } = req.body;
+        const username = req.session.username.toLowerCase();
+        
+        await Subscription.findOneAndUpdate(
+            { "subscription.endpoint": subscription.endpoint },
+            { username, subscription },
+            { upsert: true }
+        );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
