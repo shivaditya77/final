@@ -624,6 +624,49 @@ app.get("/outfit", isAuth, (req, res) => res.render("outfit"));
 app.get("/future-plans", isAuth, (req, res) => res.render("future-plans"));
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
+// Pusher Auth
+app.post("/pusher/auth", isAuth, (req, res) => {
+    const socketId = req.body.socket_id;
+    const channel = req.body.channel_name;
+    const username = req.session.username || "Bhondu";
+    
+    const presenceData = {
+        user_id: username.toLowerCase(),
+        user_info: { name: username }
+    };
+    
+    const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
+    res.send(authResponse);
+});
+
+// ========== VIDEO CALL SIGNALING ==========
+app.post("/api/video/signal", isAuth, async (req, res) => {
+    try {
+        const { to, signal, type } = req.body;
+        const from = req.session.username || "Bhondu";
+        // Trigger event to the specific channel
+        await pusher.trigger("presence-bhondu-chat", "video-signal", { 
+            from, 
+            to, 
+            ...req.body 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// ========== WATCHING TOGETHER API ==========
+app.post("/api/reels/watching", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-watching-reel", { 
+            username, 
+            reelIndex 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // Error & Health
 app.get("/api/ping", (req, res) => res.send("pong root " + (process.env.NODE_ENV || "development")));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
