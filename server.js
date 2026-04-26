@@ -202,7 +202,7 @@ app.post("/api/chat/send", isAuth, async (req, res) => {
         });
 
         const populated = await Message.findById(msg._id).populate('replyTo');
-        await pusher.trigger("presence-bhondu-chat", "new-message", populated);
+        await pusher.trigger("presence-soul-connect", "new-message", populated);
         res.json({ success: true, message: populated });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -216,14 +216,14 @@ app.post("/api/chat/upload", isAuth, chatUpload.single('file'), (req, res) => {
 });
 
 app.post("/api/chat/typing", isAuth, async (req, res) => {
-    await pusher.trigger("presence-bhondu-chat", "user-typing", { username: req.session.username });
+    await pusher.trigger("presence-soul-connect", "user-typing", { username: req.session.username });
     res.json({ success: true });
 });
 
 app.post("/api/chat/mark-read", isAuth, async (req, res) => {
     const reader = req.session.username;
     await Message.updateMany({ sender: { $ne: reader }, status: 'sent' }, { status: 'read' });
-    await pusher.trigger("presence-bhondu-chat", "messages-read", { reader });
+    await pusher.trigger("presence-soul-connect", "messages-read", { reader });
     res.json({ success: true });
 });
 
@@ -260,7 +260,7 @@ app.post("/api/chat/react", isAuth, async (req, res) => {
             }
         }
         await message.save();
-        await pusher.trigger("presence-bhondu-chat", "message-reaction", { msgId, reactions: message.reactions });
+        await pusher.trigger("presence-soul-connect", "message-reaction", { msgId, reactions: message.reactions });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -299,7 +299,7 @@ app.post("/api/chat/delete-for-everyone", isAuth, async (req, res) => {
         const msg = await Message.findById(req.body.msgId);
         if (msg && msg.sender === username) {
             await Message.findByIdAndUpdate(req.body.msgId, { isDeletedForEveryone: true });
-            await pusher.trigger("presence-bhondu-chat", "message-deleted", req.body.msgId);
+            await pusher.trigger("presence-soul-connect", "message-deleted", req.body.msgId);
             res.json({ success: true });
         } else res.status(403).json({ success: false });
     } catch (err) { res.status(500).json({ success: false }); }
@@ -314,7 +314,7 @@ app.post("/api/chat/edit", isAuth, async (req, res) => {
             msg.text = newText;
             msg.isEdited = true;
             await msg.save();
-            await pusher.trigger("presence-bhondu-chat", "message-edited", { msgId, newText });
+            await pusher.trigger("presence-soul-connect", "message-edited", { msgId, newText });
             res.json({ success: true });
         } else res.status(403).json({ success: false });
     } catch (err) { res.status(500).json({ success: false }); }
@@ -413,7 +413,7 @@ app.post("/api/video/signal", isAuth, async (req, res) => {
             });
         }
 
-        await pusher.trigger("presence-bhondu-chat", "video-signal", { from, to, ...req.body });
+        await pusher.trigger("presence-soul-connect", "video-signal", { from, to, ...req.body });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -470,7 +470,7 @@ app.post("/api/reels/watching", isAuth, async (req, res) => {
     try {
         const { reelIndex } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-watching-reel", { username, reelIndex });
+        await pusher.trigger("presence-soul-connect", "user-watching-reel", { username, reelIndex });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -479,7 +479,7 @@ app.post("/api/reels/comment", isAuth, async (req, res) => {
     try {
         const { reelIndex, text } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-reel-comment", { username, reelIndex, text });
+        await pusher.trigger("presence-soul-connect", "user-reel-comment", { username, reelIndex, text });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -488,7 +488,7 @@ app.post("/api/reels/heart", isAuth, async (req, res) => {
     try {
         const { reelIndex } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-hearted-reel", { username, reelIndex });
+        await pusher.trigger("presence-soul-connect", "user-hearted-reel", { username, reelIndex });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -497,7 +497,7 @@ app.post("/api/reels/sync-scroll", isAuth, async (req, res) => {
     try {
         const { reelIndex } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-scrolled-reel", { username, reelIndex });
+        await pusher.trigger("presence-soul-connect", "user-scrolled-reel", { username, reelIndex });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -506,7 +506,7 @@ app.post("/api/reels/gift", isAuth, async (req, res) => {
     try {
         const { reelIndex } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-gifted-reel", { username, reelIndex });
+        await pusher.trigger("presence-soul-connect", "user-gifted-reel", { username, reelIndex });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -515,7 +515,7 @@ app.post("/api/reels/play", isAuth, async (req, res) => {
     try {
         const { reelIndex, currentTime } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-played-reel", { username, reelIndex, currentTime });
+        await pusher.trigger("presence-soul-connect", "user-played-reel", { username, reelIndex, currentTime });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -524,7 +524,7 @@ app.post("/api/reels/pause", isAuth, async (req, res) => {
     try {
         const { reelIndex } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-paused-reel", { username, reelIndex });
+        await pusher.trigger("presence-soul-connect", "user-paused-reel", { username, reelIndex });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -533,7 +533,7 @@ app.post("/api/reels/seek", isAuth, async (req, res) => {
     try {
         const { reelIndex, currentTime } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "user-seeked-reel", { username, reelIndex, currentTime });
+        await pusher.trigger("presence-soul-connect", "user-seeked-reel", { username, reelIndex, currentTime });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -541,7 +541,7 @@ app.post("/api/reels/seek", isAuth, async (req, res) => {
 app.post("/api/reels/request-state", isAuth, async (req, res) => {
     try {
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "request-reel-state", { username });
+        await pusher.trigger("presence-soul-connect", "request-reel-state", { username });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -550,7 +550,7 @@ app.post("/api/reels/send-state", isAuth, async (req, res) => {
     try {
         const { to, reelIndex, currentTime, isPaused } = req.body;
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "receive-reel-state", { username, to, reelIndex, currentTime, isPaused });
+        await pusher.trigger("presence-soul-connect", "receive-reel-state", { username, to, reelIndex, currentTime, isPaused });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -558,7 +558,7 @@ app.post("/api/reels/send-state", isAuth, async (req, res) => {
 app.post("/api/reels/invite", isAuth, async (req, res) => {
     try {
         const username = req.session.username || "Bhondu";
-        await pusher.trigger("presence-bhondu-chat", "together-invitation", { username });
+        await pusher.trigger("presence-soul-connect", "together-invitation", { username });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
