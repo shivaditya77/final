@@ -65,15 +65,16 @@ if (!process.env.PUSHER_KEY || !process.env.PUSHER_APP_ID) {
 
 // ========== MONGODB ==========
 const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-    console.error("❌ CRITICAL ERROR: MONGODB_URI is missing! Please add it to your Vercel Environment Variables.");
+function connectDB() {
+    if (!MONGODB_URI) {
+        console.error("❌ CRITICAL ERROR: MONGODB_URI is missing!");
+        return;
+    }
+    mongoose.connect(MONGODB_URI)
+        .then(() => console.log("🍃 Connected to MongoDB"))
+        .catch(err => console.error("❌ MongoDB connection error:", err.message));
 }
-
-mongoose.connect(MONGODB_URI || "mongodb://localhost:27017/birthday_db")
-    .then(() => console.log("🍃 Connected to MongoDB"))
-    .catch(err => {
-        console.error("❌ MongoDB connection error:", err.message);
-    });
+connectDB();
 
 // ========== MIDDLEWARE ==========
 app.use(cors({
@@ -173,9 +174,12 @@ app.get("/chat", isAuth, async (req, res) => {
         const user = await User.findOne({ username: username.toLowerCase() });
         const wallpaper = user ? user.chatWallpaper : '';
 
+        const otherUser = username.toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu';
+
         res.render("chat", { 
             history, 
             username,
+            otherUser,
             wallpaper,
             pusherKey: process.env.PUSHER_KEY, 
             pusherCluster: process.env.PUSHER_CLUSTER 
@@ -708,8 +712,10 @@ app.use((err, req, res, next) => {
 // Only start the server locally (Vercel will ignore this)
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 3001;
-    app.listen(PORT, () => {
-        console.log(`🚀 Local server running at http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server listening on all interfaces (0.0.0.0:${PORT})`);
+        console.log(`🔗 Local: http://localhost:${PORT}`);
+        connectDB();
     });
 }
 

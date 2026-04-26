@@ -77,6 +77,27 @@
         statusDot.style.background = s.dot;
     }
 
+    // ========== DEBUG SYSTEM ==========
+    const debugPopup = document.getElementById('debug-popup');
+    const debugLogs = document.getElementById('debug-logs');
+    
+    function logToDebug(msg) {
+        if (!debugLogs) return;
+        const line = document.createElement('div');
+        line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        debugLogs.appendChild(line);
+        debugLogs.scrollTop = debugLogs.scrollHeight;
+    }
+
+    window.openDebug = () => { if (debugPopup) debugPopup.style.display = 'flex'; };
+    window.closeDebug = () => { if (debugPopup) debugPopup.style.display = 'none'; };
+
+    // Capture Pusher Logs
+    Pusher.log = (msg) => {
+        console.log(msg);
+        logToDebug(msg);
+    };
+
     async function updateStatusUI(isOnline) {
         if (statusDot) statusDot.style.background = isOnline ? '#4caf50' : '#f44336';
         if (statusText) {
@@ -84,6 +105,7 @@
                 statusText.innerText = 'Online';
                 statusText.style.color = '#4caf50';
             } else {
+                logToDebug(`Connection state changed to: ${isOnline}`);
                 try {
                     const res = await fetch(`/api/user/status/${otherUser}`);
                     const data = await res.json();

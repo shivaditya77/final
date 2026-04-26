@@ -7,12 +7,34 @@
 
         <!-- HEADER -->
         <div class="chat-header">
-            <div class="chat-header-left">
-                <h1>Soul Space ❤️</h1>
-                <div class="chat-status-container">
-                    <div class="chat-status-dot" id="status-dot"></div>
-                    <span class="chat-status-text" id="status-text">Connecting...</span>
+            <div class="chat-header-info">
+                <div id="status-dot" class="chat-status-dot connecting"></div>
+                <div class="chat-user-details">
+                    <span class="chat-user-name"><%= otherUser %></span>
+                    <span id="status-text" class="chat-status-text">Connecting...</span>
                 </div>
+            </div>
+            <div class="chat-header-actions">
+                <button class="chat-nav-btn" onclick="openDebug()" title="Connection Debug">📡</button>
+                <button class="chat-nav-btn" onclick="toggleStarredMessages()">⭐</button>
+                <button class="chat-nav-btn" onclick="toggleSettings()">⚙️</button>
+                <a href="/" class="chat-nav-btn">🏠</a>
+            </div>
+        </div>
+
+        <!-- DEBUG POPUP -->
+        <div id="debug-popup" class="settings-modal" style="display:none; z-index: 10000;">
+            <div class="settings-content" style="max-width: 90%; width: 400px;">
+                <div class="settings-header">
+                    <h3>📡 Connection Debug</h3>
+                    <button onclick="closeDebug()">&times;</button>
+                </div>
+                <div id="debug-logs" style="background:#000; color:#0f0; padding:10px; font-family:monospace; font-size:12px; height:200px; overflow-y:auto; margin-bottom:10px; border-radius:8px;">
+                    Waiting for logs...
+                </div>
+                <button class="chat-nav-btn" style="width:100%" onclick="location.reload()">🔄 Hard Reload App</button>
+            </div>
+        </div>
                 <span class="typing-indicator" id="typing-indicator"></span>
                 <div id="missing-key-alert" style="display:none; color: #ff5252; font-size: 12px; margin-top: 5px; font-weight: bold;">
                     ⚠️ Chat Offline: Missing Keys on Server.
