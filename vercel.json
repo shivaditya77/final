@@ -2,10 +2,7 @@
   "version": 2,
   "functions": {
     "server.js": {
-      "includeFiles": [
-        "views/**",
-        "reels_list.json"
-      ]
+      "includeFiles": "{views/**,reels_list.json}"
     }
   },
   "routes": [
