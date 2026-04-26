@@ -6,16 +6,28 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "views/**",
+          "middleware/**",
           "models/**",
           "routes/**",
-          "middleware/**",
-          "public/**"
+          "views/**",
+          "reels_list.json"
         ]
       }
     }
   ],
   "routes": [
+    {
+      "src": "/assets/(.*)",
+      "dest": "/public/assets/$1"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/public/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/public/js/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "server.js"

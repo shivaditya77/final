@@ -6,31 +6,26 @@ const { isAuth } = require('../middleware/auth');
 
 router.get('/reels', (req, res) => {
     const username = req.session.username || "Bhondu";
-    const reelsDir = path.join(__dirname, '../public/assets/reels');
+    const listPath = path.join(__dirname, '../reels_list.json');
     
     let reels = [];
 
     try {
-        if (fs.existsSync(reelsDir)) {
-            const files = fs.readdirSync(reelsDir);
-            reels = files
-                .filter(file => /\.(mp4|webm|mov)$/i.test(file))
-                .map(file => ({
-                    // We encode the filename so special characters like # and emojis work in the URL
-                    url: `/assets/reels/${encodeURIComponent(file)}`,
-                    // We clean up the title for the display (removing extension and long text)
-                    title: file.split('.')[0].substring(0, 30) + (file.length > 30 ? '...' : '')
-                }));
+        if (fs.existsSync(listPath)) {
+            const files = JSON.parse(fs.readFileSync(listPath, 'utf8'));
+            reels = files.map(file => ({
+                url: `/assets/reels/${encodeURIComponent(file)}`,
+                title: file.split('.')[0].substring(0, 30) + (file.length > 30 ? '...' : '')
+            }));
         }
     } catch (err) {
-        console.error("Error reading reels directory:", err);
+        console.error("Error reading reels list:", err);
     }
 
     if (reels.length === 0) {
-        reels = [{ url: '/assets/reels/sample.mp4', title: 'Add videos to assets/reels!' }];
+        reels = [{ url: '/assets/reels/r_1.mp4', title: 'Loading Bhondu Feed...' }];
     }
 
-    // Shuffle for variety
     const shuffledReels = [...reels].sort(() => Math.random() - 0.5);
 
     res.render('reels', { 
