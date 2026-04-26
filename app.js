@@ -79,7 +79,7 @@ app.use(express.json());
 // Static assets are handled by Vercel routes in production.
 // We only serve them manually for local development.
 if (process.env.NODE_ENV !== 'production') {
-    const publicDir = "../public"; // Hidden from Vercel tracer
+    const publicDir = "public"; // Hidden from Vercel tracer
     app.use(express.static(path.join(__dirname, publicDir)));
 }
 
