@@ -24,6 +24,8 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  /* Support for notched phones */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ========== HEADER ========== */
@@ -498,7 +500,9 @@
   color: rgba(255,255,255,0.6);
   z-index: 10;
   line-height: 1;
-  padding: 4px 6px;
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -571,19 +575,20 @@
   position: absolute;
   top: 6px;
   right: 32px;
-  opacity: 0.4; /* Subtle visibility for mobile */
+  opacity: 0.6; /* Higher base opacity for mobile visibility */
   transition: opacity 0.2s, transform 0.2s, background 0.2s;
   cursor: pointer;
-  font-size: 0.85rem;
-  background: rgba(255,255,255,0.1);
-  width: 28px;
-  height: 28px;
+  font-size: 0.9rem;
+  background: rgba(255,255,255,0.12);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   color: var(--primary);
   z-index: 15;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
 .chat-message:hover .reaction-picker-btn,
@@ -777,6 +782,8 @@
   align-items: center;
   z-index: 100;
   flex-shrink: 0;
+  /* Support for notched phones */
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 .media-btns {
@@ -1042,20 +1049,25 @@
 /* ========== MOBILE ========== */
 @media (max-width: 480px) {
   .chat-input-area { padding: 10px 12px; gap: 8px; }
-  .chat-media-btn { width: 40px; height: 40px; font-size: 1.1rem; }
-  .chat-input-field { padding: 10px 16px; font-size: 0.9rem; }
-  .chat-send-btn { width: 44px; height: 44px; font-size: 1.1rem; }
-  .chat-message { max-width: 88%; }
-  .chat-media-img, .chat-media-video { max-height: 220px; }
+  .chat-media-btn { width: 42px; height: 42px; font-size: 1.2rem; }
+  .chat-input-field { padding: 10px 16px; font-size: 0.95rem; }
+  .chat-send-btn { width: 48px; height: 48px; font-size: 1.3rem; }
+  .chat-message { max-width: 90%; }
+  .chat-media-img, .chat-media-video { max-height: 240px; }
   
   /* Increase reaction picker size for easier tapping */
   .reaction-picker {
-    gap: 12px;
-    padding: 8px 14px;
-    top: -45px;
+    gap: 14px;
+    padding: 10px 18px;
+    top: -55px;
+    border-radius: 30px;
   }
-  .reaction-picker span { font-size: 1.5rem; }
+  .reaction-picker span { font-size: 1.7rem; }
   
+  /* Improve message options tap area on mobile */
+  .msg-options { min-width: 34px; min-height: 34px; font-size: 1.3rem; }
+  .reaction-picker-btn { width: 34px; height: 34px; font-size: 1.1rem; }
+
   /* Improve lightbox close on mobile */
   .lightbox-close {
     top: 20px;
