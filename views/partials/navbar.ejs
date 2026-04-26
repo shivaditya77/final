@@ -18,19 +18,19 @@
     <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="confirmLogout(event)" data-barba-prevent="true">
         <span>💋</span><span class="nav-text">Logout</span>
     </a>
+</div>
 
-    <!-- GLOBAL NOTIFICATION DROPDOWN -->
-    <div class="notif-dropdown" id="notif-dropdown">
-        <div class="notif-header">
-            <span>Notifications</span>
-            <button onclick="markAllRead(event)">Mark all read</button>
-        </div>
-        <div class="notif-list" id="notif-list">
-            <div class="notif-empty">No notifications yet ❤️</div>
-        </div>
-        <div class="notif-footer">
-            <button onclick="clearNotifications(event)">Clear All</button>
-        </div>
+<!-- PROFESSIONAL GLOBAL NOTIFICATION PORTAL (Moved outside nav-container to fix stacking issues) -->
+<div class="notif-dropdown" id="notif-dropdown">
+    <div class="notif-header">
+        <span>Notifications</span>
+        <button onclick="markAllRead(event)">Mark all read</button>
+    </div>
+    <div class="notif-list" id="notif-list">
+        <div class="notif-empty">No notifications yet ❤️</div>
+    </div>
+    <div class="notif-footer">
+        <button onclick="clearNotifications(event)">Clear All</button>
     </div>
 </div>
 
@@ -69,9 +69,9 @@
 
 /* NOTIFICATION DROPDOWN */
 .notif-dropdown {
-    position: absolute;
-    top: 55px;
-    right: 0;
+    position: fixed;
+    top: 80px;
+    right: 20px;
     width: 320px;
     background: #1a1a1a;
     border: 1px solid rgba(255,255,255,0.15);
@@ -81,7 +81,7 @@
     flex-direction: column;
     overflow: hidden;
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1001;
+    z-index: 9999; /* Top level */
 }
 
 .notif-dropdown.show {
@@ -207,14 +207,12 @@
     .nav-text { display: none; }
     .nav-btn { padding: 10px; }
     .notif-dropdown { 
-        position: fixed !important; 
-        top: 75px !important; 
-        left: 3vw !important; 
-        right: 3vw !important;
-        width: 94vw !important; 
+        top: 70px !important; 
+        left: 5% !important; 
+        right: 5% !important;
+        width: 90% !important; 
         max-width: none !important;
         border-radius: 20px !important;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.8) !important;
     }
 }
 </style>
