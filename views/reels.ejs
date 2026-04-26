@@ -300,13 +300,16 @@
                     try {
                         isGlobalMuted ? player.mute() : player.unMute();
                         player.playVideo();
-                        // Safety check: Hide loader if already playing or after a short delay
+                        
+                        // Mobile Fail-Safe: Recover if browser auto-paused
                         setTimeout(() => {
-                            if (player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
-                                hideLoader(index);
+                            if (player.getPlayerState && player.getPlayerState() !== YT.PlayerState.PLAYING) {
+                                player.playVideo();
                             }
+                            hideLoader(index);
                         }, 500);
-                        setTimeout(() => hideLoader(index), 2000); // Final fail-safe
+                        
+                        setTimeout(() => hideLoader(index), 2000); 
                     } catch(e) {}
                 }
             }
@@ -328,27 +331,51 @@
             if (window.YT && window.YT.Player) initReels();
 
             window.handleReelClick = (event, index) => { 
+                const p = players[index];
+                if (p && p.playVideo) { try { p.playVideo(); } catch(e) {} }
+
                 const now = Date.now(); 
-                if (now - lastTap < 300) return; 
+                const delta = now - lastTap;
+                
+                if (delta < 300 && delta > 0) {
+                    handleDoubleTap(event, index);
+                    lastTap = 0; 
+                    return;
+                }
+                
                 lastTap = now; 
-                toggleMute(index); 
+                setTimeout(() => {
+                    if (lastTap === now) {
+                        toggleMute(index);
+                    }
+                }, 250); 
             };
 
             function toggleMute(index) {
                 isGlobalMuted = !isGlobalMuted;
-                Object.values(players).forEach(p => { try { isGlobalMuted ? p.mute() : p.unMute(); } catch(e) {} });
+                
+                Object.values(players).forEach(p => { 
+                    try { 
+                        if (isGlobalMuted) {
+                            p.mute();
+                        } else {
+                            p.unMute();
+                            p.playVideo(); 
+                        }
+                    } catch(e) {} 
+                });
                 
                 const indicator = document.getElementById('mute-indicator-' + index);
                 if (indicator) {
                     indicator.innerText = isGlobalMuted ? '🔇' : '🔊';
                     indicator.classList.remove('visible');
-                    void indicator.offsetWidth; // Trigger reflow
+                    void indicator.offsetWidth; 
                     indicator.classList.add('visible');
                 }
             }
 
             window.handleDoubleTap = (event, index) => {
-                event.preventDefault(); 
+                if (event) event.preventDefault(); 
                 const btn = document.getElementById(`heart-btn-${index}`); 
                 triggerLove(btn, event, index); 
                 notifyHearted(index);
@@ -366,8 +393,20 @@
                     btn.classList.toggle('heart-active');
                     btn.innerText = btn.classList.contains('heart-active') ? '❤️' : '🤍';
                 }
-                const x = event ? (event.clientX || event.pageX) : window.innerWidth / 2;
-                const y = event ? (event.clientY || event.pageY) : window.innerHeight / 2;
+                
+                // Get coordinates safely for both Mouse and Touch
+                let x, y;
+                if (event && event.changedTouches && event.changedTouches.length > 0) {
+                    x = event.changedTouches[0].clientX;
+                    y = event.changedTouches[0].clientY;
+                } else if (event) {
+                    x = event.clientX || event.pageX;
+                    y = event.clientY || event.pageY;
+                } else {
+                    x = window.innerWidth / 2;
+                    y = window.innerHeight / 2;
+                }
+                
                 spawnHeart(x, y);
                 if (!event) notifyHearted(currentActive);
             };
