@@ -595,7 +595,8 @@
   position: absolute;
   top: 6px;
   right: 32px;
-  opacity: 0.6; /* Higher base opacity for mobile visibility */
+  opacity: 0; /* Hidden by default - shows on long press */
+  pointer-events: none;
   transition: opacity 0.2s, transform 0.2s, background 0.2s;
   cursor: pointer;
   font-size: 0.9rem;

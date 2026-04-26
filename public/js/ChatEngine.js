@@ -247,6 +247,38 @@
     }
 
     // ========== GLOBAL LISTENERS ==========
+    // ========== LONG PRESS (WHATSAPP STYLE) ==========
+    let pressTimer;
+    function startPress(e, id) {
+        if (e.type === 'click') return;
+        pressTimer = setTimeout(() => {
+            haptic('heart');
+            const picker = document.getElementById('picker-' + id);
+            if (picker) {
+                // Hide all other pickers
+                document.querySelectorAll('.reaction-picker').forEach(p => p.classList.remove('show'));
+                picker.classList.add('show');
+            }
+        }, 600); // 600ms hold
+    }
+
+    function cancelPress() {
+        clearTimeout(pressTimer);
+    }
+
+    container.addEventListener('mousedown', (e) => {
+        const msg = e.target.closest('.chat-message');
+        if (msg) startPress(e, msg.id.replace('msg-', ''));
+    });
+    container.addEventListener('touchstart', (e) => {
+        const msg = e.target.closest('.chat-message');
+        if (msg) startPress(e, msg.id.replace('msg-', ''));
+    }, { passive: true });
+    
+    window.addEventListener('mouseup', cancelPress);
+    window.addEventListener('touchend', cancelPress);
+    window.addEventListener('scroll', cancelPress, true);
+
     window.addEventListener('click', (e) => {
         const target = e.target;
         const id = target.dataset.id;
