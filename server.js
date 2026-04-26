@@ -46,7 +46,7 @@ cloudinary.config({
 // ========== MONGODB ==========
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-    console.error("❌ WARNING: MONGODB_URI is missing from Environment Variables!");
+    console.error("❌ CRITICAL ERROR: MONGODB_URI is missing! Please add it to your Vercel Environment Variables.");
 }
 
 mongoose.connect(MONGODB_URI || "mongodb://localhost:27017/birthday_db")
