@@ -27,6 +27,7 @@ const Journal = require("./models/Journal");
 const Question = require("./models/Question");
 const Message = require("./models/Message");
 const User = require("./models/User");
+const Notification = require("./models/Notification");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -147,11 +148,24 @@ app.get("/chat", isAuth, async (req, res) => {
 app.post("/api/chat/send", isAuth, async (req, res) => {
     try {
         const { text, fileUrl, fileType, replyTo, expiresAt, isSecret } = req.body;
+        const sender = req.session.username || "Bhondu";
         const msg = new Message({
-            sender: req.session.username || "Bhondu",
+            sender,
             text, fileUrl, fileType, replyTo, expiresAt, isSecret
         });
         await msg.save();
+
+        // Create Notification for recipient
+        const recipient = sender.toLowerCase() === 'bhondu' ? 'vishu' : 'bhondu';
+        const notif = new Notification({
+            recipient, sender,
+            type: fileType === 'audio' ? 'call' : 'message',
+            content: text || (fileType === 'audio' ? 'Sent a voice note 🎙️' : 'Sent a photo/video 🖼️'),
+            link: '/chat'
+        });
+        await notif.save();
+        await pusher.trigger("private-notifications-" + recipient.toLowerCase(), "new-notification", notif);
+
         const populated = await Message.findById(msg._id).populate('replyTo');
         await pusher.trigger("presence-bhondu-chat", "new-message", populated);
         res.json({ success: true, message: populated });
@@ -186,7 +200,22 @@ app.post("/api/chat/react", isAuth, async (req, res) => {
         if (!message) return res.status(404).json({ success: false });
         const existingIndex = message.reactions.findIndex(r => r.emoji === emoji && r.username === username);
         if (existingIndex > -1) message.reactions.splice(existingIndex, 1);
-        else message.reactions.push({ emoji, username });
+        else {
+            message.reactions.push({ emoji, username });
+            
+            // Notify recipient if they are not the sender
+            if (message.sender !== username) {
+                const notif = new Notification({
+                    recipient: message.sender.toLowerCase(),
+                    sender: username,
+                    type: 'reaction',
+                    content: `Reacted ${emoji} to your message`,
+                    link: '/chat'
+                });
+                await notif.save();
+                await pusher.trigger("private-notifications-" + message.sender.toLowerCase(), "new-notification", notif);
+            }
+        }
         await message.save();
         await pusher.trigger("presence-bhondu-chat", "message-reaction", { msgId, reactions: message.reactions });
         res.json({ success: true });
@@ -298,7 +327,54 @@ app.post("/api/video/signal", isAuth, async (req, res) => {
     try {
         const { to, signal, type } = req.body;
         const from = req.session.username || "Bhondu";
+
+        // Create notification for incoming call
+        if (type === 'offer') {
+             const notif = new Notification({
+                recipient: to.toLowerCase(),
+                sender: from,
+                type: 'call',
+                content: `Incoming ${req.body.isVoiceOnly ? 'Voice' : 'Video'} Call 📞`,
+                link: '/chat'
+            });
+            await notif.save();
+            await pusher.trigger("private-notifications-" + to.toLowerCase(), "new-notification", notif);
+        }
+
         await pusher.trigger("presence-bhondu-chat", "video-signal", { from, to, ...req.body });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// ========== NOTIFICATION API ==========
+app.get("/api/notifications", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username.toLowerCase();
+        const notifications = await Notification.find({ recipient: username }).sort({ createdAt: -1 }).limit(20);
+        const unreadCount = await Notification.countDocuments({ recipient: username, isRead: false });
+        res.json({ success: true, notifications, unreadCount });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.post("/api/notifications/read-all", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username.toLowerCase();
+        await Notification.updateMany({ recipient: username }, { isRead: true });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/notifications/mark-read", isAuth, async (req, res) => {
+    try {
+        await Notification.findByIdAndUpdate(req.body.id, { isRead: true });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.delete("/api/notifications/clear", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username.toLowerCase();
+        await Notification.deleteMany({ recipient: username });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });

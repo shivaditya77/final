@@ -4,6 +4,24 @@
         <span>🏠</span><span class="nav-text">Home</span>
     </a>
     
+    <div class="nav-btn notification-bell-btn" id="notif-bell" style="cursor: pointer; position: relative;">
+        <span class="bell-icon">🔔</span>
+        <div class="notif-badge" id="notif-badge" style="display: none;">0</div>
+        
+        <div class="notif-dropdown" id="notif-dropdown">
+            <div class="notif-header">
+                <span>Notifications</span>
+                <button onclick="markAllRead(event)">Mark all read</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+                <div class="notif-empty">No notifications yet ❤️</div>
+            </div>
+            <div class="notif-footer">
+                <button onclick="clearNotifications(event)">Clear All</button>
+            </div>
+        </div>
+    </div>
+
     <% if (typeof showMusic !== 'undefined' && showMusic) { %>
     <div class="nav-btn" id="music-toggle" style="cursor: pointer;">
         <span id="music-icon">🎶</span><span class="nav-text" id="music-status">On</span>
@@ -48,22 +66,276 @@
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
-.premium-logout:hover {
-    background: rgba(255, 77, 109, 0.2);
-    border-color: rgba(255, 77, 109, 0.5);
+/* NOTIFICATION DROPDOWN */
+.notif-dropdown {
+    position: absolute;
+    top: 55px;
+    right: 0;
+    width: 320px;
+    background: #1a1a1a;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1001;
+}
+
+.notif-dropdown.show {
+    display: flex;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.notif-header {
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.notif-header button {
+    background: none;
+    border: none;
+    color: #ff4d6d;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.notif-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notif-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    gap: 12px;
+    transition: background 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+    color: white;
+}
+
+.notif-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.notif-item.unread {
+    background: rgba(255, 77, 109, 0.05);
+}
+
+.notif-item-icon {
+    font-size: 1.2rem;
+    margin-top: 2px;
+}
+
+.notif-item-content {
+    flex: 1;
+}
+
+.notif-item-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.notif-item-desc {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.3;
+}
+
+.notif-item-time {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.4);
+    margin-top: 4px;
+}
+
+.notif-empty {
+    padding: 30px 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    opacity: 0.5;
+}
+
+.notif-footer {
+    padding: 10px;
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.notif-footer button {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff4d6d;
+    color: white;
+    font-size: 0.65rem;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #1a1a1a;
+    font-weight: 800;
 }
 
 @media (max-width: 768px) {
-    .nav-container {
-        top: 10px;
-        right: 10px;
-        gap: 8px;
-    }
-    .nav-text {
-        display: none;
-    }
-    .nav-btn {
-        padding: 10px;
-    }
+    .nav-container { top: 10px; right: 10px; gap: 8px; }
+    .nav-text { display: none; }
+    .nav-btn { padding: 10px; }
+    .notif-dropdown { position: fixed; top: 60px; right: 10px; left: 10px; width: auto; }
 }
 </style>
+
+<script>
+(function() {
+    const bell = document.getElementById('notif-bell');
+    const dropdown = document.getElementById('notif-dropdown');
+    const badge = document.getElementById('notif-badge');
+    const list = document.getElementById('notif-list');
+    
+    const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+    if (bell) {
+        bell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('show');
+            if (dropdown.classList.contains('show')) fetchNotifications();
+        });
+    }
+
+    document.addEventListener('click', () => {
+        if (dropdown) dropdown.classList.remove('show');
+    });
+
+    async function fetchNotifications() {
+        try {
+            const res = await fetch('/api/notifications');
+            const data = await res.json();
+            if (data.success) {
+                renderNotifications(data.notifications);
+                updateBadge(data.unreadCount);
+            }
+        } catch (e) {}
+    }
+
+    function renderNotifications(notifications) {
+        if (!list) return;
+        if (notifications.length === 0) {
+            list.innerHTML = '<div class="notif-empty">No notifications yet ❤️</div>';
+            return;
+        }
+        list.innerHTML = notifications.map(n => `
+            <a href="${n.link || '#'}" class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markOneRead('${n._id}')">
+                <div class="notif-item-icon">${getIcon(n.type)}</div>
+                <div class="notif-item-content">
+                    <div class="notif-item-title">${n.sender}</div>
+                    <div class="notif-item-desc">${n.content}</div>
+                    <div class="notif-item-time">${formatTime(n.createdAt)}</div>
+                </div>
+            </a>
+        `).join('');
+    }
+
+    function getIcon(type) {
+        switch(type) {
+            case 'message': return '💬';
+            case 'reaction': return '❤️';
+            case 'call': return '📞';
+            default: return '✨';
+        }
+    }
+
+    function formatTime(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function updateBadge(count) {
+        if (!badge) return;
+        if (count > 0) {
+            badge.innerText = count > 9 ? '9+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    window.markAllRead = async (e) => {
+        e.stopPropagation();
+        try {
+            await fetch('/api/notifications/read-all', { method: 'POST' });
+            fetchNotifications();
+        } catch (e) {}
+    };
+
+    window.markOneRead = async (id) => {
+        try {
+            await fetch('/api/notifications/mark-read', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+        } catch (e) {}
+    };
+
+    window.clearNotifications = async (e) => {
+        e.stopPropagation();
+        if (!confirm('Clear all notifications?')) return;
+        try {
+            await fetch('/api/notifications/clear', { method: 'DELETE' });
+            fetchNotifications();
+        } catch (e) {}
+    };
+
+    // Pusher Real-time Notifications
+    if (window.globalPusher) {
+        const username = "<%= typeof username !== 'undefined' ? username : '' %>";
+        if (username) {
+            const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
+            channel.bind('new-notification', (data) => {
+                notifSound.play().catch(() => {});
+                fetchNotifications();
+                showBrowserNotification(data);
+            });
+        }
+    }
+
+    function showBrowserNotification(data) {
+        if (!("Notification" in window)) return;
+        if (Notification.permission === "granted") {
+            new Notification(`New from ${data.sender}`, {
+                body: data.content,
+                icon: '/favicon.ico'
+            });
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    }
+
+    // Initial load
+    setTimeout(fetchNotifications, 2000);
+})();
+</script>
