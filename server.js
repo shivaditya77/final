@@ -113,8 +113,8 @@ app.use(session({
 
 // Global locals for Pusher/Auth
 app.use(async (req, res, next) => {
-    res.locals.pusherKey = process.env.PUSHER_KEY;
-    res.locals.pusherCluster = process.env.PUSHER_CLUSTER;
+    res.locals.pusherKey = process.env.PUSHER_KEY || "";
+    res.locals.pusherCluster = process.env.PUSHER_CLUSTER || "ap2";
     res.locals.username = req.session.username || "";
     
     // Update Last Seen for authenticated users

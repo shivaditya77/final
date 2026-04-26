@@ -55,8 +55,9 @@
 
         container.appendChild(notif);
 
-        // Play sound
+        // Play sound and Vibrate
         notifSound.play().catch(e => console.log('Audio play blocked by browser'));
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); 
 
         // Show with animation
         setTimeout(() => notif.classList.add('show'), 100);

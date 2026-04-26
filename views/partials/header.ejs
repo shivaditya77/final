@@ -38,12 +38,12 @@
 
         function initGlobalPusher() {
             if (!window.PUSHER_KEY || window.PUSHER_KEY === "") {
-                console.error("🔥 Chat Engine: PUSHER_KEY is missing!");
-                return null;
+                // Try to recover from meta if available
+                window.PUSHER_KEY = document.querySelector('meta[name="pusher-key"]')?.content || "";
             }
             
-            if (!window.globalPusher) {
-                console.log("Initializing Global Pusher...");
+            if (!window.globalPusher && window.PUSHER_KEY) {
+                console.log("🚀 Connection Rescue: Initializing Pusher...");
                 
                 const cluster = window.PUSHER_CLUSTER || 'ap2';
 
@@ -56,9 +56,12 @@
 
                 window.globalChannel = window.globalPusher.subscribe('presence-soul-connect');
 
-                // Connection State Logging
                 window.globalPusher.connection.bind('state_change', (states) => {
                     console.log(`📡 Pusher State: ${states.previous} -> ${states.current}`);
+                    if (states.current === 'unavailable' || states.current === 'failed') {
+                        console.warn("Connection failing, attempting rescue...");
+                        setTimeout(() => window.globalPusher.connect(), 2000);
+                    }
                 });
 
                 window.addEventListener('focus', () => {

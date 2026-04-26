@@ -137,6 +137,9 @@
         console.log(`Chat Engine: State changed to ${sc.current}`);
         if (sc.current === 'connecting') startConnectionCheck();
         else if (connectionTimeout) clearTimeout(connectionTimeout);
+        
+        // Force refresh status on reconnect
+        if (sc.current === 'connected') checkOtherUserStatus();
     });
 
     pusher.connection.bind('error', (err) => {
