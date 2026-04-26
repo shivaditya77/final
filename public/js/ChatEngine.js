@@ -96,12 +96,26 @@
 
     function formatLastSeen(dateStr) {
         const date = new Date(dateStr);
-        const diffMins = Math.floor((new Date() - date) / 60000);
+        const now = new Date();
+        const diffMins = Math.floor((now - date) / 60000);
+        
         if (diffMins < 1) return 'just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        const diffHours = Math.floor(diffMins / 60);
-        if (diffHours < 24) return `${diffHours}h ago`;
-        return date.toLocaleDateString();
+        
+        const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        
+        // If today
+        if (date.toDateString() === now.toDateString()) {
+            return `today at ${timeStr}`;
+        }
+        
+        // If yesterday
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (date.toDateString() === yesterday.toDateString()) {
+            return `yesterday at ${timeStr}`;
+        }
+        
+        return `${date.toLocaleDateString()} at ${timeStr}`;
     }
 
     // ========== PUSHER BINDINGS ==========
@@ -524,9 +538,6 @@
                             await fetch('/api/chat/send', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    fileUrl: data.fileUrl, 
-                                    fileType: 'audio',
                                     text: '' 
                                 })
                             });

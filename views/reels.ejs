@@ -297,9 +297,30 @@
                     playVideo(index);
                     notifyWatching(index);
                     notifyScroll(index - 1);
-                    // Pre-load neighbors
+                    // Pre-load neighbors (Window of 3)
                     preLoadVideo(index + 1);
                     preLoadVideo(index - 1);
+
+                    // UNLOAD far away videos to save memory and ensure smoothness
+                    Object.keys(videoElements).forEach(idx => {
+                        const i = parseInt(idx);
+                        if (i < index - 2 || i > index + 2) {
+                            unLoadVideo(i);
+                        }
+                    });
+                }
+            }
+
+            function unLoadVideo(index) {
+                const video = videoElements[index];
+                if (video) {
+                    video.pause();
+                    video.src = ""; // Stop buffering
+                    video.load();
+                    video.remove();
+                    delete videoElements[index];
+                    const loader = document.querySelector(`#reel-${index} .reel-loader`);
+                    if (loader) loader.classList.remove('hidden');
                 }
             }
 
