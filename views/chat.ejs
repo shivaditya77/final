@@ -8,7 +8,7 @@
         <!-- HEADER -->
         <div class="chat-header">
             <div class="chat-header-left">
-                <h1>Private Space ❤️</h1>
+                <h1>Soul Space ❤️</h1>
                 <div class="chat-status-container">
                     <div class="chat-status-dot" id="status-dot"></div>
                     <span class="chat-status-text" id="status-text">Connecting...</span>
@@ -241,6 +241,14 @@
     <script>
         (function() {
             if (typeof Pusher === 'undefined') return;
+
+            // ========== AD-BLOCK DETECTION ==========
+            setTimeout(() => {
+                if (typeof Pusher === 'undefined' || (pusher && pusher.connection.state === 'connecting')) {
+                    console.warn("Chat Engine: Connection slow. Checking for Ad-blockers...");
+                    if (statusText) statusText.innerText = "Connecting (Check Ad-blocker?) 🔄";
+                }
+            }, 4000);
 
             // ========== TOP-TIER CONNECTION MANAGER ==========
             const PusherConfig = {
