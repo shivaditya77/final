@@ -22,7 +22,7 @@
                         <div class="reel-progress-bar" id="progress-<%= index %>"></div>
                     </div>
 
-                    <div class="reel-content" id="content-<%= index %>" ontouchstart="handleReelClick(event, '<%= index %>')" onclick="handleReelClick(event, '<%= index %>')" ondblclick="handleDoubleTap(event, '<%= index %>')">
+                    <div class="reel-content" id="content-<%= index %>" onclick="handleReelClick(event, '<%= index %>')" ondblclick="handleDoubleTap(event, '<%= index %>')">
                         <div class="reel-loader">❤️</div>
                         <div class="reel-error-msg" style="display:none; position:absolute; color:white; z-index:10; text-align:center;">Video unavailable 💔</div>
                         
@@ -304,69 +304,35 @@
                 }
             }
 
-            function playReel(index) {
-                if (!players[index]) preLoadReel(index);
-                
-                // Pause others silently
-                Object.keys(players).forEach(idx => { 
-                    if (parseInt(idx) !== index) pauseReel(idx); 
-                });
-
-                const player = players[index];
-                if (player && player.playVideo) {
-                    try {
-                        // Respect Global Sound State (Instagram Style)
-                        if (isGlobalMuted) {
-                            player.mute(); 
-                        } else {
-                            player.unMute();
-                        }
-                        
-                        player.playVideo();
-                        
-                        // Rapid loader clearance
-                        setTimeout(() => hideLoader(index), 300);
-                    } catch(e) {}
-                }
-            }
-
-            function pauseReel(index) { const player = players[index]; if (player && player.pauseVideo) { try { player.pauseVideo(); } catch(e) {} } stopProgressTracking(); }
-
-            function scrollToIndex(index) {
-                const itemHeight = window.innerHeight;
-                container.scrollTo({ top: index * itemHeight, behavior: 'smooth' });
-            }
-
-            window.initReels = () => {
-                container.scrollTop = window.innerHeight;
-                document.querySelectorAll('.reel-slide').forEach((slide) => { observer.observe(slide); });
-                setTimeout(() => { if(currentActive === -1) handleReelVisible(1); }, 500);
-            };
-
-            window.onYouTubeIframeAPIReady = () => { initReels(); };
-            if (window.YT && window.YT.Player) initReels();
+            let lastTapTime = 0;
+            let tapTimeout;
 
             window.handleReelClick = (event, index) => { 
-                const p = players[index];
-                if (p) { try { p.playVideo(); hideLoader(index); } catch(e) {} }
-
                 const now = Date.now(); 
-                const delta = now - lastTap;
-                
+                const delta = now - lastTapTime;
+
+                // 1. PRIME: Direct gesture for mobile audio trust
+                const p = players[index];
+                if (p && p.playVideo) { try { p.playVideo(); hideLoader(index); } catch(e) {} }
+
                 if (delta < 300 && delta > 0) {
+                    clearTimeout(tapTimeout);
                     handleDoubleTap(event, index);
-                    lastTap = 0; 
-                    return;
+                    lastTapTime = 0;
+                } else {
+                    lastTapTime = now;
+                    tapTimeout = setTimeout(() => {
+                        if (Date.now() - lastTapTime >= 250) {
+                            toggleMute(index);
+                        }
+                    }, 300);
                 }
-                
-                lastTap = now; 
-                toggleMute(index);
             };
 
             function toggleMute(index) {
                 isGlobalMuted = !isGlobalMuted;
                 const p = players[index];
-                if (p) {
+                if (p && p.unMute) {
                     try { 
                         if (isGlobalMuted) { p.mute(); } 
                         else { p.unMute(); p.playVideo(); }
@@ -381,6 +347,31 @@
                     indicator.classList.add('visible');
                 }
             }
+
+            function playReel(index) {
+                if (!players[index]) preLoadReel(index);
+                Object.keys(players).forEach(idx => { if (parseInt(idx) !== index) pauseReel(idx); });
+                const player = players[index];
+                if (player && player.playVideo) {
+                    try {
+                        if (isGlobalMuted) { player.mute(); } else { player.unMute(); }
+                        player.playVideo();
+                        setTimeout(() => hideLoader(index), 1000);
+                    } catch(e) {}
+                }
+            }
+
+            function pauseReel(index) { const player = players[index]; if (player && player.pauseVideo) { try { player.pauseVideo(); } catch(e) {} } stopProgressTracking(); }
+            function scrollToIndex(index) { const itemHeight = window.innerHeight; container.scrollTo({ top: index * itemHeight, behavior: 'smooth' }); }
+
+            window.initReels = () => {
+                container.scrollTop = window.innerHeight;
+                document.querySelectorAll('.reel-slide').forEach((slide) => { observer.observe(slide); });
+                setTimeout(() => { if(currentActive === -1) handleReelVisible(1); }, 500);
+            };
+
+            window.onYouTubeIframeAPIReady = () => { initReels(); };
+            if (window.YT && window.YT.Player) initReels();
 
             window.handleDoubleTap = (event, index) => {
                 if (event) event.preventDefault(); 
@@ -402,7 +393,6 @@
                     btn.innerText = btn.classList.contains('heart-active') ? '❤️' : '🤍';
                 }
                 
-                // Get coordinates safely for both Mouse and Touch
                 let x, y;
                 if (event && event.changedTouches && event.changedTouches.length > 0) {
                     x = event.changedTouches[0].clientX;
