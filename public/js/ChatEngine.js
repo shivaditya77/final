@@ -8,10 +8,17 @@
         return;
     }
 
+    // SINGLETON PATTERN: Don't initialize if already running
+    if (window.chatEngineInitialized) {
+        console.warn("Chat Engine already active. Skipping duplicate init.");
+        return;
+    }
+    window.chatEngineInitialized = true;
+
     // ========== CONFIGURATION ==========
     const config = {
-        key: window.PUSHER_KEY,
-        cluster: window.PUSHER_CLUSTER,
+        key: window.PUSHER_KEY || '5fbb7a762f5963516ffb', 
+        cluster: window.PUSHER_CLUSTER || 'ap2',
         user: window.CURRENT_USER,
         username: window.CURRENT_USER
     };
@@ -152,6 +159,18 @@
                 setTimeout(() => pusher.connect(), 1000);
             }
         }, 8000); // 8 seconds retry
+    }
+
+    // MANUAL RECONNECT
+    if (statusText) {
+        statusText.style.cursor = 'pointer';
+        statusText.onclick = () => {
+            logToDebug("Manual reconnect triggered...");
+            if (window.globalPusher) {
+                window.globalPusher.disconnect();
+                setTimeout(() => window.globalPusher.connect(), 500);
+            }
+        };
     }
 
     pusher.connection.bind('state_change', (sc) => {

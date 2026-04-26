@@ -50,7 +50,7 @@
                 window.globalPusher = new Pusher(window.PUSHER_KEY, {
                     cluster: cluster,
                     forceTLS: true,
-                    enabledTransports: ['ws', 'xhr_streaming', 'xhr_polling'],
+                    enabledTransports: ['ws', 'xhr_polling'],
                     authEndpoint: '/pusher/auth'
                 });
 
