@@ -14,6 +14,19 @@
                     <span class="chat-status-text" id="status-text">Connecting...</span>
                 </div>
                 <span class="typing-indicator" id="typing-indicator"></span>
+                <div id="missing-key-alert" style="display:none; color: #ff5252; font-size: 12px; margin-top: 5px; font-weight: bold;">
+                    ⚠️ Chat Offline: Missing Keys on Server.
+                </div>
+                <script>
+                    setTimeout(() => {
+                        if (!window.PUSHER_KEY || window.PUSHER_KEY === "") {
+                            const alertBox = document.getElementById('missing-key-alert');
+                            if(alertBox) alertBox.style.display = 'block';
+                            const statusText = document.getElementById('status-text');
+                            if(statusText) statusText.innerText = "Offline (No Keys) ❌";
+                        }
+                    }, 1000);
+                </script>
             </div>
             <div class="chat-header-right">
                 <button class="chat-nav-btn" onclick="toggleMediaView()">📁 <span>Media</span></button>

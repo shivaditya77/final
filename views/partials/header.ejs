@@ -37,8 +37,13 @@
         window.CURRENT_USER = "<%= typeof username !== 'undefined' ? username : '' %>";
 
         function initGlobalPusher() {
-            if (window.PUSHER_KEY && !window.globalPusher) {
-                console.log("Initializing Global Pusher...");
+            if (!window.PUSHER_KEY || window.PUSHER_KEY === "") {
+                console.error("🔥 Chat Engine: PUSHER_KEY is missing! Check Vercel Env Vars.");
+                return null;
+            }
+            
+            if (!window.globalPusher) {
+                console.log("Initializing Global Pusher for cluster:", window.PUSHER_CLUSTER);
                 window.globalPusher = new Pusher(window.PUSHER_KEY, {
                     cluster: window.PUSHER_CLUSTER,
                     forceTLS: true,
@@ -50,7 +55,9 @@
         }
 
         // Auto-init on page load
-        initGlobalPusher();
+        document.addEventListener('DOMContentLoaded', () => {
+            initGlobalPusher();
+        });
     </script>
 </head>
 <body data-barba="wrapper">
