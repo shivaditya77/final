@@ -338,18 +338,24 @@
 
             // Bind State listeners
             pusher.connection.unbind('state_change');
-            pusher.connection.bind('state_change', (sc) => updateConnectionUI(sc.current));
+            pusher.connection.bind('state_change', (sc) => {
+                updateConnectionUI(sc.current);
+                if (sc.current === 'failed') {
+                    console.error("Pusher connection failed. Check your keys/cluster.");
+                }
+            });
             updateConnectionUI(pusher.connection.state);
 
-            // Re-connect if stuck
-            if (pusher.connection.state !== 'connected') {
-                setTimeout(() => {
-                    if (pusher.connection.state === 'connecting') {
-                        console.log("Chat Engine: Forcing Reconnect...");
-                        pusher.connect();
-                    }
-                }, 3000);
-            }
+            // "Panic Mode" Re-connect
+            let panicTimeout = setTimeout(() => {
+                if (pusher.connection.state !== 'connected') {
+                    console.warn("Chat Engine: Connection taking too long. Retrying...");
+                    statusText.innerText = "Still Connecting... (Retry?)";
+                    statusText.onclick = () => window.location.reload();
+                    statusText.style.cursor = "pointer";
+                    pusher.connect();
+                }
+            }, 5000);
 
             channel.unbind('pusher:subscription_succeeded');
             channel.bind('pusher:subscription_succeeded', (members) => {

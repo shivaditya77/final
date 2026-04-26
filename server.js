@@ -56,6 +56,13 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// ========== PUSHER HEALTH CHECK ==========
+if (!process.env.PUSHER_KEY || !process.env.PUSHER_APP_ID) {
+    console.error("🔥 CRITICAL: Pusher credentials missing! Chat will NOT work.");
+} else {
+    console.log("✅ Pusher credentials detected for cluster:", process.env.PUSHER_CLUSTER);
+}
+
 // ========== MONGODB ==========
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
