@@ -375,6 +375,8 @@ app.post("/api/questions/save", isAuth, async (req, res) => {
 });
 
 app.get("/questions", isAuth, (req, res) => res.render("questions"));
+app.get("/promise", isAuth, (req, res) => res.render("promise"));
+app.get("/love-letter", isAuth, (req, res) => res.render("love-letter"));
 app.get("/timeline", isAuth, (req, res) => res.render("timeline"));
 app.get("/reasons", isAuth, (req, res) => res.render("reasons"));
 app.get("/voice-memory", isAuth, (req, res) => res.render("voice-memory"));
