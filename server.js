@@ -328,22 +328,47 @@ app.use('/', reelsRouter);
 
 app.get("/journal", isAuth, async (req, res) => {
     try {
-        const items = await Journal.find().sort({ timestamp: -1 });
-        res.render("journal", { items });
+        const entries = await Journal.find().sort({ date: -1, createdAt: -1 });
+        res.render("journal", { entries });
     } catch (err) { res.status(500).send("Journal error 💔"); }
 });
 
-app.post("/api/journal/add", isAuth, upload.single('file'), async (req, res) => {
+app.post("/api/journal/add", isAuth, upload.single('media'), async (req, res) => {
     try {
-        const { text, type } = req.body;
-        const item = new Journal({
-            text, type,
-            fileUrl: req.file ? req.file.path : "",
+        const { description, date } = req.body;
+        let type = 'text';
+        if (req.file) {
+            type = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+        }
+        const entry = new Journal({
+            description, date,
+            filename: req.file ? req.file.path : "",
+            type,
             username: req.session.username || "Bhondu"
         });
-        await item.save();
-        res.redirect("/journal");
-    } catch (err) { res.status(500).send("Journal add failed 💔"); }
+        await entry.save();
+        res.json({ success: true, entry });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.put("/api/journal/edit/:id", isAuth, upload.single('media'), async (req, res) => {
+    try {
+        const { description, date } = req.body;
+        const updateData = { description, date };
+        if (req.file) {
+            updateData.filename = req.file.path;
+            updateData.type = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+        }
+        await Journal.findByIdAndUpdate(req.params.id, updateData);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.delete("/api/journal/delete/:id", isAuth, async (req, res) => {
+    try {
+        await Journal.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
 const memories = [

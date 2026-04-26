@@ -5,6 +5,7 @@ const journalSchema = new mongoose.Schema({
     type: { type: String, enum: ["image", "video", "text"], default: "text" },
     description: { type: String, default: "" },
     date: { type: String, required: true },
+    username: { type: String, default: "Bhondu" },
     createdAt: { type: Date, default: Date.now }
 });
 
