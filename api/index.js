@@ -43,10 +43,17 @@ cloudinary.config({
 });
 
 // ========== MONGODB ==========
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/birthday_db";
-mongoose.connect(MONGODB_URI)
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    console.error("❌ WARNING: MONGODB_URI is missing from Environment Variables!");
+}
+
+mongoose.connect(MONGODB_URI || "mongodb://localhost:27017/birthday_db")
     .then(() => console.log("🍃 Connected to MongoDB"))
-    .catch(err => console.error("❌ MongoDB connection error:", err));
+    .catch(err => {
+        console.error("❌ MongoDB connection error:", err.message);
+        // Do not crash the process, allow health check to run
+    });
 
 // ========== MIDDLEWARE ==========
 const allowedOrigins = [
@@ -618,6 +625,7 @@ app.get("/future-plans", isAuth, (req, res) => res.render("future-plans"));
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
 // Error & Health
+app.get("/api/ping", (req, res) => res.send("pong " + (process.env.NODE_ENV || "development")));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).send("Something went wrong! 💔"); });
 
