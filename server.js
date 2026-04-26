@@ -56,24 +56,8 @@ mongoose.connect(MONGODB_URI || "mongodb://localhost:27017/birthday_db")
     });
 
 // ========== MIDDLEWARE ==========
-const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://bhondu.me",
-    "https://www.bhondu.me",
-    "https://final-phi-ten.vercel.app"
-];
-
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow if no origin (like mobile apps or curl) or if it's in our list
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
-            callback(null, true);
-        } else {
-            console.warn("🚫 CORS Blocked Origin:", origin);
-            callback(new Error("Not allowed by CORS"));
-        }
-    },
+    origin: true, // 1000% Assurity: Allow all origins to prevent any CORS blocks in production
     credentials: true
 }));
 
