@@ -178,6 +178,14 @@ app.post("/api/chat/send", isAuth, async (req, res) => {
         await notif.save();
         await pusher.trigger("private-notifications-" + recipient.toLowerCase(), "new-notification", notif);
 
+        // Send Background Push
+        sendWebPush(recipient, {
+            title: `New message from ${sender}`,
+            content: text || `Sent a ${fileType} 📎`,
+            link: '/chat',
+            sender: sender
+        });
+
         const populated = await Message.findById(msg._id).populate('replyTo');
         await pusher.trigger("presence-bhondu-chat", "new-message", populated);
         res.json({ success: true, message: populated });
@@ -226,6 +234,14 @@ app.post("/api/chat/react", isAuth, async (req, res) => {
                 });
                 await notif.save();
                 await pusher.trigger("private-notifications-" + message.sender.toLowerCase(), "new-notification", notif);
+                
+                // Send Background Push
+                sendWebPush(message.sender, {
+                    title: `New reaction ❤️`,
+                    content: `${username} reacted ${emoji} to your message`,
+                    link: '/chat',
+                    sender: username
+                });
             }
         }
         await message.save();
