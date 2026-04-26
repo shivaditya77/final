@@ -44,28 +44,21 @@
             
             if (!window.globalPusher) {
                 console.log("Initializing Global Pusher...");
-                // Set Global Pusher Log to see errors in console
-                Pusher.logToConsole = true;
+                
+                const cluster = window.PUSHER_CLUSTER || 'ap2';
 
                 window.globalPusher = new Pusher(window.PUSHER_KEY, {
-                    cluster: window.PUSHER_CLUSTER || 'ap2',
+                    cluster: cluster,
                     forceTLS: true,
                     enabledTransports: ['ws', 'xhr_streaming', 'xhr_polling'],
-                    authEndpoint: '/pusher/auth',
-                    auth: {
-                        headers: {
-                            'X-CSRF-Token': 'Pusher-Auth' // Extra security hint
-                        }
-                    }
+                    authEndpoint: '/pusher/auth'
                 });
+
                 window.globalChannel = window.globalPusher.subscribe('presence-soul-connect');
 
-                // Error Monitor
-                window.globalPusher.connection.bind('error', (err) => {
-                    console.error('🔥 Pusher Connection Error:', err);
-                    if (err.error && err.error.data && err.error.data.code === 4004) {
-                        console.error('Pusher Key limit reached or invalid key!');
-                    }
+                // Connection State Logging
+                window.globalPusher.connection.bind('state_change', (states) => {
+                    console.log(`📡 Pusher State: ${states.previous} -> ${states.current}`);
                 });
 
                 window.addEventListener('focus', () => {

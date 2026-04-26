@@ -368,12 +368,29 @@ app.post("/api/user/wallpaper", isAuth, async (req, res) => {
 
 // ========== PUSHER AUTH ==========
 app.post("/pusher/auth", isAuth, (req, res) => {
-    const socketId = req.body.socket_id;
-    const channel = req.body.channel_name;
-    const username = req.session.username || "Bhondu";
-    const presenceData = { user_id: username.toLowerCase(), user_info: { name: username } };
-    const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
-    res.send(authResponse);
+    try {
+        const socketId = req.body.socket_id;
+        const channel = req.body.channel_name;
+        const username = req.session.username || "Bhondu";
+        
+        console.log(`📡 Pusher Auth Request: user="${username}", channel="${channel}"`);
+        
+        if (!socketId || !channel) {
+            console.error("🔥 Pusher Auth Error: Missing socket_id or channel_name");
+            return res.status(400).send("Missing data");
+        }
+
+        const presenceData = { 
+            user_id: username.toLowerCase(), 
+            user_info: { name: username } 
+        };
+        
+        const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
+        res.send(authResponse);
+    } catch (err) {
+        console.error("🔥 Pusher Auth Exception:", err.message);
+        res.status(500).send("Auth failed");
+    }
 });
 
 // ========== PUSH NOTIFICATION UTILITY ==========
