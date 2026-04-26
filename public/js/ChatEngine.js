@@ -726,3 +726,139 @@
         });
     }
 })();
+
+// ========== UI TOGGLES (Moved here for Barba.js compatibility) ==========
+window.toggleHeaderMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('header-dropdown');
+    if (menu) {
+        if (menu.classList.contains('show')) {
+            menu.classList.remove('show');
+        } else {
+            menu.classList.add('show');
+        }
+    }
+};
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('header-dropdown');
+    if (menu && menu.classList.contains('show')) {
+        if (!e.target.closest('.header-dropdown-menu')) {
+            menu.classList.remove('show');
+        }
+    }
+});
+
+window.toggleMediaView = () => {
+    const view = document.getElementById('media-view');
+    if (view && view.style.display === 'flex') {
+        view.style.display = 'none';
+    } else if (view) {
+        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+        view.style.display = 'flex';
+    }
+};
+
+window.toggleSearchView = () => {
+    const view = document.getElementById('search-view');
+    if (view && view.style.display === 'flex') {
+        view.style.display = 'none';
+    } else if (view) {
+        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+        view.style.display = 'flex';
+        const input = document.getElementById('search-input');
+        if (input) input.focus();
+    }
+};
+
+window.toggleStarredView = () => {
+    const view = document.getElementById('starred-view');
+    if (view && view.style.display === 'flex') {
+        view.style.display = 'none';
+    } else if (view) {
+        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+        view.style.display = 'flex';
+    }
+};
+
+window.toggleWallpaperPicker = () => {
+    const view = document.getElementById('wallpaper-picker');
+    if (view && view.style.display === 'flex') {
+        view.style.display = 'none';
+    } else if (view) {
+        document.querySelectorAll('.starred-view').forEach(v => v.style.display = 'none');
+        view.style.display = 'flex';
+    }
+};
+
+window.setWallpaper = async (url) => {
+    const root = document.getElementById('chat-page-root');
+    if (root && url) {
+        root.style.backgroundImage = `url('${url}')`;
+        root.style.backgroundSize = 'cover';
+        root.style.backgroundPosition = 'center';
+    } else if (root) {
+        root.style.backgroundImage = '';
+    }
+    try {
+        await fetch('/api/user/wallpaper', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallpaper: url })
+        });
+    } catch (err) {
+        console.error('Failed to save wallpaper', err);
+    }
+};
+
+window.handleWallpaperUpload = async (input) => {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('media', file);
+    
+    try {
+        const res = await fetch('/api/chat/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.fileUrl) {
+            window.setWallpaper(data.fileUrl);
+        }
+    } catch (err) {
+        alert('Failed to upload wallpaper.');
+    }
+};
+
+window.toggleSettings = () => {
+    alert("Settings coming soon! ❤️");
+};
+
+window.handleSearch = (query) => {
+    const q = (query || "").toLowerCase();
+    const msgs = document.querySelectorAll('.message-bubble');
+    const results = document.getElementById('search-results');
+    if (!results) return;
+    
+    results.innerHTML = '';
+    if (!q) {
+        results.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">Type something to search... ❤️</p>';
+        return;
+    }
+    
+    let found = 0;
+    msgs.forEach(el => {
+        const textEl = el.querySelector('.message-text');
+        if (textEl && textEl.innerText.toLowerCase().includes(q)) {
+            found++;
+            const clone = el.cloneNode(true);
+            const btn = clone.querySelector('.msg-options');
+            if (btn) btn.remove();
+            results.appendChild(clone);
+        }
+    });
+    if (found === 0) {
+        results.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">No matching messages found 😢</p>';
+    }
+};
