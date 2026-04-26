@@ -81,12 +81,8 @@ app.use(helmet({
 }));
 
 // Serve static files from the root public directory
-// Static assets are handled by Vercel routes in production.
-// We only serve them manually for local development.
-if (process.env.NODE_ENV !== 'production') {
-    const publicDir = "public"; // Direct access at root
-    app.use(express.static(path.join(__dirname, publicDir)));
-}
+const publicDir = "public"; 
+app.use(express.static(path.join(__dirname, publicDir)));
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
