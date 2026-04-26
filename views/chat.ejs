@@ -634,10 +634,13 @@
                     };
 
                     appendMessage(msgData, true);
-                    chatInput.value = '';
-                    scrollToBottom(true);
                     createHeartBurst();
                     haptic('click'); // Sending haptic
+
+                    // Optimistic UI: Reset input immediately
+                    chatInput.value = '';
+                    chatInput.style.height = 'auto'; // Reset height
+                    scrollToBottom(true);
 
                     try {
                         const res = await fetch('/api/chat/send', {
@@ -800,26 +803,42 @@
                             const formData = new FormData();
                             formData.append('file', audioBlob, 'voice_note.webm');
                             
-                            const progress = document.getElementById('upload-progress-container');
-                            if (progress) progress.style.display = 'block';
+                            const progressFill = document.getElementById('upload-progress-fill');
+                            const progressLabel = document.getElementById('upload-progress-label');
+                            
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/api/chat/upload', true);
+                            
+                            xhr.upload.onprogress = (e) => {
+                                if (e.lengthComputable) {
+                                    const percent = Math.round((e.loaded / e.total) * 100);
+                                    if (progressFill) progressFill.style.width = percent + '%';
+                                    if (progressLabel) progressLabel.innerText = `Uploading... ${percent}%`;
+                                }
+                            };
 
-                            try {
-                                const res = await fetch('/api/chat/upload', { method: 'POST', body: formData });
-                                const data = await res.json();
-                                
-                                await fetch('/api/chat/send', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ 
-                                        fileUrl: data.fileUrl, 
-                                        fileType: 'audio' 
-                                    })
-                                });
-                            } catch (err) {
-                                alert('Voice note upload failed');
-                            } finally {
+                            xhr.onload = async () => {
+                                if (xhr.status === 200) {
+                                    const data = JSON.parse(xhr.responseText);
+                                    await fetch('/api/chat/send', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ 
+                                            fileUrl: data.fileUrl, 
+                                            fileType: 'audio' 
+                                        })
+                                    });
+                                } else {
+                                    alert('Voice note upload failed');
+                                }
                                 if (progress) progress.style.display = 'none';
-                            }
+                            };
+
+                            xhr.send(formData);
+                        } catch (err) {
+                            console.error(err);
+                            if (progress) progress.style.display = 'none';
+                        }
                             
                             // Stop all tracks to release microphone
                             stream.getTracks().forEach(track => track.stop());
@@ -864,29 +883,50 @@
                     const file = e.target.files[0];
                     if (!file) return;
 
-                    const formData = new FormData();
-                    formData.append('file', file);
+                    const progressFill = document.getElementById('upload-progress-fill');
+                    const progressLabel = document.getElementById('upload-progress-label');
                     const progress = document.getElementById('upload-progress-container');
+                    
                     if (progress) progress.style.display = 'block';
 
-                    try {
-                        const res = await fetch('/api/chat/upload', { method: 'POST', body: formData });
-                        const data = await res.json();
-                        
-                        // Send via API
-                        await fetch('/api/chat/send', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                fileUrl: data.fileUrl, 
-                                fileType: data.fileType 
-                            })
-                        });
-                    } catch (err) {
-                        alert('Upload failed');
-                    } finally {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/chat/upload', true);
+                    
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            if (progressFill) progressFill.style.width = percent + '%';
+                            if (progressLabel) progressLabel.innerText = `Uploading... ${percent}%`;
+                        }
+                    };
+
+                    xhr.onload = async () => {
+                        if (xhr.status === 200) {
+                            const data = JSON.parse(xhr.responseText);
+                            await fetch('/api/chat/send', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    fileUrl: data.fileUrl, 
+                                    fileType: data.fileType 
+                                })
+                            });
+                            fileInput.value = '';
+                        } else {
+                            alert('Upload failed');
+                        }
                         if (progress) progress.style.display = 'none';
-                    }
+                    };
+
+                    xhr.onerror = () => {
+                        alert('Upload failed due to connection error');
+                        if (progress) progress.style.display = 'none';
+                    };
+
+                    xhr.send(formData);
                 });
             }
 
@@ -1076,6 +1116,16 @@
             window.react = async (msgId, emoji) => {
                 haptic('click');
                 
+                // Optimistic UI for reactions
+                const reactionsEl = document.getElementById('reactions-' + msgId);
+                if (reactionsEl) {
+                    const bubble = document.createElement('span');
+                    bubble.className = 'reaction-bubble optimistic';
+                    bubble.innerText = emoji + ' 1';
+                    reactionsEl.appendChild(bubble);
+                    setTimeout(() => bubble.classList.remove('optimistic'), 2000);
+                }
+
                 // Close picker immediately
                 const picker = document.getElementById('picker-' + msgId);
                 if (picker) picker.classList.remove('show');
@@ -1219,6 +1269,60 @@
                 video.src = "";
                 lightbox.classList.remove('show');
             };
+
+            // ========== SWIPE TO REPLY GESTURE ==========
+            let touchStartX = 0;
+            let activeSwipeEl = null;
+
+            document.addEventListener('touchstart', (e) => {
+                const msg = e.target.closest('.chat-message');
+                if (msg) {
+                    touchStartX = e.touches[0].clientX;
+                    activeSwipeEl = msg;
+                }
+            }, {passive: true});
+
+            document.addEventListener('touchmove', (e) => {
+                if (!activeSwipeEl) return;
+                const touchX = e.touches[0].clientX;
+                const diff = touchX - touchStartX;
+                if (diff > 0 && diff < 80) { // Swipe right
+                    activeSwipeEl.style.transform = `translateX(${diff}px)`;
+                    if (diff > 50) activeSwipeEl.style.opacity = '0.7';
+                }
+            }, {passive: true});
+
+            document.addEventListener('touchend', (e) => {
+                if (!activeSwipeEl) return;
+                const touchX = e.changedTouches[0].clientX;
+                const diff = touchX - touchStartX;
+                
+                if (diff > 60) {
+                    haptic('click');
+                    const msgId = activeSwipeEl.id.replace('msg-', '');
+                    const sender = activeSwipeEl.querySelector('.sender-name').innerText;
+                    const text = activeSwipeEl.querySelector('.text')?.innerText || "Media";
+                    showReplyPreview(msgId, sender, text);
+                }
+                
+                activeSwipeEl.style.transform = '';
+                activeSwipeEl.style.opacity = '';
+                activeSwipeEl = null;
+            });
+
+            // Auto-expanding Input
+            if (chatInput) {
+                chatInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = (this.scrollHeight) + 'px';
+                    if (this.scrollHeight > 150) {
+                        this.style.overflowY = 'auto';
+                        this.style.height = '150px';
+                    } else {
+                        this.style.overflowY = 'hidden';
+                    }
+                });
+            }
 
             // Handle URL actions (Video/Voice Call)
             const handleUrlAction = () => {
