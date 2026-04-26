@@ -2,7 +2,6 @@
 <div data-barba="container" data-barba-namespace="chat">
     <link rel="stylesheet" href="/css/Chat.css">
     <link rel="stylesheet" href="/css/VideoCall.css">
-    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <div class="chat-body" id="chat-page-root">
         <canvas id="heartParticles"></canvas>
 
@@ -281,23 +280,24 @@
                 });
             }
 
-            // Improved Auto-scroll to bottom
-            function scrollToBottom(smooth = false) {
-                if (!container) return;
-                const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
+            function scrollToBottom(smooth = true) {
+                if (!container || !msgEnd) return;
+                const behavior = smooth ? 'smooth' : 'auto';
                 
-                if (isAtBottom || !smooth) {
-                    container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: smooth ? 'smooth' : 'auto'
-                    });
-                }
+                // Aggressive scroll to bottom
+                container.scrollTo({ top: container.scrollHeight, behavior });
+                
+                // Fail-safe for mobile browsers/keyboard jumps
+                setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                }, 100);
             }
 
-            // Multiple triggers for 1000% reliability
-            scrollToBottom(false); // Immediate
-            setTimeout(() => scrollToBottom(false), 100); // After layout shift
-            setTimeout(() => scrollToBottom(false), 500); // Fail-safe for Barba sync
+            // Initial scroll sequence for absolute reliability
+            scrollToBottom(false);
+            setTimeout(() => scrollToBottom(false), 100);
+            setTimeout(() => scrollToBottom(false), 500);
+            setTimeout(() => scrollToBottom(false), 1500); 
 
             // If images load later, they might push the scroll up. Fix that:
             container.querySelectorAll('img, video').forEach(el => {
@@ -305,45 +305,47 @@
                 el.addEventListener('loadedmetadata', () => scrollToBottom(false));
             });
 
-            // Status indication - Check initial state immediately
+            // Status indication
             function updateConnectionUI(state) {
                 if (!statusText || !statusDot) return;
-                statusText.innerText = state.charAt(0).toUpperCase() + state.slice(1);
-                statusDot.style.background = state === 'connected' ? '#4caf50' : '#ffeb3b';
-                if (state === 'unavailable' || state === 'failed' || state === 'disconnected') {
-                    statusText.innerText = state === 'disconnected' ? 'Disconnected' : 'Offline';
-                    statusDot.style.background = '#f44336';
-                    statusText.style.color = '#f44336';
-                } else if (state === 'connected') {
+                console.log("Pusher Connection State:", state);
+                
+                if (state === 'connected') {
+                    statusText.innerText = 'Connected';
                     statusText.style.color = '#4caf50';
-                    // If we're connected, trigger the online status check
+                    statusDot.style.background = '#4caf50';
+                    // Re-check online status
                     if (channel && channel.subscribed) {
-                        const members = channel.members;
-                        if (members) updateStatusUI(members.count > 1);
+                        updateStatusUI(channel.members.count > 1);
                     }
+                } else if (state === 'connecting') {
+                    statusText.innerText = 'Connecting...';
+                    statusText.style.color = '#ffeb3b';
+                    statusDot.style.background = '#ffeb3b';
+                } else {
+                    statusText.innerText = 'Offline';
+                    statusText.style.color = '#f44336';
+                    statusDot.style.background = '#f44336';
                 }
             }
 
-            // Set initial state
-            updateConnectionUI(pusher.connection.state);
+            // Set initial state and start heartbeat
+            if (pusher) {
+                updateConnectionUI(pusher.connection.state);
+                
+                // If stuck in connecting, check again in 2 seconds
+                setTimeout(() => {
+                    if (pusher.connection.state === 'connecting') {
+                        console.log("Stuck in connecting, forcing UI update...");
+                        updateConnectionUI(pusher.connection.state);
+                    }
+                }, 2000);
 
-            // Clean up previous listeners to prevent duplicates during Barba transitions
-            pusher.connection.unbind('state_change');
-            if (channel) {
-                channel.unbind('new-message');
-                channel.unbind('message-deleted');
-                channel.unbind('message-edited');
-                channel.unbind('messages-read');
-                channel.unbind('message-reaction');
-                channel.unbind('user-typing');
-                channel.unbind('pusher:subscription_succeeded');
-                channel.unbind('pusher:member_added');
-                channel.unbind('pusher:member_removed');
+                pusher.connection.unbind('state_change');
+                pusher.connection.bind('state_change', (states) => {
+                    updateConnectionUI(states.current);
+                });
             }
-
-            pusher.connection.bind('state_change', (states) => {
-                updateConnectionUI(states.current);
-            });
 
             pusher.connection.bind('connected', () => {
                 // Initial check will happen in subscription_succeeded
