@@ -1,7 +1,7 @@
 {
   "version": 2,
   "functions": {
-    "server.js": {
+    "api/index.js": {
       "includeFiles": "{views/**,reels_list.json}"
     }
   },
@@ -20,7 +20,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "/api/index.js"
     }
   ]
 }
