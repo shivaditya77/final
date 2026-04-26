@@ -134,8 +134,17 @@
 
     pusher.connection.bind('state_change', (sc) => {
         updateConnectionUI(sc.current);
+        console.log(`Chat Engine: State changed to ${sc.current}`);
         if (sc.current === 'connecting') startConnectionCheck();
         else if (connectionTimeout) clearTimeout(connectionTimeout);
+    });
+
+    pusher.connection.bind('error', (err) => {
+        console.error('Chat Engine: Pusher Error', err);
+        if (statusText) {
+            statusText.innerText = 'Connection Error ⚠️';
+            statusText.style.color = '#ff9800';
+        }
     });
     
     updateConnectionUI(pusher.connection.state);

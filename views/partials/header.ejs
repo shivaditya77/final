@@ -38,24 +38,38 @@
 
         function initGlobalPusher() {
             if (!window.PUSHER_KEY || window.PUSHER_KEY === "") {
-                console.error("🔥 Chat Engine: PUSHER_KEY is missing! Check Vercel Env Vars.");
+                console.error("🔥 Chat Engine: PUSHER_KEY is missing!");
                 return null;
             }
             
             if (!window.globalPusher) {
-                console.log("Initializing Global Pusher for cluster:", window.PUSHER_CLUSTER);
+                console.log("Initializing Global Pusher...");
+                // Set Global Pusher Log to see errors in console
+                Pusher.logToConsole = true;
+
                 window.globalPusher = new Pusher(window.PUSHER_KEY, {
-                    cluster: window.PUSHER_CLUSTER,
+                    cluster: window.PUSHER_CLUSTER || 'ap2',
                     forceTLS: true,
-                    enabledTransports: ['ws', 'xhr_streaming', 'xhr_polling'], // Fallback for restrictive networks
-                    authEndpoint: '/pusher/auth'
+                    enabledTransports: ['ws', 'xhr_streaming', 'xhr_polling'],
+                    authEndpoint: '/pusher/auth',
+                    auth: {
+                        headers: {
+                            'X-CSRF-Token': 'Pusher-Auth' // Extra security hint
+                        }
+                    }
                 });
                 window.globalChannel = window.globalPusher.subscribe('presence-soul-connect');
 
-                // Tab Focus Re-Sync
+                // Error Monitor
+                window.globalPusher.connection.bind('error', (err) => {
+                    console.error('🔥 Pusher Connection Error:', err);
+                    if (err.error && err.error.data && err.error.data.code === 4004) {
+                        console.error('Pusher Key limit reached or invalid key!');
+                    }
+                });
+
                 window.addEventListener('focus', () => {
                     if (window.globalPusher && window.globalPusher.connection.state === 'disconnected') {
-                        console.log("Call Guardian: Re-syncing on focus...");
                         window.globalPusher.connect();
                     }
                 });
