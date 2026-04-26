@@ -1,14 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": "{server/views/**,server/reels_list.json,server/models/**,server/routes/**,server/middleware/**}"
-      }
+  "functions": {
+    "server/index.js": {
+      "maxDuration": 60
     }
-  ],
+  },
   "routes": [
     {
       "src": "/assets/(.*)",
