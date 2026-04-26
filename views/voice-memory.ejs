@@ -3,14 +3,7 @@
     <link rel="stylesheet" href="/css/VoiceMemory.css">
     <div class="voice-memory-body">
         <div class="voice-memory-vignette"></div>
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar') %>
 
         <div class="voice-memory-music-control" id="music-toggle-btn">
             <div class="music-icon" id="voice-music-icon">🎶</div>
@@ -28,7 +21,7 @@
                 </div>
 
                 <div class="waveform" id="waveform">
-                    <% for(let i=0; i<12; i++) { %>
+                    <% for(let i=0; i<40; i++) { %>
                         <div class="wave-bar"></div>
                     <% } %>
                 </div>
@@ -40,9 +33,9 @@
                 </div>
 
                 <div class="voice-controls">
-                    <div class="ctrl-btn" id="prev-btn">⏮</div>
-                    <div class="ctrl-btn" id="play-btn">▶</div>
-                    <div class="ctrl-btn" id="next-btn">⏭</div>
+                    <button class="ctrl-btn" id="prev-btn" title="Previous">⏮</button>
+                    <button class="ctrl-btn" id="play-btn" title="Play/Pause">▶</button>
+                    <button class="ctrl-btn" id="next-btn" title="Next">⏭</button>
                 </div>
 
                 <div class="voice-slide-counter">
@@ -104,7 +97,7 @@
                 
                 const currentEl = document.getElementById('current-slide');
                 if (currentEl) currentEl.innerText = num;
-                waveBars.forEach(b => b.classList.remove('active'));
+                updateWaveform(false);
             }
 
             function startTyping(text) {
@@ -125,19 +118,32 @@
                 }, 35);
             }
 
+            function updateWaveform(active) {
+                waveBars.forEach((bar, index) => {
+                    if (active) {
+                        bar.classList.add('active');
+                        // Vary the animation duration for organic feel
+                        bar.style.animationDuration = (0.3 + Math.random() * 0.4) + 's';
+                    } else {
+                        bar.classList.remove('active');
+                        bar.style.animationDuration = '0s';
+                    }
+                });
+            }
+
             if (playBtn) {
                 playBtn.addEventListener('click', () => {
                     if (isPlayingVoice) {
                         voiceAudio.pause();
                         isPlayingVoice = false;
                         playBtn.innerHTML = '▶';
-                        waveBars.forEach(b => b.classList.remove('active'));
+                        updateWaveform(false);
                     } else {
                         voiceAudio.play().catch(e => console.log("Audio play failed", e));
                         isPlayingVoice = true;
                         playBtn.innerHTML = '⏸';
-                        waveBars.forEach(b => b.classList.add('active'));
-                        if (shayariEl && shayariEl.innerText === '') {
+                        updateWaveform(true);
+                        if (shayariEl && (shayariEl.innerText === '' || shayariEl.innerText === '...')) {
                             startTyping(shayariList[currentSlide]);
                         }
                     }

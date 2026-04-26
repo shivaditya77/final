@@ -1,23 +1,13 @@
 <%- include('partials/header') %>
 <div data-barba="container" data-barba-namespace="home">
     <link rel="stylesheet" href="/css/Home.css">
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <div class="home-body">
         <div class="animated-bg"></div>
         <div class="vignette"></div>
         <div class="particles" id="particles-container"></div>
 
-        <!-- Navigation -->
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <div class="nav-btn" id="music-toggle" style="cursor: pointer;">
-                <span id="music-icon">🎶</span><span class="nav-text" id="music-status">On</span>
-            </div>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar', { showMusic: true }) %>
 
         <div class="home-container">
             <div class="intro-badge">
@@ -80,6 +70,35 @@
                         Chat <span class="card-btn-arrow">→</span>
                     </button>
                 </a>
+
+                <!-- Card 4: Reels -->
+                <a href="/reels" class="section-card card-reels">
+                    <span class="card-tag">🔥 Trending</span>
+                    <span class="card-icon">📽️</span>
+                    <div class="card-label">The Feed</div>
+                    <h2 class="card-title">Bhondu Feed</h2>
+                    <p class="card-desc">A curated feed of reels that remind me of us. Swipe up to feel the love. ❤️</p>
+                    <button class="card-btn">
+                        Watch <span class="card-btn-arrow">→</span>
+                    </button>
+                </a>
+
+                <!-- Card 5: Soul Connect -->
+                <div class="section-card card-call">
+                    <span class="card-tag">📞 Live</span>
+                    <span class="card-icon">📞</span>
+                    <div class="card-label">Soul Connect</div>
+                    <h2 class="card-title">Heart Line</h2>
+                    <p class="card-desc">Call my heart anytime. Voice or Video — I'm always just one click away. 💖</p>
+                    <div class="card-status-indicator">
+                        <div class="status-dot-mini" id="home-status-dot"></div>
+                        <span id="home-status-text" style="color: rgba(255,255,255,0.4)">Checking...</span>
+                    </div>
+                    <div class="call-buttons-inline">
+                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(false)">📹 Video Call</button>
+                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(true)">📞 Voice Call</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -158,6 +177,44 @@
                 if (musicStatus) musicStatus.innerText = isPlaying ? 'On' : 'Off';
             }
             setTimeout(syncMusicUI, 100);
+
+            // ========== PUSHER STATUS TRACKING ==========
+            const channel = window.globalChannel;
+            const homeStatusDot = document.getElementById('home-status-dot');
+            const homeStatusText = document.getElementById('home-status-text');
+
+            if (channel) {
+                // Initial check
+                if (channel.members) {
+                    updateHomeStatus(channel.members.count > 1);
+                }
+
+                channel.bind('pusher:subscription_succeeded', (members) => {
+                    updateHomeStatus(members.count > 1);
+                });
+
+                channel.bind('pusher:member_added', (member) => {
+                    if (member.id !== username.toLowerCase()) {
+                        updateHomeStatus(true);
+                    }
+                });
+
+                channel.bind('pusher:member_removed', (member) => {
+                    if (member.id !== username.toLowerCase()) {
+                        updateHomeStatus(false);
+                    }
+                });
+            }
+
+            function updateHomeStatus(isOnline) {
+                if (homeStatusDot) {
+                    homeStatusDot.classList.toggle('online', isOnline);
+                }
+                if (homeStatusText) {
+                    homeStatusText.innerText = isOnline ? 'Online now ❤️' : 'Offline right now 💔';
+                    homeStatusText.style.color = isOnline ? '#00ffcc' : 'rgba(255,255,255,0.4)';
+                }
+            }
         })();
     </script>
 

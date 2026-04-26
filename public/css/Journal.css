@@ -162,12 +162,14 @@
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 20px;
   overflow: hidden;
-  transition: all 0.4s ease;
+  transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   will-change: transform, box-shadow;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .journal-card:hover {
-  transform: translateY(-6px);
+  transform: translate3d(0, -6px, 0) scale(1.01);
   box-shadow: 0 20px 50px rgba(139, 92, 246, 0.3);
   border-color: rgba(139, 92, 246, 0.5);
 }
@@ -314,13 +316,14 @@
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
-  transform: scale(0.9);
-  transition: transform 0.3s;
+  transform: scale(0.9) translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  backface-visibility: hidden;
 }
 
 .journal-overlay.open .journal-modal {
-  transform: scale(1);
+  transform: scale(1) translateZ(0);
 }
 
 .modal-title {
@@ -403,7 +406,7 @@
 }
 
 .btn-save:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px) scale(1.02) translateZ(0);
   box-shadow: 0 15px 30px rgba(255, 77, 109, 0.5);
 }
 
@@ -431,13 +434,13 @@
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 40px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  50% { transform: translateY(-15px) translateZ(0); }
 }
 
 @media (max-width: 768px) {

@@ -16,17 +16,7 @@
         <div class="timeline-scroll-progress" id="timeline-pct">0%</div>
 
         <!-- Navigation -->
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <div class="nav-btn" id="music-toggle" style="cursor: pointer;">
-                <span id="music-icon">🎶</span><span class="nav-text" id="music-status">On</span>
-            </div>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar', { showMusic: true }) %>
 
         <!-- Hero Section -->
         <div class="hero-timeline">

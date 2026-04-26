@@ -13,7 +13,6 @@ const cors = require("cors");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const path = require("path");
-const fs = require("fs");
 const multer = require("multer");
 const mongoose = require("mongoose");
 const Pusher = require("pusher");
@@ -26,6 +25,7 @@ const app = express();
 const Journal = require("./models/Journal");
 const Question = require("./models/Question");
 const Message = require("./models/Message");
+const User = require("./models/User");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -94,17 +94,32 @@ app.use(session({
     saveUninitialized: false,
     store: sessionStore,
     cookie: {
-        secure: true, // Required for HTTPS on Vercel
+        secure: process.env.NODE_ENV === 'production', // Only secure in production (Vercel)
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-        sameSite: 'lax' // Better for same-domain sessions than 'none'
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     },
     name: 'loveSessionId'
 }));
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     res.locals.isAuthenticated = req.session.isAuth;
     res.locals.username = req.session.username || "Bhondu";
+    
+    // Update last seen if authenticated
+    if (req.session.isAuth && req.session.username) {
+        res.locals.pusherKey = process.env.PUSHER_KEY;
+        res.locals.pusherCluster = process.env.PUSHER_CLUSTER;
+        try {
+            await User.findOneAndUpdate(
+                { username: req.session.username.toLowerCase() },
+                { lastSeen: new Date() },
+                { upsert: true }
+            );
+        } catch (e) {
+            console.error("Error updating last seen:", e.message);
+        }
+    }
     next();
 });
 
@@ -131,7 +146,12 @@ const chatUpload = multer({ storage: chatStorage });
 const authRoutes = require("./routes/auth");
 app.use("/", authRoutes);
 
-app.get("/", isAuth, (req, res) => res.render("home"));
+app.get("/", isAuth, (req, res) => {
+    res.render("home", {
+        pusherKey: process.env.PUSHER_KEY, 
+        pusherCluster: process.env.PUSHER_CLUSTER 
+    });
+});
 app.get("/login", (req, res) => {
     if (req.session.isAuth) return res.redirect("/");
     res.render("login", { error: req.session.error });
@@ -189,24 +209,139 @@ app.delete("/api/journal/delete/:id", isAuth, async (req, res) => {
 // Chat API
 app.get("/chat", isAuth, async (req, res) => {
     const username = req.session.username || "Bhondu";
-    const history = await Message.find({ isDeletedForEveryone: false, deletedBy: { $ne: username } }).sort({ timestamp: 1 }).limit(100);
-    res.render("chat", { history, username, pusherKey: process.env.PUSHER_KEY, pusherCluster: process.env.PUSHER_CLUSTER });
+    const history = await Message.find({ isDeletedForEveryone: false, deletedBy: { $ne: username } })
+        .populate('replyTo')
+        .sort({ timestamp: 1 })
+        .limit(100);
+    
+    const user = await User.findOne({ username: username.toLowerCase() });
+    const wallpaper = user ? user.chatWallpaper : '';
+
+    res.render("chat", { 
+        history, 
+        username, 
+        wallpaper,
+        pusherKey: process.env.PUSHER_KEY, 
+        pusherCluster: process.env.PUSHER_CLUSTER 
+    });
 });
+
+// Helper for Link Previews
+async function getLinkPreview(text) {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const match = text.match(urlRegex);
+    if (!match) return null;
+    const url = match[0];
+    try {
+        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(3000) });
+        const html = await response.text();
+        const title = html.match(/<meta property="og:title" content="([^"]+)"/i)?.[1] || 
+                      html.match(/<title>([^<]+)<\/title>/i)?.[1];
+        const description = html.match(/<meta property="og:description" content="([^"]+)"/i)?.[1];
+        const image = html.match(/<meta property="og:image" content="([^"]+)"/i)?.[1];
+        if (!title) return null;
+        return { title, description, image, url };
+    } catch (e) { return null; }
+}
 
 app.post("/api/chat/send", isAuth, async (req, res) => {
     try {
         const { text, fileUrl, fileType, tempId } = req.body;
+        const linkPreview = await getLinkPreview(text);
+
         const newMessage = new Message({ 
             sender: req.session.username || "Bhondu", 
             text: text || "", 
             fileUrl: fileUrl || "", 
             fileType: fileType || 'text',
+            replyTo: req.body.replyTo || null,
+            linkPreview: linkPreview,
             timestamp: new Date()
         });
-        const savedMsg = await newMessage.save();
-        await pusher.trigger("bhondu-chat", "new-message", { ...savedMsg.toObject(), tempId: tempId || null });
+        let savedMsg = await newMessage.save();
+        savedMsg = await Message.findById(savedMsg._id).populate('replyTo');
+        await pusher.trigger("presence-bhondu-chat", "new-message", { ...savedMsg.toObject(), tempId: tempId || null });
         res.json({ success: true, message: savedMsg });
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.post("/api/chat/typing", isAuth, async (req, res) => {
+    try {
+        await pusher.trigger("presence-bhondu-chat", "user-typing", { 
+            username: req.session.username || "Bhondu" 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/mark-read", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+
+        const result = await Message.updateMany(
+            { sender: { $ne: username }, status: 'sent' },
+            { $set: { status: 'read' } }
+        );
+
+        if (result.modifiedCount > 0) {
+            await pusher.trigger("presence-bhondu-chat", "messages-read", { 
+                reader: username
+            });
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/edit", isAuth, async (req, res) => {
+    try {
+        const { msgId, newText } = req.body;
+        const username = req.session.username || "Bhondu";
+        
+        const message = await Message.findById(msgId);
+        if (!message) return res.status(404).json({ success: false });
+        if (message.sender !== username) return res.status(403).json({ success: false });
+
+        const linkPreview = await getLinkPreview(newText);
+        
+        message.text = newText;
+        message.linkPreview = linkPreview;
+        message.isEdited = true;
+        await message.save();
+
+        await pusher.trigger("presence-bhondu-chat", "message-edited", { 
+            msgId, 
+            newText, 
+            linkPreview,
+            isEdited: true 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/react", isAuth, async (req, res) => {
+    try {
+        const { msgId, emoji } = req.body;
+        const username = req.session.username || "Bhondu";
+        
+        const message = await Message.findById(msgId);
+        if (!message) return res.status(404).json({ success: false });
+
+        // Find if user already reacted with this exact emoji
+        const existingIndex = message.reactions.findIndex(r => r.emoji === emoji && r.username === username);
+
+        if (existingIndex > -1) {
+            // Remove reaction (toggle off)
+            message.reactions.splice(existingIndex, 1);
+        } else {
+            // Add reaction
+            message.reactions.push({ emoji, username });
+        }
+
+        await message.save();
+        await pusher.trigger("presence-bhondu-chat", "message-reaction", { msgId, reactions: message.reactions });
+        res.json({ success: true, reactions: message.reactions });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
 app.post("/api/chat/upload", isAuth, chatUpload.single("file"), (req, res) => {
@@ -230,12 +365,202 @@ app.post("/api/chat/delete-everyone", isAuth, async (req, res) => {
         const msg = await Message.findById(req.body.msgId);
         if (msg.sender === (req.session.username || "Bhondu")) {
             await Message.findByIdAndUpdate(req.body.msgId, { isDeletedForEveryone: true });
-            await pusher.trigger("bhondu-chat", "message-deleted", req.body.msgId);
+            await pusher.trigger("presence-bhondu-chat", "message-deleted", req.body.msgId);
             res.json({ success: true });
         } else {
             res.status(403).json({ success: false, error: "Not authorized" });
         }
     } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// Pusher Auth
+app.post("/pusher/auth", isAuth, (req, res) => {
+    const socketId = req.body.socket_id;
+    const channel = req.body.channel_name;
+    const username = req.session.username || "Bhondu";
+    
+    const presenceData = {
+        user_id: username.toLowerCase(),
+        user_info: { name: username }
+    };
+    
+    const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
+    res.send(authResponse);
+});
+
+app.post("/api/chat/star", isAuth, async (req, res) => {
+    try {
+        const { msgId } = req.body;
+        const username = req.session.username || "Bhondu";
+        const message = await Message.findById(msgId);
+        if (!message) return res.status(404).json({ success: false });
+
+        const index = message.isStarredBy.indexOf(username);
+        if (index > -1) {
+            message.isStarredBy.splice(index, 1);
+        } else {
+            message.isStarredBy.push(username);
+        }
+        await message.save();
+        res.json({ success: true, isStarred: message.isStarredBy.includes(username) });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/delete-for-me", isAuth, async (req, res) => {
+    try {
+        const { msgId } = req.body;
+        const username = req.session.username || "Bhondu";
+        await Message.findByIdAndUpdate(msgId, { $addToSet: { deletedBy: username } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/chat/delete-for-everyone", isAuth, async (req, res) => {
+    try {
+        const { msgId } = req.body;
+        const username = req.session.username || "Bhondu";
+        const message = await Message.findById(msgId);
+        if (message.sender === username) {
+            message.isDeletedForEveryone = true;
+            await message.save();
+            await pusher.trigger("presence-bhondu-chat", "message-deleted", msgId);
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/api/chat/starred", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        const starred = await Message.find({ isStarredBy: username }).sort({ timestamp: -1 }).populate('replyTo');
+        res.json({ success: true, starred });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// ========== VIDEO CALL SIGNALING ==========
+app.post("/api/video/signal", isAuth, async (req, res) => {
+    try {
+        const { to, signal, type } = req.body;
+        const from = req.session.username || "Bhondu";
+        // Trigger event to the specific channel
+        await pusher.trigger("presence-bhondu-chat", "video-signal", { 
+            from, 
+            to, 
+            ...req.body 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// ========== WATCHING TOGETHER API ==========
+app.post("/api/reels/watching", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-watching-reel", { 
+            username, 
+            reelIndex 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/heart", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-hearted-reel", { 
+            username, 
+            reelIndex 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/sync-scroll", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-scrolled-reel", { 
+            username, 
+            reelIndex 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/poke", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-poked", { 
+            username 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/comment", isAuth, async (req, res) => {
+    try {
+        const { reelIndex, text } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-reel-comment", { 
+            username, 
+            reelIndex, 
+            text 
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+const reelsRouter = require('./routes/reels');
+app.use('/', reelsRouter);
+
+app.get("/api/chat/search", isAuth, async (req, res) => {
+    try {
+        const { q } = req.query;
+        const username = req.session.username || "Bhondu";
+        if (!q) return res.json({ success: true, results: [] });
+        
+        const results = await Message.find({
+            text: { $regex: q, $options: 'i' },
+            isDeletedForEveryone: false,
+            deletedBy: { $ne: username }
+        }).sort({ timestamp: -1 }).limit(50).populate('replyTo');
+        
+        res.json({ success: true, results });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/api/chat/media", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        const media = await Message.find({
+            fileUrl: { $ne: "" },
+            isDeletedForEveryone: false,
+            deletedBy: { $ne: username }
+        }).sort({ timestamp: -1 });
+        res.json({ success: true, media });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/user/wallpaper", isAuth, async (req, res) => {
+    try {
+        const { wallpaperUrl } = req.body;
+        const username = req.session.username || "Bhondu";
+        await User.findOneAndUpdate(
+            { username: username.toLowerCase() },
+            { chatWallpaper: wallpaperUrl },
+            { upsert: true }
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/api/user/status/:username", isAuth, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username.toLowerCase() });
+        res.json({ lastSeen: user ? user.lastSeen : null });
+    } catch (err) { res.status(500).json({ error: "Failed" }); }
 });
 
 // Memories & Others
@@ -253,12 +578,27 @@ const memories = [
 
 app.get("/memories", isAuth, (req, res) => res.render("memories", { memories, name: req.session.username || "Bhondu" }));
 app.get("/api/questions", isAuth, async (req, res) => {
-    const q = await Question.findOne({ username: req.session.username || "Bhondu" });
+    const username = (req.session.username || "Bhondu").toLowerCase();
+    const q = await Question.findOne({ username });
     res.json(q ? q.answers : {});
 });
+
 app.post("/api/questions/save", isAuth, async (req, res) => {
-    await Question.findOneAndUpdate({ username: req.session.username || "Bhondu" }, { answers: req.body.answers }, { upsert: true });
-    res.json({ success: true });
+    try {
+        const username = (req.session.username || "Bhondu").toLowerCase();
+        await Question.findOneAndUpdate(
+            { username }, 
+            { 
+                answers: req.body.answers,
+                updatedAt: new Date()
+            }, 
+            { upsert: true, new: true }
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Error saving questions:", err);
+        res.status(500).json({ success: false, error: "Failed to save" });
+    }
 });
 
 // Other Pages
@@ -276,4 +616,13 @@ app.get("/final", isAuth, (req, res) => res.render("final"));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).send("Something went wrong! 💔"); });
 
+
 module.exports = app;
+
+// Only start the server locally (Vercel will ignore this)
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+        console.log(`🚀 Local server running at http://localhost:${PORT}`);
+    });
+}

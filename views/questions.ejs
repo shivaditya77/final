@@ -5,14 +5,7 @@
         <div class="questions-vignette"></div>
         <div class="questions-floating-hearts" id="hearts-container"></div>
 
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar') %>
 
         <div class="questions-music-control" id="music-toggle-btn">
             <div class="music-icon" id="questions-music-icon">🎶</div>
@@ -22,8 +15,11 @@
             <h1>9 Questions 💕</h1>
             <div class="questions-subtitle">Answer these from your heart... I'll read every word ❤️</div>
             
-            <div class="questions-progress-bar-container">
-                <div class="questions-progress-fill" id="progress-fill" style="width: 0%"></div>
+            <div class="questions-status-bar">
+                <div class="questions-progress-bar-container">
+                    <div class="questions-progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="save-status" class="save-status">Checking connection...</div>
             </div>
 
             <form id="questions-form">
@@ -45,20 +41,20 @@
                     <div class="question-card">
                         <div class="question-number"><%= q.icon %> QUESTION <%= q.num %> / 9</div>
                         <div class="question-text"><%= q.text %></div>
-                        <input
-                            type="text"
+                        <textarea
                             class="answer-input"
                             id="<%= q.id %>"
-                            placeholder="Type your answer here..."
-                        />
+                            placeholder="Type your heartfelt answer here..."
+                            rows="2"
+                        ></textarea>
                     </div>
                 <% }) %>
             </form>
 
             <div class="questions-button-group">
-                <button class="questions-save-btn" id="save-btn">💾 Save My Answers</button>
+                <button class="questions-save-btn" id="save-btn">💾 Save Now</button>
                 <button class="questions-final-btn" id="final-btn">💕 Continue to Timeline 💕</button>
-                <button class="questions-skip-btn" id="skip-btn">⏩ Skip and Proceed</button>
+                <button class="questions-skip-btn" id="skip-btn">⏩ Skip</button>
             </div>
         </div>
 
@@ -87,6 +83,7 @@
             const progressFill = document.getElementById('progress-fill');
             const toast = document.getElementById('questions-toast');
             const inputs = document.querySelectorAll('.answer-input');
+            const saveStatus = document.getElementById('save-status');
 
             function updateProgress() {
                 if (!progressFill) return;
@@ -95,24 +92,36 @@
                 progressFill.style.width = (filled / 9 * 100) + '%';
             }
 
-            inputs.forEach(i => i.addEventListener('input', updateProgress));
+            let saveTimeout;
+            inputs.forEach(i => i.addEventListener('input', () => {
+                updateProgress();
+                if (saveStatus) saveStatus.innerText = 'Typing...';
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => saveAnswers(false), 2000); 
+            }));
 
             async function fetchAnswers() {
                 try {
                     const res = await fetch('/api/questions');
                     const data = await res.json();
-                    if (data) {
+                    if (data && Object.keys(data).length > 0) {
                         Object.keys(data).forEach(id => {
                             const input = document.getElementById(id);
                             if (input) input.value = data[id];
                         });
                         updateProgress();
+                        if (saveStatus) saveStatus.innerText = 'Saved to database ✅';
+                    } else {
+                        if (saveStatus) saveStatus.innerText = 'Ready to start ❤️';
                     }
-                } catch (err) {}
+                } catch (err) {
+                    if (saveStatus) saveStatus.innerText = 'Offline ❌';
+                }
             }
             fetchAnswers();
 
             async function saveAnswers(showMsg = true) {
+                if (saveStatus) saveStatus.innerText = 'Saving... 💾';
                 const answers = {};
                 inputs.forEach(i => answers[i.id] = i.value);
                 try {
@@ -121,17 +130,24 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ answers })
                     });
-                    if (res.ok && showMsg) {
-                        let allFilled = true;
-                        inputs.forEach(i => { if (i.value.trim() === '') allFilled = false; });
-                        displayToast(allFilled ? '💕 All answers saved! Thank you my love! 💕' : '💾 Answers saved! (Empty ones can be filled later) 💾');
+                    if (res.ok) {
+                        if (saveStatus) saveStatus.innerText = 'All changes saved ✅';
+                        if (showMsg) {
+                            let allFilled = true;
+                            inputs.forEach(i => { if (i.value.trim() === '') allFilled = false; });
+                            displayToast(allFilled ? '💕 All answers saved! Thank you my love! 💕' : '💾 Answers saved! (Empty ones can be filled later) 💾');
+                        }
+                    } else {
+                        if (saveStatus) saveStatus.innerText = 'Save failed ⚠️';
                     }
-                } catch (err) {}
+                } catch (err) {
+                    if (saveStatus) saveStatus.innerText = 'Connection error ❌';
+                }
             }
 
             const saveBtn = document.getElementById('save-btn');
             if (saveBtn) {
-                saveBtn.addEventListener('click', () => saveAnswers());
+                saveBtn.addEventListener('click', () => saveAnswers(true));
             }
 
             const skipBtn = document.getElementById('skip-btn');

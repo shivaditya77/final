@@ -3,6 +3,9 @@
     <!-- Music Player -->
     <%- include('music') %>
 
+    <!-- Global Call UI -->
+    <%- include('call') %>
+
     <!-- Global Scripts -->
     <script>
         // ========== BARBA.JS INITIALIZATION ==========
@@ -10,27 +13,48 @@
 
         barba.init({
             prefetch: true,
+            sync: true,
             transitions: [{
-                name: 'opacity-transition',
-                leave(data) {
-                    gsap.set('.transition-overlay', { visibility: 'visible' });
-                    return gsap.to('.transition-overlay', {
-                        duration: 0.6,
-                        scaleY: 1,
-                        transformOrigin: 'bottom',
-                        ease: 'power2.inOut'
+                name: 'pro-ghost-slide',
+                async leave(data) {
+                    // Start blurring and fading the current page
+                    return gsap.to(data.current.container, {
+                        duration: 0.4,
+                        opacity: 0,
+                        filter: 'blur(15px)',
+                        scale: 0.96,
+                        ease: 'power2.in'
                     });
                 },
-                enter(data) {
-                    // Scroll to top on new page
-                    window.scrollTo(0, 0);
-                    
+                async enter(data) {
                     // Update Background Music Track
                     if (window.updateMusicTrack) {
                         window.updateMusicTrack(window.location.pathname);
                     }
+
+                    // Morph Body Background based on destination
+                    const path = window.location.pathname;
+                    let targetBg = '#0a0a0a';
+                    if (path.includes('journal')) targetBg = '#0f0c29';
+                    else if (path.includes('chat')) targetBg = '#1a1405';
+                    else if (path.includes('memories')) targetBg = '#1a0b0f';
                     
-                    // Re-run any scripts found in the new container
+                    gsap.to('body', {
+                        backgroundColor: targetBg,
+                        duration: 0.6,
+                        ease: 'power2.out'
+                    });
+
+                    // Prepare next container
+                    gsap.set(data.next.container, {
+                        opacity: 0,
+                        filter: 'blur(15px)',
+                        scale: 1.04
+                    });
+
+                    window.scrollTo(0, 0);
+
+                    // Re-run scripts
                     const scripts = data.next.container.querySelectorAll('script');
                     scripts.forEach(script => {
                         const newScript = document.createElement('script');
@@ -39,15 +63,14 @@
                         script.parentNode.replaceChild(newScript, script);
                     });
 
-                    gsap.set('.transition-overlay', { transformOrigin: 'top' });
-                    return gsap.to('.transition-overlay', {
-                        duration: 0.6,
-                        scaleY: 0,
-                        ease: 'power2.inOut',
-                        delay: 0.2,
-                        onComplete: () => {
-                            gsap.set('.transition-overlay', { visibility: 'hidden' });
-                        }
+                    // Snappy fade and focus
+                    return gsap.to(data.next.container, {
+                        duration: 0.5,
+                        opacity: 1,
+                        filter: 'blur(0px)',
+                        scale: 1,
+                        ease: 'power3.out',
+                        clearProps: 'all'
                     });
                 }
             }]

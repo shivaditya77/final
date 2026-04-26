@@ -3,36 +3,51 @@
     <link rel="stylesheet" href="/css/Reasons.css">
     <div class="reasons-body">
         <div class="reasons-netflix-intro" id="reasons-intro">
-            <div class="reasons-netflix-logo">
-                100 Reasons ❤️
-                <span>FOR YOU, BHONDU</span>
+            <div class="netflix-content">
+                <div class="reasons-netflix-logo">
+                    100 Reasons ❤️
+                    <span>A Bhondu Original Series</span>
+                </div>
+                <div class="intro-loading-bar">
+                    <div class="loading-fill"></div>
+                </div>
             </div>
         </div>
 
         <div class="reasons-vignette"></div>
         <div class="reasons-grain"></div>
 
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar') %>
 
         <div class="reasons-music-control" id="music-toggle-btn">
             <div class="music-icon" id="reasons-music-icon">🎶</div>
         </div>
 
         <div class="reasons-container">
-            <div class="cinematic-title">
+            <header class="cinematic-header">
                 <h1>100 Reasons Why I Love You 💕</h1>
-                <div class="reasons-subtitle">Scroll to unlock each reason... ❤️</div>
-            </div>
+                <div class="reasons-subtitle">Every scroll reveals another piece of my heart... ❤️</div>
+                
+                <div class="reasons-toolbar">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="reasons-search" placeholder="Find a reason...">
+                    </div>
+                    <button class="shuffle-btn" id="shuffle-btn" title="Random Reason">
+                        🎲 Shuffle
+                    </button>
+                </div>
+            </header>
 
-            <div class="unlock-counter">
-                🔓 <span id="unlock-count">0</span> / 100 Reasons Unlocked
+            <div class="unlock-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="unlock-count">0</span>
+                    <span class="stat-label">Unlocked</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">100%</span>
+                    <span class="stat-label">Love</span>
+                </div>
             </div>
 
             <div class="reasons-progress-container">
@@ -146,18 +161,19 @@
                 %>
 
                 <% reasonsList.forEach((reason, index) => { %>
-                    <div class="reason-card locked" id="reason-<%= index %>">
+                    <div class="reason-card locked" id="reason-<%= index %>" ondblclick="heartReason('<%= index %>')">
                         <div class="lock-icon">🔒</div>
                         <div class="reason-number">
                             <span class="heart-icon">❤️</span> REASON <%= index + 1 %>/<%= reasonsList.length %>
                         </div>
                         <div class="reason-text" style="filter: blur(5px)"><%= reason %></div>
+                        <div class="reason-heart-pop" id="heart-pop-<%= index %>">❤️</div>
                     </div>
                 <% }) %>
             </div>
         </div>
 
-        <a href="/voice-memory" class="reasons-next-btn" id="next-btn" style="display: none; text-decoration: none;">
+        <a href="/voice-memory" class="reasons-next-btn" id="next-btn" style="text-decoration: none;">
             <span>🎤 Continue to Voice Message</span>
             <span>→</span>
         </a>
@@ -181,15 +197,63 @@
             const intro = document.getElementById('reasons-intro');
             if (intro) {
                 setTimeout(() => {
-                    if (intro) {
-                        intro.style.opacity = '0';
-                        setTimeout(() => intro.remove(), 1000);
+                    intro.classList.add('fade-out');
+                    setTimeout(() => intro.remove(), 800);
+                }, 1200); // Faster intro (1.2s instead of 3s)
+            }
+
+            // ========== SEARCH & SHUFFLE ==========
+            const searchInput = document.getElementById('reasons-search');
+            const shuffleBtn = document.getElementById('shuffle-btn');
+            const cards = document.querySelectorAll('.reason-card');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    const term = e.target.value.toLowerCase();
+                    cards.forEach(card => {
+                        const text = card.querySelector('.reason-text').innerText.toLowerCase();
+                        if (text.includes(term)) {
+                            card.style.display = 'flex';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            }
+
+            if (shuffleBtn) {
+                shuffleBtn.addEventListener('click', () => {
+                    const randomIndex = Math.floor(Math.random() * cards.length);
+                    const target = document.getElementById('reason-' + randomIndex);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        target.classList.add('highlight-glow');
+                        setTimeout(() => target.classList.remove('highlight-glow'), 2000);
                     }
-                }, 2500);
+                });
+            }
+
+            // ========== INTERSECTION OBSERVER (FADE IN) ==========
+            const cardObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in-view');
+                    }
+                });
+            }, { 
+                threshold: 0.01, // Very sensitive
+                rootMargin: '0px 0px 200px 0px' // Proactive: Trigger 200px BEFORE it enters
+            });
+
+            cards.forEach(card => cardObserver.observe(card));
+
+            // Force reveal first 4 cards immediately as a safety measure
+            for(let i=0; i<4; i++) {
+                if(cards[i]) cards[i].classList.add('in-view');
             }
 
             // ========== SCROLL LOGIC ==========
-            const actualReasons = document.querySelectorAll('.reason-card').length;
+            const actualReasons = cards.length;
             let unlockedUpTo = 0;
             const progressFill = document.getElementById('reasons-progress');
             const scrollPctText = document.getElementById('scroll-pct');
@@ -199,51 +263,82 @@
 
             function handleScroll() {
                 if (!progressFill) return;
-                const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
-                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-                const scrolled = (winScroll / height) * 100;
-                const pct = Math.round(scrolled);
+                
+                const winHeight = window.innerHeight;
+                const docHeight = document.documentElement.scrollHeight;
+                const scrollTop = window.scrollY || document.documentElement.scrollTop;
+                const scrolled = (scrollTop / (docHeight - winHeight)) * 100;
+                const pct = Math.min(100, Math.round(scrolled));
 
-                if (progressFill) progressFill.style.width = pct + '%';
+                progressFill.style.width = pct + '%';
                 if (scrollPctText) scrollPctText.innerText = pct + '%';
 
-                const targetUnlocked = Math.min(actualReasons, Math.max(1, Math.floor((scrolled / 100) * actualReasons)));
+                // Unlock based on scroll position - ensure we reach the end
+                const targetUnlocked = Math.ceil((scrolled / 100) * actualReasons);
                 
                 if (targetUnlocked > unlockedUpTo) {
-                    for (let i = unlockedUpTo; i < targetUnlocked; i++) {
+                    for (let i = 0; i < targetUnlocked; i++) {
                         const card = document.getElementById('reason-' + i);
                         if (card && card.classList.contains('locked')) {
-                            card.classList.remove('locked');
-                            card.classList.add('unlocked');
-                            const lock = card.querySelector('.lock-icon');
-                            if (lock) lock.remove();
-                            const txt = card.querySelector('.reason-text');
-                            if (txt) txt.style.filter = 'none';
-                            const badge = document.createElement('div');
-                            badge.className = 'new-badge';
-                            badge.innerText = 'NEW';
-                            card.appendChild(badge);
-                            setTimeout(() => badge.remove(), 5000);
+                            unlockCard(card);
                         }
                     }
-                    unlockedUpTo = targetUnlocked;
-                    if (unlockCountText) unlockCountText.innerText = unlockedUpTo;
+                    unlockedUpTo = Math.max(unlockedUpTo, targetUnlocked);
+                    if (unlockCountText) unlockCountText.innerText = Math.min(actualReasons, unlockedUpTo);
                 }
 
-                if (pct > 85 && nextBtn) {
-                    nextBtn.style.display = 'flex';
+                if (pct > 90 && nextBtn) {
                     nextBtn.classList.add('show');
                 }
 
-                if (unlockedUpTo >= actualReasons && popupOverlay && popupOverlay.style.display === 'none') {
+                // Final check when at bottom
+                if (pct >= 99) {
+                    if (unlockedUpTo < actualReasons) {
+                        cards.forEach(c => unlockCard(c));
+                        unlockedUpTo = actualReasons;
+                        if (unlockCountText) unlockCountText.innerText = actualReasons;
+                    }
+                    if (nextBtn) nextBtn.classList.add('show');
+                }
+
+                if (unlockedUpTo >= actualReasons && popupOverlay && !popupOverlay.classList.contains('show')) {
                     setTimeout(() => {
                         if (popupOverlay) {
-                            popupOverlay.style.display = 'flex';
+                            popupOverlay.classList.add('show');
                             createHeartExplosion();
                         }
-                    }, 1000);
+                    }, 800);
                 }
             }
+
+            function unlockCard(card) {
+                card.classList.remove('locked');
+                card.classList.add('unlocked');
+                card.classList.add('in-view'); // Backup to ensure it's never black
+                const lock = card.querySelector('.lock-icon');
+                if (lock) lock.remove();
+                const txt = card.querySelector('.reason-text');
+                if (txt) txt.style.filter = 'none';
+                
+                const badge = document.createElement('div');
+                badge.className = 'new-badge';
+                badge.innerText = 'UNLOCKED';
+                card.appendChild(badge);
+                setTimeout(() => badge.remove(), 4000);
+            }
+
+            window.heartReason = (index) => {
+                const card = document.getElementById('reason-' + index);
+                if (card.classList.contains('locked')) return;
+                
+                const heart = document.getElementById('heart-pop-' + index);
+                if (heart) {
+                    heart.classList.remove('pop');
+                    void heart.offsetWidth;
+                    heart.classList.add('pop');
+                    card.classList.add('hearted');
+                }
+            };
 
             window.addEventListener('scroll', handleScroll);
             handleScroll();
@@ -251,7 +346,7 @@
             const popupClose = document.getElementById('popup-close');
             if (popupClose) {
                 popupClose.addEventListener('click', () => {
-                    if (popupOverlay) popupOverlay.style.display = 'none';
+                    if (popupOverlay) popupOverlay.classList.remove('show');
                 });
             }
 

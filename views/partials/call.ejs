@@ -1,0 +1,350 @@
+<!-- VIDEO CALL OVERLAY -->
+<div id="video-call-overlay" class="video-call-overlay" style="display:none">
+    <div class="call-header">
+        <div class="call-status" id="call-status">Calling...</div>
+        <div class="call-timer" id="call-timer" style="display:none">00:00</div>
+    </div>
+    <div class="video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <video id="local-video" autoplay playsinline muted></video>
+        <div class="heart-pulse-container" id="heart-pulse" style="display:none">❤️</div>
+    </div>
+    <div class="call-controls">
+        <button class="control-btn" title="Toggle Picture-in-Picture" onclick="togglePiP()" id="pip-btn">🔳</button>
+        <button class="control-btn" id="mute-btn" onclick="toggleMute()">🎤</button>
+        <button class="control-btn" id="camera-btn" onclick="toggleCamera()">📹</button>
+        <button class="control-btn end-call" onclick="endCall()">📞</button>
+    </div>
+</div>
+
+<!-- INCOMING CALL MODAL -->
+<div id="incoming-call-modal" class="incoming-call-modal" style="display:none">
+    <div class="caller-avatar">❤️</div>
+    <div class="caller-info">
+        <h3 id="caller-name">Someone</h3>
+        <p id="call-type-text">Incoming Video Call... ❤️</p>
+    </div>
+    <div class="call-actions">
+        <button class="call-btn accept-btn" onclick="acceptCall()">Accept</button>
+        <button class="call-btn decline-btn" onclick="declineCall()">Decline</button>
+    </div>
+</div>
+
+<!-- RINGTONE -->
+<audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
+<audio id="calling-tone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
+
+<script>
+    (function() {
+        let localStream;
+        let peerConnection;
+        let callStartTime;
+        let timerInterval;
+        let isAlreadyOnCall = false;
+
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        };
+
+        const videoOverlay = document.getElementById('video-call-overlay');
+        const incomingCallModal = document.getElementById('incoming-call-modal');
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const callStatus = document.getElementById('call-status');
+        const callTimer = document.getElementById('call-timer');
+        const ringtone = document.getElementById('ringtone');
+        const callingTone = document.getElementById('calling-tone');
+        const heartPulse = document.getElementById('heart-pulse');
+
+        const username = window.CURRENT_USER;
+        const otherUser = username.toLowerCase() === 'bhondu' ? 'vishu' : 'bhondu';
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            callStartTime = Date.now();
+            callTimer.style.display = 'block';
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+                callTimer.innerText = formatTime(elapsed);
+                callStatus.innerText = `Heart-to-heart... ❤️`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            callTimer.style.display = 'none';
+            callTimer.innerText = '00:00';
+        }
+
+        function createHeartBurst() {
+            if (typeof window.createHeartBurst === 'function') {
+                window.createHeartBurst();
+            } else {
+                // Fallback local heart burst
+                for(let i=0; i<15; i++) {
+                    const h = document.createElement('div');
+                    h.innerHTML = '❤️';
+                    h.style.cssText = `position:fixed; left:50%; top:50%; font-size:30px; pointer-events:none; z-index:100000; transition:all 1s ease-out;`;
+                    document.body.appendChild(h);
+                    const tx = (Math.random() - 0.5) * 400;
+                    const ty = (Math.random() - 0.5) * 400;
+                    setTimeout(() => {
+                        h.style.transform = `translate(${tx}px, ${ty}px) scale(0.5)`;
+                        h.style.opacity = '0';
+                    }, 10);
+                    setTimeout(() => h.remove(), 1000);
+                }
+            }
+        }
+
+        window.startVideoCall = async (audioOnly = false) => {
+            if (isAlreadyOnCall) return;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: !audioOnly, 
+                    audio: true 
+                });
+                localVideo.srcObject = localStream;
+                videoOverlay.style.display = 'flex';
+                callingTone.play().catch(e => console.log("Audio play blocked"));
+                isAlreadyOnCall = true;
+                
+                if (audioOnly) {
+                    localVideo.style.display = 'none';
+                    heartPulse.style.display = 'block';
+                    callStatus.innerText = `Calling my heart... 📞`;
+                } else {
+                    localVideo.style.display = 'block';
+                    heartPulse.style.display = 'none';
+                    callStatus.innerText = `Video calling you... 📹`;
+                }
+
+                await fetch('/api/video/signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        to: otherUser, 
+                        type: 'call-request',
+                        callType: audioOnly ? 'voice' : 'video'
+                    })
+                });
+
+                createPeerConnection();
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                await fetch('/api/video/signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: otherUser, signal: offer, type: 'offer' })
+                });
+
+            } catch (err) {
+                console.error(err);
+                alert("Please enable camera/mic permissions to connect! 💔");
+                endCall(false);
+            }
+        };
+
+        if (window.globalChannel) {
+            window.globalChannel.bind('video-signal', async (data) => {
+                if (data.to.toLowerCase() !== username.toLowerCase()) return;
+
+                if (data.type === 'call-request') {
+                    if (isAlreadyOnCall) {
+                        fetch('/api/video/signal', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: data.from, type: 'call-rejected', reason: 'busy' })
+                        });
+                        return;
+                    }
+                    document.getElementById('caller-name').innerText = data.from.charAt(0).toUpperCase() + data.from.slice(1);
+                    document.getElementById('call-type-text').innerText = `Incoming ${data.callType || 'video'} call... ❤️`;
+                    incomingCallModal.setAttribute('data-call-type', data.callType || 'video');
+                    incomingCallModal.style.display = 'flex';
+                    ringtone.play().catch(e => console.log("Audio play blocked"));
+                } else if (data.type === 'offer') {
+                    if (!peerConnection) createPeerConnection();
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+                    
+                    if (videoOverlay.style.display === 'flex') {
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        await fetch('/api/video/signal', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: data.from, signal: answer, type: 'answer' })
+                        });
+                        callStatus.innerText = 'Connecting...';
+                    }
+                } else if (data.type === 'answer') {
+                    if (peerConnection) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+                        callingTone.pause();
+                        createHeartBurst();
+                        startTimer();
+                    }
+                } else if (data.type === 'candidate') {
+                    if (peerConnection && data.signal) {
+                        try {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal));
+                        } catch (e) {}
+                    }
+                } else if (data.type === 'call-rejected') {
+                    const reason = data.reason === 'busy' ? 'is on another call' : 'is busy right now';
+                    alert(`${data.from} ${reason}. 💔`);
+                    endCall(false);
+                } else if (data.type === 'call-ended') {
+                    endCall(false);
+                }
+            });
+        }
+
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(iceServers);
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    fetch('/api/video/signal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser, signal: event.candidate, type: 'candidate' })
+                    });
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+                if (!timerInterval) {
+                    startTimer();
+                    createHeartBurst();
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+                    endCall(false);
+                }
+            };
+        }
+
+        window.acceptCall = async () => {
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            const callType = incomingCallModal.getAttribute('data-call-type');
+            incomingCallModal.style.display = 'none';
+            videoOverlay.style.display = 'flex';
+            callStatus.innerText = 'Connecting...';
+            isAlreadyOnCall = true;
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: callType !== 'voice', 
+                    audio: true 
+                });
+                localVideo.srcObject = localStream;
+                
+                if (callType === 'voice') {
+                    localVideo.style.display = 'none';
+                    heartPulse.style.display = 'block';
+                } else {
+                    localVideo.style.display = 'block';
+                    heartPulse.style.display = 'none';
+                }
+                
+                if (!peerConnection) createPeerConnection();
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                if (peerConnection.remoteDescription) {
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    await fetch('/api/video/signal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser, signal: answer, type: 'answer' })
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Camera/Mic error! 💔");
+                endCall();
+            }
+        };
+
+        window.declineCall = async () => {
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            incomingCallModal.style.display = 'none';
+            isAlreadyOnCall = false;
+            await fetch('/api/video/signal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to: otherUser, type: 'call-rejected' })
+            });
+        };
+
+        window.endCall = async (notify = true) => {
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            callingTone.pause();
+            callingTone.currentTime = 0;
+            stopTimer();
+            isAlreadyOnCall = false;
+
+            if (notify) {
+                fetch('/api/video/signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: otherUser, type: 'call-ended' })
+                });
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            videoOverlay.style.display = 'none';
+            incomingCallModal.style.display = 'none';
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+        };
+
+        window.toggleMute = () => {
+            if (!localStream) return;
+            const audioTrack = localStream.getAudioTracks()[0];
+            audioTrack.enabled = !audioTrack.enabled;
+            const btn = document.getElementById('mute-btn');
+            btn.classList.toggle('muted');
+            btn.innerText = audioTrack.enabled ? '🎤' : '🔇';
+        };
+
+        window.toggleCamera = () => {
+            if (!localStream) return;
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (!videoTrack) return;
+            videoTrack.enabled = !videoTrack.enabled;
+            document.getElementById('camera-btn').innerText = videoTrack.enabled ? '📹' : '🚫';
+        };
+
+        window.togglePiP = () => {
+            videoOverlay.classList.toggle('pip-mode');
+            const isPiP = videoOverlay.classList.contains('pip-mode');
+            document.getElementById('pip-btn').innerText = isPiP ? '🔲' : '🔳';
+        };
+    })();
+</script>

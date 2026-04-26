@@ -23,6 +23,37 @@ const messageSchema = new mongoose.Schema({
     isDeletedForEveryone: {
         type: Boolean,
         default: false
+    },
+    status: {
+        type: String,
+        enum: ['sent', 'read'],
+        default: 'sent'
+    },
+    reactions: [{
+        emoji: String,
+        username: String
+    }],
+    replyTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message'
+    },
+    isStarredBy: [String], // List of users who starred this message
+    isSecret: {
+        type: Boolean,
+        default: false
+    },
+    expiresAt: {
+        type: Date
+    },
+    linkPreview: {
+        title: String,
+        description: String,
+        image: String,
+        url: String
+    },
+    isEdited: {
+        type: Boolean,
+        default: false
     }
 });
 

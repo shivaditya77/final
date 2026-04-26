@@ -2,14 +2,7 @@
 <div data-barba="container" data-barba-namespace="outfit">
     <link rel="stylesheet" href="/css/Outfit.css">
     <div class="outfit-body">
-        <div class="nav-container">
-            <a href="/" class="nav-btn" style="text-decoration: none;">
-                <span>🏠</span><span class="nav-text">Home</span>
-            </a>
-            <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">
-                <span>💋</span><span class="nav-text">Logout</span>
-            </a>
-        </div>
+        <%- include('partials/navbar') %>
 
         <div class="outfit-music-control" id="music-toggle-btn">
             <div class="music-icon" id="outfit-music-icon">🎶</div>

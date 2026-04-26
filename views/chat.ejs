@@ -1,6 +1,7 @@
 <%- include('partials/header') %>
 <div data-barba="container" data-barba-namespace="chat">
     <link rel="stylesheet" href="/css/Chat.css">
+    <link rel="stylesheet" href="/css/VideoCall.css">
     <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <div class="chat-body" id="chat-page-root">
         <canvas id="heartParticles"></canvas>
@@ -9,12 +10,19 @@
         <div class="chat-header">
             <div class="chat-header-left">
                 <h1>Private Space ❤️</h1>
-                <div class="chat-status-dot" id="status-dot"></div>
-                <span class="chat-status-text" id="status-text">Connecting...</span>
+                <div class="chat-status-container">
+                    <div class="chat-status-dot" id="status-dot"></div>
+                    <span class="chat-status-text" id="status-text">Connecting...</span>
+                </div>
+                <span class="typing-indicator" id="typing-indicator"></span>
             </div>
             <div class="chat-header-right">
+                <button class="chat-nav-btn" onclick="toggleMediaView()">📁 Media</button>
+                <button class="chat-nav-btn" onclick="toggleSearchView()">🔍 Search</button>
+                <button class="chat-nav-btn" onclick="toggleWallpaperPicker()">🎨 Wallpaper</button>
+                <button class="chat-nav-btn" onclick="toggleStarredView()">⭐ Starred</button>
                 <a href="/" class="chat-nav-btn" style="text-decoration: none;">🏠 Home</a>
-                <a href="/logout" class="chat-nav-btn chat-logout-btn" style="text-decoration: none;" onclick="return confirm('Are you sure you want to logout? ❤️')" data-barba-prevent="true">💋 Logout</a>
+                <a href="/logout" class="chat-nav-btn chat-logout-btn" style="text-decoration: none;" onclick="confirmLogout(event)" data-barba-prevent="true">💋 Logout</a>
             </div>
         </div>
 
@@ -37,19 +45,43 @@
                 <div class="chat-message <%= msg.sender === username ? 'sent' : 'received' %>" id="msg-<%= msg._id %>">
                     <div class="msg-options" onclick="toggleDropdown('<%= msg._id %>')">⋮</div>
                     <div class="msg-dropdown" id="dropdown-<%= msg._id %>">
-                        <button onclick="deleteForMe('<%= msg._id %>')">🗑 Delete for me</button>
-                        <% if (msg.sender === username) { %>
-                            <button onclick="deleteForEveryone('<%= msg._id %>')">🚫 Delete for everyone</button>
+                        <button onclick="showReplyPreview('<%= msg._id %>', '<%= msg.sender %>', '<%= (msg.text || "Media").replace(/'/g, "\\'") %>')">⤴️ Reply</button>
+                        <% if (msg.sender === username && msg.fileType === 'text') { %>
+                            <button onclick="startEditing('<%= msg._id %>', '<%= msg.text.replace(/'/g, "\\'") %>')">✏️ Edit</button>
                         <% } %>
+                        <button onclick="toggleStar('<%= msg._id %>')" id="star-btn-<%= msg._id %>"><%= (msg.isStarredBy || []).includes(username) ? '⭐ Unstar' : '⭐ Star' %></button>
+                        
+                        <div class="divider"></div>
+
+                        <button class="delete-btn" onclick="deleteForMe('<%= msg._id %>')">🗑 Delete for me</button>
+                        <% if (msg.sender === username) { %>
+                            <button class="delete-btn" onclick="deleteForEveryone('<%= msg._id %>')">🚫 Delete for everyone</button>
+                        <% } %>
+                    </div>
+
+                    <div class="reaction-picker-btn" onclick="showReactionPicker('<%= msg._id %>')">❤️+</div>
+                    <div class="reaction-picker" id="picker-<%= msg._id %>">
+                        <span onclick="react('<%= msg._id %>', '❤️')">❤️</span>
+                        <span onclick="react('<%= msg._id %>', '😂')">😂</span>
+                        <span onclick="react('<%= msg._id %>', '😮')">😮</span>
+                        <span onclick="react('<%= msg._id %>', '😢')">😢</span>
+                        <span onclick="react('<%= msg._id %>', '👍')">👍</span>
                     </div>
 
                     <div class="sender-name"><%= msg.sender %></div>
 
+                    <% if (msg.replyTo) { %>
+                        <div class="reply-quote">
+                            <div class="reply-quote-sender"><%= msg.replyTo.sender %></div>
+                            <div class="reply-quote-text"><%= msg.replyTo.text || (msg.replyTo.fileUrl ? "Media" : "...") %></div>
+                        </div>
+                    <% } %>
+
                     <% if (msg.fileUrl) { %>
                         <% if (msg.fileType === 'image') { %>
-                            <img src="<%= msg.fileUrl %>" class="chat-media-img" onclick="window.open('<%= msg.fileUrl %>')">
+                            <img src="<%= msg.fileUrl %>" class="chat-media-img" onclick="openLightbox('<%= msg.fileUrl %>', 'image')">
                         <% } else if (msg.fileType === 'video') { %>
-                            <video src="<%= msg.fileUrl %>" class="chat-media-video" controls playsinline></video>
+                            <video src="<%= msg.fileUrl %>" class="chat-media-video" onclick="openLightbox('<%= msg.fileUrl %>', 'video')"></video>
                         <% } else if (msg.fileType === 'audio') { %>
                             <audio src="<%= msg.fileUrl %>" class="chat-media-audio" controls></audio>
                         <% } %>
@@ -59,10 +91,65 @@
                         <div class="text"><%= msg.text %></div>
                     <% } %>
 
-                    <div class="msg-time"><%= new Date(msg.timestamp || msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) %></div>
+                    <% if (msg.linkPreview && msg.linkPreview.url) { %>
+                        <a href="<%= msg.linkPreview.url %>" target="_blank" class="link-preview">
+                            <% if (msg.linkPreview.image) { %>
+                                <img src="<%= msg.linkPreview.image %>" class="lp-image">
+                            <% } %>
+                            <div class="lp-content">
+                                <div class="lp-title"><%= msg.linkPreview.title %></div>
+                                <% if (msg.linkPreview.description) { %>
+                                    <div class="lp-desc"><%= msg.linkPreview.description %></div>
+                                <% } %>
+                                <div class="lp-url"><%= new URL(msg.linkPreview.url).hostname %></div>
+                            </div>
+                        </a>
+                    <% } %>
+
+                    <div class="reactions-display" id="reactions-<%= msg._id %>">
+                        <% 
+                            const emojiGroups = {};
+                            (msg.reactions || []).forEach(r => {
+                                emojiGroups[r.emoji] = (emojiGroups[r.emoji] || 0) + 1;
+                            });
+                            Object.keys(emojiGroups).forEach(emoji => { 
+                        %>
+                            <span class="reaction-bubble"><%= emoji %> <small><%= emojiGroups[emoji] %></small></span>
+                        <% }) %>
+                    </div>
+
+                    <div class="msg-time">
+                        <%= new Date(msg.timestamp || msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) %>
+                        <% if (msg.sender === username) { %>
+                            <span class="tick <%= msg.status === 'read' ? 'read' : '' %>">✔✔</span>
+                        <% } %>
+                        <span class="msg-star-icon <%= (msg.isStarredBy || []).includes(username) ? 'active' : '' %>" id="star-icon-<%= msg._id %>">⭐</span>
+                        <span class="edited-label" id="edited-<%= msg._id %>" style="<%= msg.isEdited ? '' : 'display:none' %>">(edited)</span>
+                    </div>
+<% if (msg.sender !== username && msg.status === 'sent') { %>
+    <script>fetch('/api/chat/mark-read', {method:'POST'})</script>
+<% } %>
                 </div>
             <% }) %>
             <div id="messages-end"></div>
+        </div>
+
+        <!-- REPLY PREVIEW -->
+        <div class="reply-preview-container" id="reply-preview" style="display:none">
+            <div class="reply-preview-content">
+                <span class="reply-preview-sender" id="reply-preview-sender"></span>
+                <p class="reply-preview-text" id="reply-preview-text"></p>
+            </div>
+            <button type="button" class="reply-preview-close" onclick="cancelReply()">✕</button>
+        </div>
+
+        <!-- EDIT PREVIEW -->
+        <div class="reply-preview-container" id="edit-preview" style="display:none; border-left-color: #ffc107;">
+            <div class="reply-preview-content">
+                <span class="reply-preview-sender" style="color: #ffc107;">Editing Message</span>
+                <p class="reply-preview-text" id="edit-preview-text"></p>
+            </div>
+            <button type="button" class="reply-preview-close" onclick="cancelEdit()">✕</button>
         </div>
 
         <!-- INPUT AREA -->
@@ -80,37 +167,220 @@
         </form>
 
         <div class="chat-toast" id="chat-toast"></div>
+
+        <div class="chat-toast" id="chat-toast"></div>
+
+        <!-- MEDIA GALLERY VIEW -->
+        <div class="starred-view" id="media-view">
+            <div class="starred-header">
+                <h2>📁 Media Gallery</h2>
+                <button onclick="toggleMediaView()">✕</button>
+            </div>
+            <div class="starred-list">
+                <div class="media-gallery-grid" id="media-gallery-list">
+                    <!-- Media items injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SEARCH VIEW -->
+        <div class="starred-view" id="search-view">
+            <div class="starred-header">
+                <h2>🔍 Search Messages</h2>
+                <button onclick="toggleSearchView()">✕</button>
+            </div>
+            <div class="search-input-container">
+                <input type="text" id="search-input" placeholder="Search for memories..." oninput="handleSearch(this.value)">
+            </div>
+            <div class="starred-list" id="search-results">
+                <p style="text-align:center; opacity:0.5; padding:20px;">Type something to search... ❤️</p>
+            </div>
+        </div>
+
+        <!-- STARRED MESSAGES VIEW -->
+        <div class="starred-view" id="starred-view">
+            <div class="starred-header">
+                <h2>⭐ Starred Messages</h2>
+                <button onclick="toggleStarredView()">✕</button>
+            </div>
+            <div class="starred-list" id="starred-list">
+                <!-- Starred messages injected here -->
+            </div>
+        </div>
+
+
+        <!-- WALLPAPER PICKER -->
+        <div class="starred-view" id="wallpaper-picker">
+            <div class="starred-header">
+                <h2>🎨 Chat Wallpaper</h2>
+                <button onclick="toggleWallpaperPicker()">✕</button>
+            </div>
+            <div class="starred-list">
+                <div class="wallpaper-grid">
+                    <div class="wallpaper-item" style="background: var(--bg-dark);" onclick="setWallpaper('')">
+                        <span>Default</span>
+                    </div>
+                    <div class="wallpaper-item" style="background-image: url('https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=200');" onclick="setWallpaper('https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80')"></div>
+                    <div class="wallpaper-item" style="background-image: url('https://images.unsplash.com/photo-1516589174184-c68526673fd0?auto=format&fit=crop&w=200');" onclick="setWallpaper('https://images.unsplash.com/photo-1516589174184-c68526673fd0?auto=format&fit=crop&q=80')"></div>
+                    <div class="wallpaper-item" style="background-image: url('https://images.unsplash.com/photo-1494774157365-9e04c6720e47?auto=format&fit=crop&w=200');" onclick="setWallpaper('https://images.unsplash.com/photo-1494774157365-9e04c6720e47?auto=format&fit=crop&q=80')"></div>
+                    <div class="wallpaper-item" style="background-image: url('https://images.unsplash.com/photo-1581022295087-35e593704911?auto=format&fit=crop&w=200');" onclick="setWallpaper('https://images.unsplash.com/photo-1581022295087-35e593704911?auto=format&fit=crop&q=80')"></div>
+                </div>
+                <hr style="opacity:0.1; margin: 20px 0;">
+                <button class="chat-nav-btn" style="width:100%" onclick="document.getElementById('wallpaper-upload').click()">📤 Upload Custom Photo</button>
+                <input type="file" id="wallpaper-upload" style="display:none" accept="image/*" onchange="handleWallpaperUpload(this)">
+            </div>
+        </div>
+
+        <!-- LIGHTBOX -->
+        <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+            <span class="lightbox-close">&times;</span>
+            <div class="lightbox-content" onclick="event.stopPropagation()">
+                <img id="lightbox-img" src="" style="display:none">
+                <video id="lightbox-video" src="" controls style="display:none"></video>
+            </div>
+        </div>
     </div>
 
     <script>
         (function() {
             if (typeof Pusher === 'undefined') return;
 
-            // Initialize Pusher
-            const pusher = new Pusher('<%= pusherKey %>', {
-                cluster: '<%= pusherCluster %>',
-                forceTLS: true
-            });
+            // ========== PUSHER INITIALIZATION ==========
+            const pusher = window.globalPusher;
+            if (!pusher) {
+                console.error('Pusher not initialized globally');
+                const statusText = document.getElementById('status-text');
+                if (statusText) statusText.innerText = 'Initialization Error 💔';
+                return;
+            }
 
-            const channel = pusher.subscribe('bhondu-chat');
             const username = "<%= username %>";
+            const otherUser = username.toLowerCase() === 'bhondu' ? 'vishu' : 'bhondu';
+            const channel = window.globalChannel;
             const container = document.getElementById('messages-container');
-            const msgEnd = document.getElementById('messages-end');
             const chatForm = document.getElementById('chat-form');
             const chatInput = document.getElementById('chat-input');
             const statusDot = document.getElementById('status-dot');
             const statusText = document.getElementById('status-text');
 
-            if (msgEnd) msgEnd.scrollIntoView();
+            // Improved Auto-scroll to bottom
+            function scrollToBottom(smooth = false) {
+                if (!container) return;
+                container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: smooth ? 'smooth' : 'auto'
+                });
+            }
 
-            // Status indication
-            pusher.connection.bind('connected', () => {
-                if (statusDot) statusDot.style.background = '#4caf50';
-                if (statusText) {
-                    statusText.innerText = 'Connected';
+            // Multiple triggers for 1000% reliability
+            scrollToBottom(false); // Immediate
+            setTimeout(() => scrollToBottom(false), 50); // After small layout shift
+            setTimeout(() => scrollToBottom(false), 300); // Fail-safe for Barba sync
+
+            // If images load later, they might push the scroll up. Fix that:
+            container.querySelectorAll('img').forEach(img => {
+                img.onload = () => scrollToBottom(false);
+            });
+
+            // Status indication - Check initial state immediately
+            function updateConnectionUI(state) {
+                if (!statusText || !statusDot) return;
+                statusText.innerText = state.charAt(0).toUpperCase() + state.slice(1);
+                statusDot.style.background = state === 'connected' ? '#4caf50' : '#ffeb3b';
+                if (state === 'unavailable' || state === 'failed' || state === 'disconnected') {
+                    statusText.innerText = state === 'disconnected' ? 'Disconnected' : 'Offline';
+                    statusDot.style.background = '#f44336';
+                    statusText.style.color = '#f44336';
+                } else if (state === 'connected') {
                     statusText.style.color = '#4caf50';
+                    // If we're connected, trigger the online status check
+                    if (channel && channel.subscribed) {
+                        const members = channel.members;
+                        if (members) updateStatusUI(members.count > 1);
+                    }
+                }
+            }
+
+            // Set initial state
+            updateConnectionUI(pusher.connection.state);
+
+            // Clean up previous listeners to prevent duplicates during Barba transitions
+            pusher.connection.unbind('state_change');
+            if (channel) {
+                channel.unbind('new-message');
+                channel.unbind('message-deleted');
+                channel.unbind('message-edited');
+                channel.unbind('messages-read');
+                channel.unbind('message-reaction');
+                channel.unbind('user-typing');
+                channel.unbind('pusher:subscription_succeeded');
+                channel.unbind('pusher:member_added');
+                channel.unbind('pusher:member_removed');
+            }
+
+            pusher.connection.bind('state_change', (states) => {
+                updateConnectionUI(states.current);
+            });
+
+            pusher.connection.bind('connected', () => {
+                // Initial check will happen in subscription_succeeded
+            });
+
+            channel.bind('pusher:subscription_succeeded', (members) => {
+                const isOtherOnline = members.count > 1;
+                updateStatusUI(isOtherOnline);
+            });
+
+            channel.bind('pusher:member_added', (member) => {
+                if (member.id !== username.toLowerCase()) {
+                    updateStatusUI(true);
                 }
             });
+
+            channel.bind('pusher:member_removed', (member) => {
+                if (member.id !== username.toLowerCase()) {
+                    updateStatusUI(false);
+                }
+            });
+
+            async function updateStatusUI(isOnline) {
+                if (statusDot) statusDot.style.background = isOnline ? '#4caf50' : '#f44336';
+                if (statusText) {
+                    if (isOnline) {
+                        statusText.innerText = 'Online';
+                        statusText.style.color = '#4caf50';
+                    } else {
+                        // Fetch last seen
+                        try {
+                            const res = await fetch(`/api/user/status/${otherUser}`);
+                            const data = await res.json();
+                            if (data.lastSeen) {
+                                statusText.innerText = `Last seen ${formatLastSeen(data.lastSeen)}`;
+                            } else {
+                                statusText.innerText = 'Offline';
+                            }
+                            statusText.style.color = '#f44336';
+                        } catch (e) {
+                            statusText.innerText = 'Offline';
+                        }
+                    }
+                }
+            }
+
+            function formatLastSeen(dateStr) {
+                const date = new Date(dateStr);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) return 'just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours < 24) return `${diffHours}h ago`;
+                
+                return date.toLocaleDateString();
+            }
 
             pusher.connection.bind('disconnected', () => {
                 if (statusDot) statusDot.style.background = '#f44336';
@@ -136,8 +406,14 @@
                     if (dropdown) {
                         dropdown.id = 'dropdown-' + msg._id;
                         dropdown.innerHTML = `
-                            <button onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
-                            <button onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>
+                            <button onclick="showReplyPreview('${msg._id}', '${msg.sender}', '${(msg.text || "Media").replace(/'/g, "\\'")}')">⤴️ Reply</button>
+                            ${msg.sender === username && msg.fileType === 'text' ? `<button onclick="startEditing('${msg._id}', '${msg.text.replace(/'/g, "\\'")}')">✏️ Edit</button>` : ''}
+                            <button onclick="toggleStar('${msg._id}')" id="star-btn-${msg._id}">⭐ Star</button>
+                            
+                            <div class="divider"></div>
+
+                            <button class="delete-btn" onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
+                            ${msg.sender === username ? `<button class="delete-btn" onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>` : ''}
                         `;
                     }
                     const options = el.querySelector('.msg-options');
@@ -147,7 +423,11 @@
                 }
 
                 appendMessage(msg);
-                if (msg.sender !== username) createHeartBurst();
+                if (msg.sender !== username) {
+                    createHeartBurst();
+                    // Mark as read immediately to trigger secret timers if any
+                    fetch('/api/chat/mark-read', { method: 'POST' });
+                }
                 if (msgEnd) msgEnd.scrollIntoView({ behavior: 'smooth' });
             });
 
@@ -157,11 +437,169 @@
                 if (el) el.remove();
             });
 
-            if (chatForm) {
+            // Listen for edits
+            channel.bind('message-edited', (data) => {
+                const msgEl = document.getElementById('msg-' + data.msgId);
+                if (msgEl) {
+                    const textEl = msgEl.querySelector('.text');
+                    if (textEl) textEl.innerText = data.newText;
+                    
+                    const editedEl = document.getElementById('edited-' + data.msgId);
+                    if (editedEl) editedEl.style.display = 'inline';
+
+                    // Update link preview if needed
+                    const existingLP = msgEl.querySelector('.link-preview');
+                    if (existingLP) existingLP.remove();
+                    
+                    if (data.linkPreview) {
+                        const lpHTML = `
+                            <a href="${data.linkPreview.url}" target="_blank" class="link-preview">
+                                ${data.linkPreview.image ? `<img src="${data.linkPreview.image}" class="lp-image">` : ''}
+                                <div class="lp-content">
+                                    <div class="lp-title">${data.linkPreview.title}</div>
+                                    ${data.linkPreview.description ? `<div class="lp-desc">${data.linkPreview.description}</div>` : ''}
+                                    <div class="lp-url">${new URL(data.linkPreview.url).hostname}</div>
+                                </div>
+                            </a>
+                        `;
+                        const textContainer = msgEl.querySelector('.text') || msgEl.querySelector('.sender-name');
+                        textContainer.insertAdjacentHTML('afterend', lpHTML);
+                    }
+                }
+            });
+
+            // Listen for read receipts
+            channel.bind('messages-read', (data) => {
+                if (data.reader !== username) {
+                    document.querySelectorAll('.chat-message.sent .tick').forEach(tick => {
+                        tick.classList.add('read');
+                    });
+                }
+            });
+
+
+            // Listen for reactions
+            channel.bind('message-reaction', (data) => {
+                const reactionsEl = document.getElementById('reactions-' + data.msgId);
+                if (reactionsEl) {
+                    const emojiGroups = {};
+                    data.reactions.forEach(r => {
+                        emojiGroups[r.emoji] = (emojiGroups[r.emoji] || 0) + 1;
+                    });
+                    
+                    reactionsEl.innerHTML = Object.keys(emojiGroups).map(emoji => 
+                        `<span class="reaction-bubble">${emoji} <small>${emojiGroups[emoji]}</small></span>`
+                    ).join('');
+                }
+            });
+
+            // Listen for typing indicator
+            let typingTimeout;
+            channel.bind('user-typing', (data) => {
+                if (data.username !== username) {
+                    const indicator = document.getElementById('typing-indicator');
+                    if (indicator) {
+                        indicator.innerText = `${data.username} is typing...`;
+                        indicator.classList.add('active');
+                        
+                        clearTimeout(typingTimeout);
+                        typingTimeout = setTimeout(() => {
+                            indicator.classList.remove('active');
+                        }, 3000);
+                    }
+                }
+            });
+
+                if (chatForm) {
+                let lastTypingTime = 0;
+                let currentReplyId = null;
+                let currentEditId = null;
+
+                window.startEditing = (id, text) => {
+                    cancelReply();
+                    currentEditId = id;
+                    chatInput.value = text;
+                    document.getElementById('edit-preview-text').innerText = text;
+                    document.getElementById('edit-preview').style.display = 'flex';
+                    chatInput.focus();
+                };
+
+                window.cancelEdit = () => {
+                    currentEditId = null;
+                    chatInput.value = '';
+                    document.getElementById('edit-preview').style.display = 'none';
+                };
+
+
+                window.showReplyPreview = (id, sender, text) => {
+                    currentReplyId = id;
+                    document.getElementById('reply-preview-sender').innerText = sender;
+                    document.getElementById('reply-preview-text').innerText = text;
+                    document.getElementById('reply-preview').style.display = 'flex';
+                    chatInput.focus();
+                };
+
+                window.cancelReply = () => {
+                    currentReplyId = null;
+                    document.getElementById('reply-preview').style.display = 'none';
+                };
+
+                window.toggleDropdown = (id) => {
+                    const dropdown = document.getElementById('dropdown-' + id);
+                    if (!dropdown) return;
+                    
+                    const isOpen = dropdown.classList.contains('show');
+                    document.querySelectorAll('.msg-dropdown').forEach(d => d.classList.remove('show'));
+                    
+                    if (!isOpen) {
+                        // Check if message is in bottom half of screen
+                        const msgEl = document.getElementById('msg-' + id);
+                        const rect = msgEl.getBoundingClientRect();
+                        const isBottomHalf = rect.bottom > (window.innerHeight / 1.5);
+                        
+                        if (isBottomHalf) {
+                            dropdown.style.top = 'auto';
+                            dropdown.style.bottom = '32px';
+                        } else {
+                            dropdown.style.top = '32px';
+                            dropdown.style.bottom = 'auto';
+                        }
+                        
+                        dropdown.classList.add('show');
+                    }
+                };
+
+                window.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('msg-options')) {
+                        document.querySelectorAll('.msg-dropdown').forEach(d => d.classList.remove('show'));
+                    }
+                });
+
+                chatInput.addEventListener('input', () => {
+                    const now = Date.now();
+                    if (now - lastTypingTime > 2000) { // Throttle typing events
+                        lastTypingTime = now;
+                        fetch('/api/chat/typing', { method: 'POST' });
+                    }
+                });
+
                 chatForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const text = chatInput.value.trim();
-                    if (!text) return;
+                    if (text === '' && !currentEditId) return;
+
+                    if (currentEditId) {
+                        const msgId = currentEditId;
+                        cancelEdit();
+                        try {
+                            await fetch('/api/chat/edit', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ msgId, newText: text })
+                            });
+                        } catch (e) { alert('Edit failed 💔'); }
+                        return;
+                    }
 
                     const tempId = 'temp_' + Date.now();
                     const msgData = {
@@ -180,8 +618,13 @@
                         const res = await fetch('/api/chat/send', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text, tempId })
+                            body: JSON.stringify({ 
+                                text, 
+                                tempId,
+                                replyTo: currentReplyId
+                            })
                         });
+                        cancelReply();
                         if (!res.ok) throw new Error('Send failed');
                     } catch (err) {
                         console.error("Send error:", err);
@@ -197,26 +640,63 @@
                 const div = document.createElement('div');
                 div.className = `chat-message ${msg.sender === username ? 'sent' : 'received'} ${isOptimistic ? 'optimistic' : ''}`;
                 div.id = 'msg-' + (msg._id || msg.tempId);
+                if (msg.isSecret) div.classList.add('secret-msg');
                 
                 const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
                 
                 let mediaHtml = '';
                 if (msg.fileUrl) {
-                    if (msg.fileType === 'image') mediaHtml = `<img src="${msg.fileUrl}" class="chat-media-img" onclick="window.open('${msg.fileUrl}')">`;
-                    else if (msg.fileType === 'video') mediaHtml = `<video src="${msg.fileUrl}" class="chat-media-video" controls playsinline></video>`;
+                    if (msg.fileType === 'image') mediaHtml = `<img src="${msg.fileUrl}" class="chat-media-img" onclick="openLightbox('${msg.fileUrl}', 'image')">`;
+                    else if (msg.fileType === 'video') mediaHtml = `<video src="${msg.fileUrl}" class="chat-media-video" onclick="openLightbox('${msg.fileUrl}', 'video')"></video>`;
                     else if (msg.fileType === 'audio') mediaHtml = `<audio src="${msg.fileUrl}" class="chat-media-audio" controls></audio>`;
                 }
 
                 div.innerHTML = `
                     <div class="msg-options" onclick="toggleDropdown('${msg._id || msg.tempId}')">⋮</div>
                     <div class="msg-dropdown" id="dropdown-${msg._id || msg.tempId}">
-                        <button onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
-                        ${msg.sender === username ? `<button onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>` : ''}
+                        <button onclick="showReplyPreview('${msg._id}', '${msg.sender}', '${(msg.text || "Media").replace(/'/g, "\\'")}')">⤴️ Reply</button>
+                        ${msg.sender === username && msg.fileType === 'text' ? `<button onclick="startEditing('${msg._id}', '${msg.text.replace(/'/g, "\\'")}')">✏️ Edit</button>` : ''}
+                        <button onclick="toggleStar('${msg._id}')" id="star-btn-${msg._id}">⭐ Star</button>
+                        
+                        <div class="divider"></div>
+
+                        <button class="delete-btn" onclick="deleteForMe('${msg._id}')">🗑 Delete for me</button>
+                        ${msg.sender === username ? `<button class="delete-btn" onclick="deleteForEveryone('${msg._id}')">🚫 Delete for everyone</button>` : ''}
+                    </div>
+                    <div class="reaction-picker-btn" onclick="showReactionPicker('${msg._id || msg.tempId}')">❤️+</div>
+                    <div class="reaction-picker" id="picker-${msg._id || msg.tempId}">
+                        <span onclick="react('${msg._id || msg.tempId}', '❤️')">❤️</span>
+                        <span onclick="react('${msg._id || msg.tempId}', '😂')">😂</span>
+                        <span onclick="react('${msg._id || msg.tempId}', '😮')">😮</span>
+                        <span onclick="react('${msg._id || msg.tempId}', '😢')">😢</span>
+                        <span onclick="react('${msg._id || msg.tempId}', '👍')">👍</span>
                     </div>
                     <div class="sender-name">${msg.sender}</div>
+                    ${msg.replyTo ? `
+                        <div class="reply-quote">
+                            <div class="reply-quote-sender">${msg.replyTo.sender}</div>
+                            <div class="reply-quote-text">${msg.replyTo.text || (msg.replyTo.fileUrl ? "Media" : "...")}</div>
+                        </div>
+                    ` : ''}
                     ${mediaHtml}
                     ${msg.text ? `<div class="text">${msg.text}</div>` : ''}
-                    <div class="msg-time">${time}</div>
+                    ${msg.linkPreview ? `
+                        <a href="${msg.linkPreview.url}" target="_blank" class="link-preview">
+                            ${msg.linkPreview.image ? `<img src="${msg.linkPreview.image}" class="lp-image">` : ''}
+                            <div class="lp-content">
+                                <div class="lp-title">${msg.linkPreview.title}</div>
+                                ${msg.linkPreview.description ? `<div class="lp-desc">${msg.linkPreview.description}</div>` : ''}
+                                <div class="lp-url">${new URL(msg.linkPreview.url).hostname}</div>
+                            </div>
+                        </a>
+                    ` : ''}
+                    <div class="reactions-display" id="reactions-${msg._id || msg.tempId}"></div>
+                    <div class="msg-time">
+                        ${time}
+                        ${msg.sender === username ? `<span class="tick ${msg.status === 'read' ? 'read' : ''}">✔✔</span>` : ''}
+                        <span class="msg-star-icon" id="star-icon-${msg._id || msg.tempId}">⭐</span>
+                        <span class="edited-label" id="edited-${msg._id || msg.tempId}" style="${msg.isEdited ? '' : 'display:none'}">(edited)</span>
+                    </div>
                 `;
                 container.insertBefore(div, msgEnd);
             }
@@ -230,27 +710,38 @@
             };
 
             window.deleteForMe = async (id) => {
+                if (!confirm('Delete this message for you? ❤️')) return;
                 try {
-                    await fetch('/api/chat/delete-me', {
+                    await fetch('/api/chat/delete-for-me', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ msgId: id })
                     });
                     const el = document.getElementById('msg-' + id);
-                    if (el) el.remove();
+                    if (el) {
+                        el.style.transform = 'scale(0.8)';
+                        el.style.opacity = '0';
+                        setTimeout(() => el.remove(), 300);
+                    }
                 } catch (err) {
                     alert('Delete failed');
                 }
             };
 
             window.deleteForEveryone = async (id) => {
-                if (confirm('Delete this message for everyone?')) {
+                if (confirm('Delete this message for everyone? 🚫')) {
                     try {
-                        await fetch('/api/chat/delete-everyone', {
+                        await fetch('/api/chat/delete-for-everyone', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ msgId: id })
                         });
+                        const el = document.getElementById('msg-' + id);
+                        if (el) {
+                            el.style.transform = 'scale(0.8)';
+                            el.style.opacity = '0';
+                            setTimeout(() => el.remove(), 300);
+                        }
                     } catch (err) {
                         alert('Delete failed');
                     }
@@ -260,6 +751,78 @@
             const fileInput = document.getElementById('chat-file-input');
             const attachBtn = document.getElementById('attach-btn');
             if (attachBtn && fileInput) attachBtn.addEventListener('click', () => fileInput.click());
+
+            // ========== VOICE NOTES ==========
+            const voiceBtn = document.getElementById('voice-btn');
+            let mediaRecorder;
+            let audioChunks = [];
+
+            if (voiceBtn) {
+                const startRecording = async () => {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = async () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            if (audioBlob.size < 1000) return; // Too short
+
+                            const formData = new FormData();
+                            formData.append('file', audioBlob, 'voice_note.webm');
+                            
+                            const progress = document.getElementById('upload-progress-container');
+                            if (progress) progress.style.display = 'block';
+
+                            try {
+                                const res = await fetch('/api/chat/upload', { method: 'POST', body: formData });
+                                const data = await res.json();
+                                
+                                await fetch('/api/chat/send', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                        fileUrl: data.fileUrl, 
+                                        fileType: 'audio' 
+                                    })
+                                });
+                            } catch (err) {
+                                alert('Voice note upload failed');
+                            } finally {
+                                if (progress) progress.style.display = 'none';
+                            }
+                            
+                            // Stop all tracks to release microphone
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+
+                        mediaRecorder.start();
+                        voiceBtn.classList.add('recording');
+                    } catch (err) {
+                        console.error("Mic access error:", err);
+                        alert("Microphone access denied! 💔");
+                    }
+                };
+
+                const stopRecording = () => {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                        voiceBtn.classList.remove('recording');
+                    }
+                };
+
+                // Desktop
+                voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startRecording(); });
+                window.addEventListener('mouseup', stopRecording);
+
+                // Mobile
+                voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, {passive: false});
+                window.addEventListener('touchend', stopRecording);
+            }
 
             if (fileInput) {
                 fileInput.addEventListener('change', async (e) => {
@@ -327,9 +890,308 @@
                 }
             }
 
+            window.showReactionPicker = (id) => {
+                const picker = document.getElementById('picker-' + id);
+                if (!picker) return;
+                const isOpen = picker.classList.contains('show');
+                document.querySelectorAll('.reaction-picker').forEach(p => p.classList.remove('show'));
+                if (!isOpen) picker.classList.add('show');
+            };
+
+            // Wallpaper Logic
+            const initialWallpaper = "<%= wallpaper %>";
+            if (initialWallpaper) {
+                container.style.backgroundImage = `url('${initialWallpaper}')`;
+                container.style.backgroundSize = 'cover';
+                container.style.backgroundPosition = 'center';
+            }
+
+            window.toggleWallpaperPicker = () => {
+                const picker = document.getElementById('wallpaper-picker');
+                picker.classList.toggle('show');
+            };
+
+            window.setWallpaper = async (url) => {
+                try {
+                    await fetch('/api/user/wallpaper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ wallpaperUrl: url })
+                    });
+                    
+                    if (url) {
+                        container.style.backgroundImage = `url('${url}')`;
+                        container.style.backgroundSize = 'cover';
+                    } else {
+                        container.style.backgroundImage = 'none';
+                    }
+                    toggleWallpaperPicker();
+                } catch (e) {}
+            };
+
+            window.handleWallpaperUpload = async (input) => {
+                if (!input.files || !input.files[0]) return;
+                const file = input.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const res = await fetch('/api/chat/upload', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.fileUrl) {
+                        setWallpaper(data.fileUrl);
+                    }
+                } catch (e) {
+                    alert('Upload failed');
+                }
+            };
+
+            window.toggleMediaView = () => {
+                const view = document.getElementById('media-view');
+                if (!view) return;
+                const isOpen = view.classList.contains('show');
+                document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+                if (!isOpen) {
+                    view.classList.add('show');
+                    fetchMedia();
+                }
+            };
+
+            window.fetchMedia = async () => {
+                const list = document.getElementById('media-gallery-list');
+                list.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px; grid-column: 1 / span 3;">Loading media... 📁</p>';
+                
+                try {
+                    const res = await fetch('/api/chat/media');
+                    const data = await res.json();
+                    
+                    if (data.media.length === 0) {
+                        list.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px; grid-column: 1 / span 3;">No photos or videos yet. 📸</p>';
+                        return;
+                    }
+
+                    list.innerHTML = data.media.map(msg => {
+                        const isVideo = msg.fileType === 'video';
+                        return `
+                            <div class="gallery-item" onclick="openLightbox('${msg.fileUrl}', '${msg.fileType}')">
+                                ${isVideo ? `
+                                    <video src="${msg.fileUrl}"></video>
+                                    <div class="video-play-icon">▶</div>
+                                ` : `
+                                    <img src="${msg.fileUrl}">
+                                `}
+                            </div>
+                        `;
+                    }).join('');
+                } catch (e) {
+                    list.innerHTML = '<p style="text-align:center; color:red; padding:20px; grid-column: 1 / span 3;">Failed to load media. 💔</p>';
+                }
+            };
+
+            let searchTimeout;
+            window.toggleSearchView = () => {
+                const view = document.getElementById('search-view');
+                if (!view) return;
+                const isOpen = view.classList.contains('show');
+                document.querySelectorAll('.starred-view').forEach(v => v.classList.remove('show'));
+                if (!isOpen) {
+                    view.classList.add('show');
+                    document.getElementById('search-input').focus();
+                }
+            };
+
+            window.handleSearch = (query) => {
+                clearTimeout(searchTimeout);
+                const resultsEl = document.getElementById('search-results');
+                
+                if (!query.trim()) {
+                    resultsEl.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">Type something to search... ❤️</p>';
+                    return;
+                }
+
+                searchTimeout = setTimeout(async () => {
+                    resultsEl.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">Searching... 🔍</p>';
+                    try {
+                        const res = await fetch(`/api/chat/search?q=${encodeURIComponent(query)}`);
+                        const data = await res.json();
+                        
+                        if (data.results.length === 0) {
+                            resultsEl.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">No messages found. 💔</p>';
+                            return;
+                        }
+
+                        resultsEl.innerHTML = data.results.map(msg => `
+                            <div class="starred-item">
+                                <div class="starred-item-header">
+                                    <strong>${msg.sender}</strong>
+                                    <span>${new Date(msg.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                <div class="starred-item-body">
+                                    <div>${msg.text}</div>
+                                </div>
+                            </div>
+                        `).join('');
+                    } catch (e) {
+                        resultsEl.innerHTML = '<p style="text-align:center; color:red; padding:20px;">Error searching. 💔</p>';
+                    }
+                }, 400);
+            };
+
+
+            window.react = async (msgId, emoji) => {
+                // ... (existing code)
+            };
+
+            window.deleteForMe = async (msgId) => {
+                if (!confirm('Delete this message for you? ❤️')) return;
+                
+                // Instant UI update
+                const el = document.getElementById('msg-' + msgId);
+                if (el) {
+                    el.style.transform = 'scale(0.8)';
+                    el.style.opacity = '0';
+                    setTimeout(() => el.remove(), 300);
+                }
+
+                try {
+                    await fetch('/api/chat/delete-for-me', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ msgId })
+                    });
+                } catch (e) { console.error(e); }
+            };
+
+            window.deleteForEveryone = async (msgId) => {
+                if (!confirm('Delete this message for everyone? 🚫')) return;
+                
+                // Instant UI update
+                const el = document.getElementById('msg-' + msgId);
+                if (el) {
+                    el.style.transform = 'scale(0.8)';
+                    el.style.opacity = '0';
+                    setTimeout(() => el.remove(), 300);
+                }
+
+                try {
+                    await fetch('/api/chat/delete-for-everyone', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ msgId })
+                    });
+                } catch (e) { console.error(e); }
+            };
+
+            window.toggleStar = async (msgId) => {
+                try {
+                    const res = await fetch('/api/chat/star', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ msgId })
+                    });
+                    const data = await res.json();
+                    
+                    const icon = document.getElementById('star-icon-' + msgId);
+                    const btn = document.getElementById('star-btn-' + msgId);
+                    
+                    if (data.isStarred) {
+                        if (icon) icon.classList.add('active');
+                        if (btn) btn.innerText = '⭐ Unstar';
+                    } else {
+                        if (icon) icon.classList.remove('active');
+                        if (btn) btn.innerText = '⭐ Star';
+                    }
+                } catch (e) {}
+            };
+
+            window.toggleStarredView = async () => {
+                const view = document.getElementById('starred-view');
+                if (view.classList.contains('show')) {
+                    view.classList.remove('show');
+                } else {
+                    view.classList.add('show');
+                    fetchStarredMessages();
+                }
+            };
+
+            window.fetchStarredMessages = async () => {
+                const list = document.getElementById('starred-list');
+                list.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">Loading your favorites... ❤️</p>';
+                
+                try {
+                    const res = await fetch('/api/chat/starred');
+                    const data = await res.json();
+                    
+                    if (data.starred.length === 0) {
+                        list.innerHTML = '<p style="text-align:center; opacity:0.5; padding:20px;">No starred messages yet. Star some sweet things! ⭐</p>';
+                        return;
+                    }
+                    
+                    list.innerHTML = data.starred.map(msg => `
+                        <div class="starred-item">
+                            <div class="starred-item-header">
+                                <strong>${msg.sender}</strong>
+                                <span>${new Date(msg.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="starred-item-body">
+                                ${msg.text ? `<div>${msg.text}</div>` : ''}
+                                ${msg.fileUrl ? `<img src="${msg.fileUrl}" style="max-width:100px; border-radius:8px; margin-top:5px;">` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    list.innerHTML = '<p style="text-align:center; color:red; padding:20px;">Failed to load. 💔</p>';
+                }
+            };
+
+            window.openLightbox = (url, type) => {
+                const lightbox = document.getElementById('lightbox');
+                const img = document.getElementById('lightbox-img');
+                const video = document.getElementById('lightbox-video');
+                
+                img.style.display = 'none';
+                video.style.display = 'none';
+                
+                if (type === 'image') {
+                    img.src = url;
+                    img.style.display = 'block';
+                } else {
+                    video.src = url;
+                    video.style.display = 'block';
+                }
+                
+                lightbox.classList.add('show');
+            };
+
+            window.closeLightbox = () => {
+                const lightbox = document.getElementById('lightbox');
+                const video = document.getElementById('lightbox-video');
+                video.pause();
+                video.src = "";
+                lightbox.classList.remove('show');
+            };
+
+            // Handle URL actions (Video/Voice Call)
+            const handleUrlAction = () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const action = urlParams.get('action');
+                if (action === 'video' || action === 'voice') {
+                    // Remove the query param so refreshing doesn't restart call
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Small delay to ensure Pusher is ready
+                    setTimeout(() => {
+                        if (window.startVideoCall) {
+                            window.startVideoCall(action === 'voice');
+                        }
+                    }, 1500);
+                }
+            };
+            handleUrlAction();
+
             // Barba cleanup
             barba.hooks.before(() => {
-                pusher.disconnect();
+                // We don't disconnect global pusher
             });
         })();
     </script>

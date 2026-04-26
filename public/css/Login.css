@@ -40,12 +40,14 @@
     border-radius: 30px;
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
     text-align: center;
-    animation: fadeIn 0.8s ease-out;
+    animation: fadeIn 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translate3d(0, 20px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 /* ========== HEARTBEAT ICON ========== */
@@ -61,8 +63,8 @@
 }
 
 @keyframes heartbeat {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.15); }
+    0%, 100% { transform: scale(1) translateZ(0); }
+    50% { transform: scale(1.15) translateZ(0); }
 }
 
 /* ========== DATE DISPLAY ========== */
@@ -171,7 +173,7 @@
 }
 
 .romantic-btn:hover {
-    transform: scale(1.03);
+    transform: scale(1.03) translateZ(0);
     box-shadow: 0 10px 20px rgba(255, 77, 109, 0.4);
 }
 
