@@ -398,6 +398,77 @@ app.post("/api/reels/comment", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+app.post("/api/reels/heart", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-hearted-reel", { username, reelIndex });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/sync-scroll", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-scrolled-reel", { username, reelIndex });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/gift", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-gifted-reel", { username, reelIndex });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/play", isAuth, async (req, res) => {
+    try {
+        const { reelIndex, currentTime } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-played-reel", { username, reelIndex, currentTime });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/pause", isAuth, async (req, res) => {
+    try {
+        const { reelIndex } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-paused-reel", { username, reelIndex });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/seek", isAuth, async (req, res) => {
+    try {
+        const { reelIndex, currentTime } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "user-seeked-reel", { username, reelIndex, currentTime });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/request-state", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "request-reel-state", { username });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/reels/send-state", isAuth, async (req, res) => {
+    try {
+        const { to, reelIndex, currentTime, isPaused } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "receive-reel-state", { username, to, reelIndex, currentTime, isPaused });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // ========== OTHER JOURNEY ROUTES ==========
 const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);

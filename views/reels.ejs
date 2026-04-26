@@ -6,7 +6,7 @@
         <!-- Watching Together Indicator -->
         <div id="together-indicator" class="together-indicator">
             <div class="pulse-dot"></div>
-            <span id="together-text">Bhondu is watching ❤️</span>
+            <span id="together-text"><%= username === 'Bhondu' ? 'Vishu' : 'Bhondu' %> is watching ❤️</span>
         </div>
 
         <div class="reels-container" id="reels-container">
@@ -53,7 +53,7 @@
                             <span class="sidebar-label">Chat</span>
                         </div>
                         <div class="sidebar-item">
-                            <button class="sidebar-btn share-btn" onclick="spawnEmoji('🎁')">🎁</button>
+                            <button class="sidebar-btn share-btn" onclick="sendGift(event, '<%= index %>')">🎁</button>
                             <span class="sidebar-label">Gift</span>
                         </div>
                     </div>
@@ -91,14 +91,27 @@
             let lastTapTime = 0;
             let isSyncEnabled = false;
             let isProcessingRemoteScroll = false;
+            let isProcessingRemotePlayback = false;
             let activeCommentIndex = -1;
             let isTeleporting = false;
             
             const container = document.getElementById('reels-container');
             const myUsername = "<%= username %>";
+            const otherUser = myUsername === 'Bhondu' ? 'Vishu' : 'Bhondu';
             const totalItems = <%= totalReels %>;
             const pusher = window.globalPusher;
             const channel = window.globalChannel;
+
+            // ========== NATIVE APP UTILITIES ==========
+            const haptic = (type) => {
+                if (!navigator.vibrate) return;
+                switch(type) {
+                    case 'click': navigator.vibrate(10); break;
+                    case 'success': navigator.vibrate([15, 30, 15]); break;
+                    case 'heart': navigator.vibrate([10, 50, 10]); break;
+                    case 'gift': navigator.vibrate([20, 100, 20]); break;
+                }
+            };
 
             // --- PUSHER SYNC ---
             if (channel) {
@@ -123,6 +136,66 @@
                     }
                 });
                 channel.bind('user-reel-comment', (data) => { if (data.username !== myUsername) showRemoteComment(data.reelIndex + 1, data.text, data.username); });
+                channel.bind('user-gifted-reel', (data) => { if (data.username !== myUsername) showGiftExplosion(true); });
+
+                // Playback Sync
+                channel.bind('user-played-reel', (data) => {
+                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                        isProcessingRemotePlayback = true;
+                        const v = videoElements[data.reelIndex + 1];
+                        v.currentTime = data.currentTime;
+                        v.play().finally(() => isProcessingRemotePlayback = false);
+                    }
+                });
+                channel.bind('user-paused-reel', (data) => {
+                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                        isProcessingRemotePlayback = true;
+                        videoElements[data.reelIndex + 1].pause();
+                        setTimeout(() => isProcessingRemotePlayback = false, 100);
+                    }
+                });
+                channel.bind('user-seeked-reel', (data) => {
+                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                        isProcessingRemotePlayback = true;
+                        videoElements[data.reelIndex + 1].currentTime = data.currentTime;
+                        setTimeout(() => isProcessingRemotePlayback = false, 100);
+                    }
+                });
+
+                // State Sharing
+                channel.bind('request-reel-state', (data) => {
+                    if (isSyncEnabled && data.username !== myUsername && currentActive !== -1) {
+                        const v = videoElements[currentActive];
+                        if (v) {
+                            fetch('/api/reels/send-state', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    to: data.username,
+                                    reelIndex: currentActive - 1,
+                                    currentTime: v.currentTime,
+                                    isPaused: v.paused
+                                })
+                            });
+                        }
+                    }
+                });
+                channel.bind('receive-reel-state', (data) => {
+                    if (isSyncEnabled && data.to.toLowerCase() === myUsername.toLowerCase()) {
+                        isProcessingRemoteScroll = true;
+                        isProcessingRemotePlayback = true;
+                        scrollToIndex(data.reelIndex + 1);
+                        setTimeout(() => {
+                            const v = videoElements[data.reelIndex + 1];
+                            if (v) {
+                                v.currentTime = data.currentTime;
+                                if (data.isPaused) v.pause(); else v.play();
+                            }
+                            isProcessingRemoteScroll = false;
+                            isProcessingRemotePlayback = false;
+                        }, 800);
+                    }
+                });
             }
 
             // --- INTERACTION HANDLING ---
@@ -132,6 +205,7 @@
 
                 if (delta < 300 && delta > 0) {
                     // Double Tap: Love
+                    haptic('heart');
                     handleDoubleTap(event, index);
                     lastTapTime = 0;
                 } else {
@@ -181,6 +255,7 @@
                 if(btn) { 
                     btn.classList.toggle('heart-active');
                     btn.innerText = btn.classList.contains('heart-active') ? '❤️' : '🤍';
+                    if (btn.classList.contains('heart-active')) haptic('heart');
                 }
                 const x = event ? (event.clientX || (event.touches && event.touches[0].clientX)) : window.innerWidth / 2;
                 const y = event ? (event.clientY || (event.touches && event.touches[0].clientY)) : window.innerHeight / 2;
@@ -243,6 +318,35 @@
                     }
                 };
 
+                // Playback Listeners for Sync
+                video.onplay = () => {
+                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                        fetch('/api/reels/play', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reelIndex: index - 1, currentTime: video.currentTime })
+                        });
+                    }
+                };
+                video.onpause = () => {
+                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                        fetch('/api/reels/pause', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reelIndex: index - 1 })
+                        });
+                    }
+                };
+                video.onseeked = () => {
+                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                        fetch('/api/reels/seek', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reelIndex: index - 1, currentTime: video.currentTime })
+                        });
+                    }
+                };
+
                 wrapper.appendChild(video);
                 videoElements[index] = video;
             }
@@ -290,6 +394,32 @@
                 document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
             }
 
+            window.sendGift = (e, index) => {
+                e.stopPropagation();
+                haptic('gift');
+                showGiftExplosion();
+                notifyGift(index);
+            };
+
+            function showGiftExplosion(isRemote = false) {
+                const emojis = ['🎁', '💎', '✨', '💖', '💍'];
+                for(let i=0; i<15; i++) {
+                    setTimeout(() => {
+                        const el = document.createElement('div');
+                        el.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
+                        el.className = 'gift-particle';
+                        el.style.left = (Math.random() * 80 + 10) + '%';
+                        if (isRemote) el.style.filter = "drop-shadow(0 0 10px white) contrast(1.2)";
+                        document.body.appendChild(el);
+                        setTimeout(() => el.remove(), 3000);
+                    }, i * 100);
+                }
+            }
+
+            async function notifyGift(index) {
+                try { fetch('/api/reels/gift', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {}
+            }
+
             function spawnHeart(x, y, isRemote = false) {
                 const heart = document.createElement('div'); heart.innerHTML = isRemote ? '💖' : '❤️'; heart.className = 'floating-heart'; heart.style.left = x + 'px'; heart.style.bottom = '80px'; heart.style.setProperty('--tx', (Math.random() * 200 - 100) + 'px');
                 if (isRemote) heart.style.filter = "hue-rotate(45deg) drop-shadow(0 0 10px white)"; document.body.appendChild(heart); setTimeout(() => heart.remove(), 2000);
@@ -300,7 +430,7 @@
                 if (show) el.classList.add('visible'); else el.classList.remove('visible');
             }
 
-            window.openCommentInput = (e, index) => { e.stopPropagation(); activeCommentIndex = index; document.getElementById('comment-input-overlay').classList.add('visible'); document.getElementById('reel-comment-input').focus(); };
+            window.openCommentInput = (e, index) => { e.stopPropagation(); haptic('click'); activeCommentIndex = index; document.getElementById('comment-input-overlay').classList.add('visible'); document.getElementById('reel-comment-input').focus(); };
             window.closeCommentInput = () => { document.getElementById('comment-input-overlay').classList.remove('visible'); document.getElementById('reel-comment-input').value = ''; };
             window.handleCommentKey = (e) => { if (e.key === 'Enter') sendComment(); };
             window.sendComment = async () => {
@@ -325,12 +455,17 @@
 
             window.toggleSync = (e) => {
                 e.stopPropagation();
+                haptic('click');
                 isSyncEnabled = !isSyncEnabled;
                 document.querySelectorAll('.sync-btn').forEach(btn => {
                     if (isSyncEnabled) { btn.classList.add('sync-active'); btn.style.color = '#ff4d6d'; } 
                     else { btn.classList.remove('sync-active'); btn.style.color = 'white'; }
                 });
-                if (isSyncEnabled && currentActive !== -1) notifyScroll(currentActive - 1);
+                if (isSyncEnabled && currentActive !== -1) {
+                    notifyScroll(currentActive - 1);
+                    // Request current state from partner to catch up
+                    fetch('/api/reels/request-state', { method: 'POST' });
+                }
             };
 
             async function notifyWatching(index) { try { fetch('/api/reels/watching', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {} }
