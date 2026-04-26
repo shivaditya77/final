@@ -22,10 +22,10 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const app = express();
 
 // ========== MODELS ==========
-const Journal = require("../models/Journal");
-const Question = require("../models/Question");
-const Message = require("../models/Message");
-const User = require("../models/User");
+const Journal = require("./models/Journal");
+const Question = require("./models/Question");
+const Message = require("./models/Message");
+const User = require("./models/User");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -76,10 +76,10 @@ app.use(cors({
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../public")));
+app.use(express.static(path.join(__dirname, "public")));
 
 app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "../views"));
+app.set("views", path.join(__dirname, "views"));
 app.set('trust proxy', 1);
 
 // ========== SESSION ==========
@@ -143,7 +143,7 @@ const chatStorage = new CloudinaryStorage({
 const chatUpload = multer({ storage: chatStorage });
 
 // ========== ROUTES ==========
-const authRoutes = require("../routes/auth");
+const authRoutes = require("./routes/auth");
 app.use("/", authRoutes);
 
 app.get("/", isAuth, (req, res) => {
@@ -512,7 +512,7 @@ app.post("/api/reels/comment", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-const reelsRouter = require('../routes/reels');
+const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
 
 app.get("/api/chat/search", isAuth, async (req, res) => {
