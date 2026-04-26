@@ -60,13 +60,19 @@ const allowedOrigins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://bhondu.me",
+    "https://www.bhondu.me",
     "https://final-phi-ten.vercel.app"
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-        else callback(new Error("Not allowed by CORS"));
+        // Allow if no origin (like mobile apps or curl) or if it's in our list
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+            callback(null, true);
+        } else {
+            console.warn("🚫 CORS Blocked Origin:", origin);
+            callback(new Error("Not allowed by CORS"));
+        }
     },
     credentials: true
 }));
