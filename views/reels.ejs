@@ -110,6 +110,7 @@
                     case 'success': navigator.vibrate([15, 30, 15]); break;
                     case 'heart': navigator.vibrate([10, 50, 10]); break;
                     case 'gift': navigator.vibrate([20, 100, 20]); break;
+                    case 'notif': navigator.vibrate([30, 100, 30, 100]); break;
                 }
             };
 
@@ -162,9 +163,21 @@
                     }
                 });
 
+                // Together Mode Invitation
+                channel.bind('together-invitation', (data) => {
+                    if (data.username !== myUsername && !isSyncEnabled) {
+                        haptic('notif');
+                        document.getElementById('together-text').innerText = `${data.username} wants to watch together! ❤️`;
+                        showTogetherIndicator(true);
+                        // Highlight the together button
+                        document.querySelectorAll('.sync-btn').forEach(btn => btn.style.boxShadow = "0 0 20px #ff4d6d");
+                    }
+                });
+
                 // State Sharing
                 channel.bind('request-reel-state', (data) => {
-                    if (isSyncEnabled && data.username !== myUsername && currentActive !== -1) {
+                    // Respond even if NOT enabled yet, so partner can catch up
+                    if (data.username !== myUsername && currentActive !== -1) {
                         const v = videoElements[currentActive];
                         if (v) {
                             fetch('/api/reels/send-state', {
@@ -465,6 +478,11 @@
                     notifyScroll(currentActive - 1);
                     // Request current state from partner to catch up
                     fetch('/api/reels/request-state', { method: 'POST' });
+                    // Invite partner to join Together Mode
+                    fetch('/api/reels/invite', { method: 'POST' });
+                } else {
+                    // Reset highlight
+                    document.querySelectorAll('.sync-btn').forEach(btn => btn.style.boxShadow = "none");
                 }
             };
 

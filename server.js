@@ -469,6 +469,14 @@ app.post("/api/reels/send-state", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+app.post("/api/reels/invite", isAuth, async (req, res) => {
+    try {
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-bhondu-chat", "together-invitation", { username });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // ========== OTHER JOURNEY ROUTES ==========
 const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
