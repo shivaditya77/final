@@ -241,7 +241,7 @@
                 playerDiv.id = playerDivId; playerDiv.className = 'yt-player'; content.prepend(playerDiv);
                 players[index] = new YT.Player(playerDivId, {
                     height: '100%', width: '100%', videoId: videoId,
-                    playerVars: { autoplay: 0, controls: 0, loop: 1, playlist: videoId, modestbranding: 1, rel: 0, mute: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: window.location.origin },
+                    playerVars: { autoplay: 1, controls: 0, loop: 1, playlist: videoId, modestbranding: 1, rel: 0, mute: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: window.location.origin },
                     events: { 
                         'onReady': (event) => { 
                             if (index === currentActive) {
@@ -298,18 +298,16 @@
                 const player = players[index];
                 if (player && player.playVideo && typeof player.playVideo === 'function') {
                     try {
-                        isGlobalMuted ? player.mute() : player.unMute();
+                        player.mute(); 
                         player.playVideo();
                         
-                        // Mobile Fail-Safe: Recover if browser auto-paused
                         setTimeout(() => {
-                            if (player.getPlayerState && player.getPlayerState() !== YT.PlayerState.PLAYING) {
-                                player.playVideo();
+                            if (player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING) {
+                                hideLoader(index);
                             }
-                            hideLoader(index);
-                        }, 500);
+                        }, 1000);
                         
-                        setTimeout(() => hideLoader(index), 2000); 
+                        setTimeout(() => hideLoader(index), 3000); 
                     } catch(e) {}
                 }
             }
@@ -332,7 +330,7 @@
 
             window.handleReelClick = (event, index) => { 
                 const p = players[index];
-                if (p && p.playVideo) { try { p.playVideo(); } catch(e) {} }
+                if (p) { try { p.playVideo(); hideLoader(index); } catch(e) {} }
 
                 const now = Date.now(); 
                 const delta = now - lastTap;
@@ -344,11 +342,7 @@
                 }
                 
                 lastTap = now; 
-                setTimeout(() => {
-                    if (lastTap === now) {
-                        toggleMute(index);
-                    }
-                }, 250); 
+                toggleMute(index);
             };
 
             function toggleMute(index) {
