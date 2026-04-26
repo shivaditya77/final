@@ -112,10 +112,21 @@ app.use(session({
 }));
 
 // Global locals for Pusher/Auth
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     res.locals.pusherKey = process.env.PUSHER_KEY;
     res.locals.pusherCluster = process.env.PUSHER_CLUSTER;
     res.locals.username = req.session.username || "";
+    
+    // Update Last Seen for authenticated users
+    if (req.session.isAuth && req.session.username) {
+        try {
+            await User.findOneAndUpdate(
+                { username: req.session.username.toLowerCase() },
+                { lastSeen: new Date() },
+                { upsert: true }
+            );
+        } catch (e) { /* ignore */ }
+    }
     next();
 });
 
@@ -439,6 +450,25 @@ app.post("/api/notifications/read-all", isAuth, async (req, res) => {
 app.post("/api/notifications/mark-read", isAuth, async (req, res) => {
     try {
         await Notification.findByIdAndUpdate(req.body.id, { isRead: true });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// ========== USER STATUS API ==========
+app.get("/api/user/status/:username", isAuth, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username.toLowerCase() });
+        if (!user) return res.json({ lastSeen: null });
+        res.json({ lastSeen: user.lastSeen });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/user/heartbeat", isAuth, async (req, res) => {
+    try {
+        await User.findOneAndUpdate(
+            { username: req.session.username.toLowerCase() },
+            { lastSeen: new Date() }
+        );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });

@@ -105,8 +105,27 @@
     }
 
     // ========== PUSHER BINDINGS ==========
-    pusher.connection.bind('state_change', (sc) => updateConnectionUI(sc.current));
+    let connectionTimeout;
+    function startConnectionCheck() {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        connectionTimeout = setTimeout(() => {
+            if (pusher.connection.state === 'connecting') {
+                console.log("Chat Engine: Connection taking too long, retrying...");
+                if (statusText) statusText.innerText = 'Retrying... 🔄';
+                pusher.disconnect();
+                setTimeout(() => pusher.connect(), 1000);
+            }
+        }, 8000); // 8 seconds retry
+    }
+
+    pusher.connection.bind('state_change', (sc) => {
+        updateConnectionUI(sc.current);
+        if (sc.current === 'connecting') startConnectionCheck();
+        else if (connectionTimeout) clearTimeout(connectionTimeout);
+    });
+    
     updateConnectionUI(pusher.connection.state);
+    if (pusher.connection.state === 'connecting') startConnectionCheck();
 
     channel.bind('pusher:subscription_succeeded', (members) => {
         updateStatusUI(members.count > 1);
@@ -122,6 +141,9 @@
     });
 
     channel.bind('new-message', (msg) => {
+        // Prevent duplicate messages if connection drops and reconnects
+        if (document.getElementById('msg-' + msg._id)) return;
+
         const empty = document.getElementById('chat-empty');
         if (empty) empty.remove();
 
@@ -530,6 +552,23 @@
             }
         });
     }
+
+    // ========== HEARTBEAT SYSTEM ==========
+    // Send a heartbeat every 30 seconds to keep lastSeen accurate
+    setInterval(async () => {
+        if (pusher.connection.state === 'connected') {
+            try { await fetch('/api/user/heartbeat', { method: 'POST' }); } catch (e) {}
+        }
+    }, 30000);
+
+    // Initial status check
+    setTimeout(() => {
+        if (pusher.connection.state === 'connected') {
+            // If we are alone, check the other user's last seen
+            const members = channel.members;
+            if (members && members.count === 1) updateStatusUI(false);
+        }
+    }, 2000);
 
     // ========== INITIALIZATION ==========
     scrollToBottom(false);
