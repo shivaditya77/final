@@ -243,8 +243,10 @@
             if (typeof Pusher === 'undefined') return;
 
             // ========== PUSHER INITIALIZATION ==========
-            const pusher = window.globalPusher;
-            if (!pusher) {
+            const pusher = typeof initGlobalPusher === 'function' ? initGlobalPusher() : window.globalPusher;
+            const channel = window.globalChannel;
+
+            if (!pusher || !channel) {
                 console.error('Pusher not initialized globally');
                 const statusText = document.getElementById('status-text');
                 if (statusText) statusText.innerText = 'Initialization Error 💔';
@@ -253,7 +255,6 @@
 
             const username = "<%= username %>";
             const otherUser = username.toLowerCase() === 'bhondu' ? 'vishu' : 'bhondu';
-            const channel = window.globalChannel;
             const container = document.getElementById('messages-container');
             const chatForm = document.getElementById('chat-form');
             const chatInput = document.getElementById('chat-input');
@@ -333,13 +334,19 @@
             if (pusher) {
                 updateConnectionUI(pusher.connection.state);
                 
-                // If stuck in connecting, check again in 2 seconds
-                setTimeout(() => {
-                    if (pusher.connection.state === 'connecting') {
-                        console.log("Stuck in connecting, forcing UI update...");
+                // If stuck in connecting, check again
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (pusher.connection.state === 'connected') {
+                        updateConnectionUI('connected');
+                        clearInterval(checkInterval);
+                    } else if (attempts > 5) {
+                        clearInterval(checkInterval);
+                    } else {
                         updateConnectionUI(pusher.connection.state);
                     }
-                }, 2000);
+                }, 1000);
 
                 pusher.connection.unbind('state_change');
                 pusher.connection.bind('state_change', (states) => {

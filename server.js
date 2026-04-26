@@ -104,6 +104,14 @@ app.use(session({
     }
 }));
 
+// Global locals for Pusher/Auth
+app.use((req, res, next) => {
+    res.locals.pusherKey = process.env.PUSHER_KEY;
+    res.locals.pusherCluster = process.env.PUSHER_CLUSTER;
+    res.locals.username = req.session.username || "";
+    next();
+});
+
 const isAuth = (req, res, next) => {
     if (req.session.isAuth) return next();
     if (req.xhr || req.path.startsWith('/api')) return res.status(401).json({ error: "Please login" });

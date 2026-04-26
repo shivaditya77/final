@@ -36,14 +36,21 @@
         window.PUSHER_CLUSTER = "<%= typeof pusherCluster !== 'undefined' ? pusherCluster : '' %>";
         window.CURRENT_USER = "<%= typeof username !== 'undefined' ? username : '' %>";
 
-        if (window.PUSHER_KEY && !window.globalPusher) {
-            window.globalPusher = new Pusher(window.PUSHER_KEY, {
-                cluster: window.PUSHER_CLUSTER,
-                forceTLS: true,
-                authEndpoint: '/pusher/auth'
-            });
-            window.globalChannel = window.globalPusher.subscribe('presence-bhondu-chat');
+        function initGlobalPusher() {
+            if (window.PUSHER_KEY && !window.globalPusher) {
+                console.log("Initializing Global Pusher...");
+                window.globalPusher = new Pusher(window.PUSHER_KEY, {
+                    cluster: window.PUSHER_CLUSTER,
+                    forceTLS: true,
+                    authEndpoint: '/pusher/auth'
+                });
+                window.globalChannel = window.globalPusher.subscribe('presence-bhondu-chat');
+            }
+            return window.globalPusher;
         }
+
+        // Auto-init on page load
+        initGlobalPusher();
     </script>
 </head>
 <body data-barba="wrapper">
