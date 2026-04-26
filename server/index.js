@@ -76,7 +76,13 @@ app.use(cors({
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-// Static assets are handled by Vercel routes, no need for express.static here
+// Static assets are handled by Vercel routes in production.
+// We only serve them manually for local development.
+if (process.env.NODE_ENV !== 'production') {
+    const publicDir = "../public"; // Hidden from Vercel tracer
+    app.use(express.static(path.join(__dirname, publicDir)));
+}
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.set('trust proxy', 1);
