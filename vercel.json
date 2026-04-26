@@ -1,20 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "middleware/**",
-          "models/**",
-          "routes/**",
-          "views/**",
-          "reels_list.json"
-        ]
-      }
+  "functions": {
+    "server.js": {
+      "includeFiles": [
+        "views/**",
+        "reels_list.json"
+      ]
     }
-  ],
+  },
   "routes": [
     {
       "src": "/assets/(.*)",
