@@ -157,7 +157,18 @@
             }
         };
 
-        if (window.globalChannel) {
+        // ========== 1000% SUREITY CALL GUARDIAN ==========
+        function bindCallListeners() {
+            if (!window.globalChannel) {
+                console.log("Call Guardian: Waiting for channel...");
+                setTimeout(bindCallListeners, 500);
+                return;
+            }
+
+            // Prevent double binding
+            window.globalChannel.unbind('video-signal');
+            
+            console.log("Call Guardian: Listeners Bound Successfully ✅");
             window.globalChannel.bind('video-signal', async (data) => {
                 if (data.to.toLowerCase() !== username.toLowerCase()) return;
 
@@ -346,5 +357,8 @@
             const isPiP = videoOverlay.classList.contains('pip-mode');
             document.getElementById('pip-btn').innerText = isPiP ? '🔲' : '🔳';
         };
+
+        // Start the guardian immediately for 1000% sureity
+        bindCallListeners();
     })();
 </script>
