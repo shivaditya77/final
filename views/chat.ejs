@@ -242,18 +242,26 @@
         (function() {
             if (typeof Pusher === 'undefined') return;
 
-            // ========== PUSHER INITIALIZATION ==========
+            // ========== TOP-TIER CONNECTION MANAGER ==========
+            const PusherConfig = {
+                key: window.PUSHER_KEY,
+                cluster: window.PUSHER_CLUSTER,
+                user: window.CURRENT_USER
+            };
+
             const pusher = typeof initGlobalPusher === 'function' ? initGlobalPusher() : window.globalPusher;
             const channel = window.globalChannel;
 
             if (!pusher || !channel) {
-                console.error('Pusher not initialized globally');
-                const statusText = document.getElementById('status-text');
-                if (statusText) statusText.innerText = 'Initialization Error 💔';
+                console.error('Chat Engine: Pusher credentials missing!');
+                if (statusText) {
+                    statusText.innerText = 'Setup Error 💔';
+                    statusText.style.color = '#f44336';
+                }
                 return;
             }
 
-            const username = "<%= username %>";
+            const username = PusherConfig.user;
             const otherUser = username.toLowerCase() === 'bhondu' ? 'vishu' : 'bhondu';
             const container = document.getElementById('messages-container');
             const chatForm = document.getElementById('chat-form');
@@ -306,61 +314,47 @@
                 el.addEventListener('loadedmetadata', () => scrollToBottom(false));
             });
 
-            // Status indication
+            // State Machine for UI
             function updateConnectionUI(state) {
                 if (!statusText || !statusDot) return;
-                console.log("Pusher Connection State:", state);
                 
-                if (state === 'connected') {
-                    statusText.innerText = 'Connected';
-                    statusText.style.color = '#4caf50';
-                    statusDot.style.background = '#4caf50';
-                    // Re-check online status
-                    if (channel && channel.subscribed) {
-                        updateStatusUI(channel.members.count > 1);
-                    }
-                } else if (state === 'connecting') {
-                    statusText.innerText = 'Connecting...';
-                    statusText.style.color = '#ffeb3b';
-                    statusDot.style.background = '#ffeb3b';
-                } else {
-                    statusText.innerText = 'Offline';
-                    statusText.style.color = '#f44336';
-                    statusDot.style.background = '#f44336';
+                const states = {
+                    'connected': { text: 'Online ✨', color: '#4caf50', dot: '#4caf50' },
+                    'connecting': { text: 'Connecting... 🔄', color: '#ffeb3b', dot: '#ffeb3b' },
+                    'unavailable': { text: 'Network Issue ⚠️', color: '#f44336', dot: '#f44336' },
+                    'failed': { text: 'Connection Failed ❌', color: '#f44336', dot: '#f44336' },
+                    'disconnected': { text: 'Offline 🌑', color: '#777', dot: '#777' }
+                };
+
+                const s = states[state] || states['disconnected'];
+                statusText.innerText = s.text;
+                statusText.style.color = s.color;
+                statusDot.style.background = s.dot;
+
+                if (state === 'connected' && channel.subscribed) {
+                    updateStatusUI(channel.members.count > 1);
                 }
             }
 
-            // Set initial state and start heartbeat
-            if (pusher) {
-                updateConnectionUI(pusher.connection.state);
-                
-                // If stuck in connecting, check again
-                let attempts = 0;
-                const checkInterval = setInterval(() => {
-                    attempts++;
-                    if (pusher.connection.state === 'connected') {
-                        updateConnectionUI('connected');
-                        clearInterval(checkInterval);
-                    } else if (attempts > 5) {
-                        clearInterval(checkInterval);
-                    } else {
-                        updateConnectionUI(pusher.connection.state);
-                    }
-                }, 1000);
+            // Bind State listeners
+            pusher.connection.unbind('state_change');
+            pusher.connection.bind('state_change', (sc) => updateConnectionUI(sc.current));
+            updateConnectionUI(pusher.connection.state);
 
-                pusher.connection.unbind('state_change');
-                pusher.connection.bind('state_change', (states) => {
-                    updateConnectionUI(states.current);
-                });
+            // Re-connect if stuck
+            if (pusher.connection.state !== 'connected') {
+                setTimeout(() => {
+                    if (pusher.connection.state === 'connecting') {
+                        console.log("Chat Engine: Forcing Reconnect...");
+                        pusher.connect();
+                    }
+                }, 3000);
             }
 
-            pusher.connection.bind('connected', () => {
-                // Initial check will happen in subscription_succeeded
-            });
-
+            channel.unbind('pusher:subscription_succeeded');
             channel.bind('pusher:subscription_succeeded', (members) => {
-                const isOtherOnline = members.count > 1;
-                updateStatusUI(isOtherOnline);
+                updateStatusUI(members.count > 1);
+                scrollToBottom(false);
             });
 
             channel.bind('pusher:member_added', (member) => {
