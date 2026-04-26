@@ -270,6 +270,8 @@
                 user: window.CURRENT_USER
             };
 
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
             const pusher = typeof initGlobalPusher === 'function' ? initGlobalPusher() : window.globalPusher;
             const channel = window.globalChannel;
 
@@ -287,8 +289,6 @@
             const container = document.getElementById('messages-container');
             const chatForm = document.getElementById('chat-form');
             const chatInput = document.getElementById('chat-input');
-            const statusDot = document.getElementById('status-dot');
-            const statusText = document.getElementById('status-text');
             
             // ========== NATIVE APP UTILITIES ==========
             const haptic = (type) => {
