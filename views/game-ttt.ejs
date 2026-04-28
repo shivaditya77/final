@@ -1,0 +1,270 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="game-ttt">
+    <style>
+        .game-body {
+            min-height: 100vh;
+            background: #0a0a0a;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 100px;
+            position: relative;
+            overflow: hidden;
+        }
+        .game-bg {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle at center, #1a0b0f 0%, #0a0a0a 100%);
+            z-index: 0;
+        }
+        .game-container {
+            position: relative; z-index: 10;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+        .status-badge {
+            background: rgba(255, 77, 109, 0.15);
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 77, 109, 0.3);
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+            color: #ffccd5;
+            display: inline-block;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 24px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .cell {
+            aspect-ratio: 1/1;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .cell:hover:not(.taken) {
+            background: rgba(255, 255, 255, 0.08);
+            transform: scale(1.05);
+        }
+        .cell.taken { cursor: default; }
+        .cell.win {
+            background: rgba(255, 77, 109, 0.3);
+            border-color: #ff4d6d;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .controls { margin-top: 40px; display: flex; gap: 15px; justify-content: center; }
+        .btn-reset {
+            background: linear-gradient(135deg, #ff4d6d, #c9184a);
+            border: none; color: white; padding: 12px 30px;
+            border-radius: 50px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-reset:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255, 77, 109, 0.3); }
+        
+        .symbol-heart { color: #ff4d6d; text-shadow: 0 0 10px rgba(255, 77, 109, 0.5); }
+        .symbol-kiss { color: #ff8fa3; text-shadow: 0 0 10px rgba(255, 143, 163, 0.5); }
+
+        .turn-indicator {
+            display: flex; justify-content: space-around; margin-bottom: 20px;
+        }
+        .player-info {
+            display: flex; flex-direction: column; align-items: center; gap: 5px; opacity: 0.5; transition: all 0.3s;
+        }
+        .player-info.active { opacity: 1; transform: scale(1.1); }
+        .player-info.active .player-name { color: #ff4d6d; font-weight: 700; }
+        .player-symbol { font-size: 1.5rem; }
+        .player-name { font-size: 0.8rem; }
+    </style>
+
+    <div class="game-body">
+        <div class="game-bg"></div>
+        <%- include('partials/navbar') %>
+
+        <div class="game-container">
+            <div class="status-badge" id="status-text">Your Turn! Make a move ❤️</div>
+
+            <div class="turn-indicator">
+                <div class="player-info" id="p1-info">
+                    <span class="player-symbol">❤️</span>
+                    <span class="player-name">Bhondu</span>
+                </div>
+                <div class="player-info" id="p2-info">
+                    <span class="player-symbol">💋</span>
+                    <span class="player-name">Vishu</span>
+                </div>
+            </div>
+
+            <div class="board" id="board">
+                <div class="cell" data-index="0"></div>
+                <div class="cell" data-index="1"></div>
+                <div class="cell" data-index="2"></div>
+                <div class="cell" data-index="3"></div>
+                <div class="cell" data-index="4"></div>
+                <div class="cell" data-index="5"></div>
+                <div class="cell" data-index="6"></div>
+                <div class="cell" data-index="7"></div>
+                <div class="cell" data-index="8"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-reset" onclick="requestReset()">🔄 Reset Board</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const username = "<%= username %>";
+            const otherUser = "<%= otherUser %>";
+            const mySymbol = username.toLowerCase() === 'bhondu' ? '❤️' : '💋';
+            const otherSymbol = mySymbol === '❤️' ? '💋' : '❤️';
+            
+            let board = Array(9).fill(null);
+            let isMyTurn = username.toLowerCase() === 'bhondu'; // Bhondu starts first
+            let gameActive = true;
+
+            const cells = document.querySelectorAll('.cell');
+            const statusText = document.getElementById('status-text');
+            const p1Info = document.getElementById('p1-info');
+            const p2Info = document.getElementById('p2-info');
+
+            function updateUI() {
+                statusText.innerText = gameActive ? (isMyTurn ? "Your Turn! ❤️" : `Waiting for ${otherUser}... ⌛`) : statusText.innerText;
+                if (isMyTurn) {
+                    username.toLowerCase() === 'bhondu' ? p1Info.classList.add('active') : p2Info.classList.add('active');
+                    username.toLowerCase() === 'bhondu' ? p2Info.classList.remove('active') : p1Info.classList.remove('active');
+                } else {
+                    username.toLowerCase() === 'bhondu' ? p2Info.classList.add('active') : p1Info.classList.add('active');
+                    username.toLowerCase() === 'bhondu' ? p1Info.classList.remove('active') : p2Info.classList.remove('active');
+                }
+            }
+
+            cells.forEach(cell => {
+                cell.addEventListener('click', () => {
+                    const idx = cell.getAttribute('data-index');
+                    if (!gameActive || !isMyTurn || board[idx]) return;
+
+                    makeMove(idx, mySymbol);
+                    syncMove(idx, mySymbol);
+                });
+            });
+
+            function makeMove(idx, symbol) {
+                board[idx] = symbol;
+                const cell = cells[idx];
+                cell.innerText = symbol;
+                cell.classList.add('taken');
+                cell.classList.add(symbol === '❤️' ? 'symbol-heart' : 'symbol-kiss');
+                
+                checkWinner();
+                if (gameActive) {
+                    isMyTurn = !isMyTurn;
+                    updateUI();
+                }
+            }
+
+            async function syncMove(index, symbol) {
+                try {
+                    await fetch('/api/games/ttt/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ index, symbol, to: otherUser })
+                    });
+                } catch (e) {}
+            }
+
+            function checkWinner() {
+                const winPatterns = [
+                    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+                    [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
+                    [0, 4, 8], [2, 4, 6]             // diags
+                ];
+
+                for (let pattern of winPatterns) {
+                    const [a, b, c] = pattern;
+                    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                        gameActive = false;
+                        cells[a].classList.add('win');
+                        cells[b].classList.add('win');
+                        cells[c].classList.add('win');
+                        statusText.innerText = board[a] === mySymbol ? "🎉 You Won! ❤️" : `💔 ${otherUser} Won!`;
+                        return;
+                    }
+                }
+
+                if (!board.includes(null)) {
+                    gameActive = false;
+                    statusText.innerText = "It's a Draw! 🤝";
+                }
+            }
+
+            window.requestReset = async () => {
+                resetBoard();
+                try {
+                    await fetch('/api/games/ttt/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser })
+                    });
+                } catch (e) {}
+            };
+
+            function resetBoard() {
+                board = Array(9).fill(null);
+                gameActive = true;
+                isMyTurn = username.toLowerCase() === 'bhondu';
+                cells.forEach(cell => {
+                    cell.innerText = '';
+                    cell.className = 'cell';
+                });
+                updateUI();
+            }
+
+            // Real-time Listeners
+            if (window.globalPusher) {
+                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
+                channel.bind('ttt-move', (data) => {
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        makeMove(data.index, data.symbol);
+                    }
+                });
+                channel.bind('ttt-reset', (data) => {
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        resetBoard();
+                        showToast(`${otherUser} reset the board! 🔄`);
+                    }
+                });
+            }
+
+            function showToast(msg) {
+                const toast = document.createElement('div');
+                toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:50px; z-index:10000; font-size:0.8rem; border:1px solid rgba(255,255,255,0.1);";
+                toast.innerText = msg;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+
+            updateUI();
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

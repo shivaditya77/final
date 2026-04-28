@@ -1,0 +1,289 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="game-heart-seeker">
+    <style>
+        .game-body {
+            min-height: 100vh;
+            background: #0a0a0a;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 100px;
+            position: relative;
+        }
+        .game-bg {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle at center, #0f0c29 0%, #0a0a0a 100%);
+            z-index: 0;
+        }
+        .game-container {
+            position: relative; z-index: 10;
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+        .status-badge {
+            background: rgba(139, 92, 246, 0.15);
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+            color: #a78bfa;
+            display: inline-block;
+        }
+        .grids-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            align-items: center;
+        }
+        .grid-wrapper {
+            width: 100%;
+            max-width: 300px;
+        }
+        .grid-title {
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .cell {
+            aspect-ratio: 1/1;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .cell.hidden-heart { background: rgba(139, 92, 246, 0.2); border-color: #a78bfa; }
+        .cell.hit { background: rgba(255, 77, 109, 0.3); border-color: #ff4d6d; color: #ff4d6d; }
+        .cell.miss { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.3); }
+        .cell.taken { cursor: default; }
+        
+        .controls { margin-top: 30px; }
+        .btn-ready {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            border: none; color: white; padding: 12px 30px;
+            border-radius: 50px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-ready:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        @media (min-width: 800px) {
+            .grids-container { flex-direction: row; max-width: 700px; justify-content: center; }
+            .game-container { max-width: 800px; }
+        }
+    </style>
+
+    <div class="game-body">
+        <div class="game-bg"></div>
+        <%- include('partials/navbar') %>
+
+        <div class="game-container">
+            <div class="status-badge" id="status-text">Phase 1: Hide 3 Hearts on your grid! 💘</div>
+
+            <div class="grids-container">
+                <div class="grid-wrapper">
+                    <div class="grid-title">Your Grid (Hide Hearts)</div>
+                    <div class="grid" id="my-grid">
+                        <% for(let i=0; i<25; i++) { %>
+                            <div class="cell" data-index="<%= i %>"></div>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="grid-wrapper" id="opponent-grid-wrapper" style="opacity: 0.3; pointer-events: none;">
+                    <div class="grid-title"><%= otherUser %>'s Grid (Attack!)</div>
+                    <div class="grid" id="opponent-grid">
+                        <% for(let i=0; i<25; i++) { %>
+                            <div class="cell" data-index="<%= i %>"></div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-ready" id="ready-btn" disabled onclick="sendReady()">I'm Ready! 🚀</button>
+                <button class="btn-ready" style="margin-left:10px; background: #333;" onclick="location.reload()">🔄 Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const username = "<%= username %>";
+            const otherUser = "<%= otherUser %>";
+            
+            let myHearts = [];
+            let opponentHits = 0;
+            let myHits = 0;
+            let phase = 1; // 1: Placing, 2: Waiting, 3: Playing
+            let isMyTurn = false;
+            let otherReady = false;
+
+            const myCells = document.querySelectorAll('#my-grid .cell');
+            const oppCells = document.querySelectorAll('#opponent-grid .cell');
+            const statusText = document.getElementById('status-text');
+            const readyBtn = document.getElementById('ready-btn');
+            const oppGridWrapper = document.getElementById('opponent-grid-wrapper');
+
+            myCells.forEach(cell => {
+                cell.addEventListener('click', () => {
+                    if (phase !== 1) return;
+                    const idx = parseInt(cell.getAttribute('data-index'));
+                    
+                    if (myHearts.includes(idx)) {
+                        myHearts = myHearts.filter(h => h !== idx);
+                        cell.classList.remove('hidden-heart');
+                        cell.innerText = '';
+                    } else if (myHearts.length < 3) {
+                        myHearts.push(idx);
+                        cell.classList.add('hidden-heart');
+                        cell.innerText = '💘';
+                    }
+                    
+                    readyBtn.disabled = myHearts.length !== 3;
+                });
+            });
+
+            oppCells.forEach(cell => {
+                cell.addEventListener('click', () => {
+                    if (phase !== 3 || !isMyTurn) return;
+                    const idx = cell.getAttribute('data-index');
+                    if (cell.classList.contains('taken')) return;
+
+                    attackOpponent(idx);
+                });
+            });
+
+            async function sendReady() {
+                phase = 2;
+                readyBtn.style.display = 'none';
+                statusText.innerText = "Waiting for " + otherUser + "... ⌛";
+                
+                try {
+                    await fetch('/api/games/heart-seeker/hide', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser })
+                    });
+                    if (otherReady) startGame();
+                } catch (e) {}
+            }
+
+            function startGame() {
+                phase = 3;
+                oppGridWrapper.style.opacity = '1';
+                oppGridWrapper.style.pointerEvents = 'all';
+                // Bhondu starts first
+                isMyTurn = username.toLowerCase() === 'bhondu';
+                updateTurnUI();
+            }
+
+            function updateTurnUI() {
+                statusText.innerText = isMyTurn ? "Your Turn! Attack " + otherUser + "'s grid! 🎯" : "Waiting for " + otherUser + "'s move... ⌛";
+            }
+
+            async function attackOpponent(index) {
+                isMyTurn = false;
+                updateTurnUI();
+                try {
+                    await fetch('/api/games/heart-seeker/attack', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ index, to: otherUser })
+                    });
+                } catch (e) {}
+            }
+
+            // Real-time Listeners
+            if (window.globalPusher) {
+                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
+                
+                channel.bind('heart-seeker-ready', (data) => {
+                    otherReady = true;
+                    if (phase === 2) startGame();
+                    else showToast(otherUser + " is ready! 🚀");
+                });
+
+                channel.bind('heart-seeker-attack', async (data) => {
+                    const idx = parseInt(data.index);
+                    const isHit = myHearts.includes(idx);
+                    const cell = myCells[idx];
+                    
+                    cell.classList.add('taken');
+                    if (isHit) {
+                        cell.classList.add('hit');
+                        cell.innerText = '💥';
+                        opponentHits++;
+                    } else {
+                        cell.classList.add('miss');
+                        cell.innerText = '❌';
+                    }
+
+                    // Send result back
+                    try {
+                        await fetch('/api/games/heart-seeker/result', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ index: idx, isHit, to: otherUser })
+                        });
+                    } catch (e) {}
+
+                    if (opponentHits === 3) {
+                        statusText.innerText = "💔 " + otherUser + " Won! Better luck next time.";
+                        phase = 4;
+                    } else {
+                        isMyTurn = true;
+                        updateTurnUI();
+                    }
+                });
+
+                channel.bind('heart-seeker-result', (data) => {
+                    const cell = oppCells[data.index];
+                    cell.classList.add('taken');
+                    if (data.isHit) {
+                        cell.classList.add('hit');
+                        cell.innerText = '💖';
+                        myHits++;
+                        if (myHits === 3) {
+                            statusText.innerText = "🎉 You Won! All hearts found! 🏆";
+                            phase = 4;
+                        }
+                    } else {
+                        cell.classList.add('miss');
+                        cell.innerText = '🌊';
+                    }
+                });
+
+                channel.bind('heart-seeker-reset', () => location.reload());
+            }
+
+            function showToast(msg) {
+                const toast = document.createElement('div');
+                toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:50px; z-index:10000; font-size:0.8rem; border:1px solid rgba(255,255,255,0.1);";
+                toast.innerText = msg;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

@@ -1,0 +1,82 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="games">
+    <link rel="stylesheet" href="/css/Home.css"> <!-- Reusing Home.css for layout -->
+    <style>
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            max-width: 1100px;
+            width: 100%;
+            margin-top: 30px;
+            animation: fadeInUp 1s cubic-bezier(0.23, 1, 0.32, 1) both;
+        }
+        .card-ttt {
+            background: linear-gradient(145deg, rgba(255, 77, 109, 0.15) 0%, rgba(26, 11, 15, 0.9) 100%);
+            box-shadow: 0 8px 32px rgba(255, 77, 109, 0.15);
+        }
+        .card-heartseeker {
+            background: linear-gradient(145deg, rgba(139, 92, 246, 0.15) 0%, rgba(15, 12, 41, 0.9) 100%);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
+        }
+        .card-sps {
+            background: linear-gradient(145deg, rgba(255, 215, 0, 0.1) 0%, rgba(26, 20, 5, 0.9) 100%);
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.1);
+        }
+    </style>
+
+    <div class="home-body">
+        <div class="animated-bg"></div>
+        <div class="vignette"></div>
+        
+        <%- include('partials/navbar') %>
+
+        <div class="home-container">
+            <div class="intro-badge">
+                <span class="badge-text">PLAY TOGETHER <span class="badge-heart">🎮</span></span>
+            </div>
+            
+            <div class="heading-wrapper">
+                <h1 class="home-h1">Bhondu Games</h1>
+                <span class="cursor">|</span>
+            </div>
+            
+            <div class="subtitle show">
+                <p>Have fun, compete, and make memories through play</p>
+            </div>
+
+            <div class="game-grid">
+                <!-- Tic Tac Toe -->
+                <a href="/games/ttt" class="section-card card-ttt">
+                    <div class="card-tag">CLASSIC</div>
+                    <span class="card-icon">⭕</span>
+                    <div class="card-label">TIC TAC TOE</div>
+                    <h2 class="card-title">Hearts vs. Kisses</h2>
+                    <p class="card-desc">The classic game of strategy. First to get 3 in a row wins a virtual hug!</p>
+                    <button class="card-btn">Play Now <span class="card-btn-arrow">→</span></button>
+                </a>
+
+                <!-- Heart Seeker -->
+                <a href="/games/heart-seeker" class="section-card card-heartseeker">
+                    <div class="card-tag">NEW</div>
+                    <span class="card-icon">💘</span>
+                    <div class="card-label">BATTLESHIP</div>
+                    <h2 class="card-title">Heart Seeker</h2>
+                    <p class="card-desc">Find the hidden hearts on your partner's grid. High suspense and high reward!</p>
+                    <button class="card-btn">Play Now <span class="card-btn-arrow">→</span></button>
+                </a>
+
+                <!-- Stone Paper Scissors -->
+                <a href="/games/sps" class="section-card card-sps">
+                    <div class="card-tag">FUN</div>
+                    <span class="card-icon">✂️</span>
+                    <div class="card-label">RPS</div>
+                    <h2 class="card-title">Stone Paper Scissors</h2>
+                    <p class="card-desc">The ultimate decider. Fast-paced, real-time action to see who's luckier today!</p>
+                    <button class="card-btn">Play Now <span class="card-btn-arrow">→</span></button>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/footer') %>

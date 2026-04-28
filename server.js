@@ -624,6 +624,107 @@ app.post("/api/reels/invite", isAuth, async (req, res) => {
 const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
 
+// ========== GAMES SECTION ==========
+app.get("/games", isAuth, (req, res) => {
+    res.render("games", { username: req.session.username });
+});
+
+app.get("/games/ttt", isAuth, (req, res) => {
+    res.render("game-ttt", { 
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
+    });
+});
+
+app.get("/games/heart-seeker", isAuth, (req, res) => {
+    res.render("game-heart-seeker", { 
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
+    });
+});
+
+app.get("/games/sps", isAuth, (req, res) => {
+    res.render("game-sps", { 
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
+    });
+});
+
+// API for Tic Tac Toe sync
+app.post("/api/games/ttt/move", isAuth, async (req, res) => {
+    try {
+        const { index, symbol, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ttt-move", { index, symbol, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ttt/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ttt-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// API for Heart Seeker sync
+app.post("/api/games/heart-seeker/hide", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-ready", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/heart-seeker/attack", isAuth, async (req, res) => {
+    try {
+        const { index, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-attack", { index, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/heart-seeker/result", isAuth, async (req, res) => {
+    try {
+        const { index, isHit, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-result", { index, isHit, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/heart-seeker/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// API for Stone Paper Scissors sync
+app.post("/api/games/sps/move", isAuth, async (req, res) => {
+    try {
+        const { move, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "sps-move", { move, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/sps/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "sps-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 app.get("/journal", isAuth, async (req, res) => {
     try {
         const entries = await Journal.find().sort({ date: -1, createdAt: -1 });

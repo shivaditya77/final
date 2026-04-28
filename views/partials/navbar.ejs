@@ -1,5 +1,11 @@
 <!-- Navigation Bar Partial -->
 <div class="nav-container">
+    <div class="nav-btn status-btn" id="partner-status-btn" style="cursor: default;">
+        <span class="status-dot" id="global-status-dot"></span>
+        <span class="nav-text" id="global-status-text">
+            <%= (typeof username !== 'undefined' && username.toLowerCase() === 'bhondu') ? 'Vishu' : 'Bhondu' %>: Offline
+        </span>
+    </div>
     <a href="/" class="nav-btn" style="text-decoration: none;">
         <span>🏠</span><span class="nav-text">Home</span>
     </a>
@@ -185,25 +191,29 @@
     cursor: pointer;
 }
 
-.notif-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff4d6d;
-    color: white;
-    font-size: 0.65rem;
-    width: 18px;
-    height: 18px;
+.status-dot {
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #1a1a1a;
-    font-weight: 800;
+    background: #555;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.status-dot.online {
+    background: #00ffcc;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.8);
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 255, 204, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(0, 255, 204, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 255, 204, 0); }
 }
 
 @media (max-width: 768px) {
     .nav-container { top: 10px; right: 10px; gap: 8px; }
+    .status-btn .nav-text { display: none; }
     .nav-text { display: none; }
     .nav-btn { padding: 10px; }
     .notif-dropdown { 
@@ -223,6 +233,50 @@
     const dropdown = document.getElementById('notif-dropdown');
     const badge = document.getElementById('notif-badge');
     const list = document.getElementById('notif-list');
+    
+    // Status Elements
+    const globalStatusDot = document.getElementById('global-status-dot');
+    const globalStatusText = document.getElementById('global-status-text');
+    const otherUser = "<%= (typeof username !== 'undefined' && username.toLowerCase() === 'bhondu') ? 'Vishu' : 'Bhondu' %>";
+    
+    function updateGlobalStatus(isOnline) {
+        if (globalStatusDot) globalStatusDot.classList.toggle('online', isOnline);
+        if (globalStatusText) {
+            globalStatusText.innerText = `${otherUser}: ${isOnline ? 'Online ❤️' : 'Offline 💔'}`;
+            globalStatusText.style.color = isOnline ? '#00ffcc' : 'rgba(255,255,255,0.6)';
+        }
+    }
+
+    // Connect to globalChannel defined in header
+    function initStatusTracking() {
+        if (window.globalChannel) {
+            const channel = window.globalChannel;
+            
+            channel.bind('pusher:subscription_succeeded', (members) => {
+                // If count > 1, it means both are here (presence channel includes self)
+                updateGlobalStatus(members.count > 1);
+            });
+
+            channel.bind('pusher:member_added', (member) => {
+                // Only care if the ADDED member is the OTHER person
+                if (member.id.toLowerCase() === otherUser.toLowerCase()) {
+                    updateGlobalStatus(true);
+                }
+            });
+
+            channel.bind('pusher:member_removed', (member) => {
+                // Only care if the REMOVED member is the OTHER person
+                if (member.id.toLowerCase() === otherUser.toLowerCase()) {
+                    updateGlobalStatus(false);
+                }
+            });
+        } else {
+            // Retry if channel not ready yet
+            setTimeout(initStatusTracking, 1000);
+        }
+    }
+
+    initStatusTracking();
     
     const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
