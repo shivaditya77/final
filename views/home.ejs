@@ -83,22 +83,6 @@
                     </button>
                 </a>
 
-                <!-- Card 5: Soul Connect -->
-                <div class="section-card card-call">
-                    <span class="card-tag">📞 Live</span>
-                    <span class="card-icon">📞</span>
-                    <div class="card-label">Soul Connect</div>
-                    <h2 class="card-title">Heart Line</h2>
-                    <p class="card-desc">Call my heart anytime. Voice or Video — I'm always just one click away. 💖</p>
-                    <div class="card-status-indicator">
-                        <div class="status-dot-mini" id="home-status-dot"></div>
-                        <span id="home-status-text" style="color: rgba(255,255,255,0.4)">Checking...</span>
-                    </div>
-                    <div class="call-buttons-inline">
-                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(false)">📹 Video Call</button>
-                        <button class="card-btn-mini card-call-btn-main" onclick="window.startVideoCall(true)">📞 Voice Call</button>
-                    </div>
-                </div>
 
                 <!-- Card 6: Bhondu Games -->
                 <a href="/games" class="section-card card-games" style="background: linear-gradient(145deg, rgba(0, 153, 255, 0.15) 0%, rgba(5, 15, 26, 0.9) 100%); box-shadow: 0 8px 32px rgba(0, 153, 255, 0.15);">
@@ -190,42 +174,8 @@
             }
             setTimeout(syncMusicUI, 100);
 
-            // ========== PUSHER STATUS TRACKING ==========
-            const channel = window.globalChannel;
-            const homeStatusDot = document.getElementById('home-status-dot');
-            const homeStatusText = document.getElementById('home-status-text');
-
-            if (channel) {
-                // Initial check
-                if (channel.members) {
-                    updateHomeStatus(channel.members.count > 1);
-                }
-
-                channel.bind('pusher:subscription_succeeded', (members) => {
-                    updateHomeStatus(members.count > 1);
-                });
-
-                channel.bind('pusher:member_added', (member) => {
-                    if (member.id !== username.toLowerCase()) {
-                        updateHomeStatus(true);
-                    }
-                });
-
-                channel.bind('pusher:member_removed', (member) => {
-                    if (member.id !== username.toLowerCase()) {
-                        updateHomeStatus(false);
-                    }
-                });
-            }
-
             function updateHomeStatus(isOnline) {
-                if (homeStatusDot) {
-                    homeStatusDot.classList.toggle('online', isOnline);
-                }
-                if (homeStatusText) {
-                    homeStatusText.innerText = isOnline ? 'Online now ❤️' : 'Offline right now 💔';
-                    homeStatusText.style.color = isOnline ? '#00ffcc' : 'rgba(255,255,255,0.4)';
-                }
+                // Feature removed
             }
         })();
     </script>
