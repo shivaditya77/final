@@ -136,10 +136,10 @@
             const username = "<%= username %>";
             const otherUser = "<%= otherUser %>";
             const mySymbol = username.toLowerCase() === 'bhondu' ? '❤️' : '💋';
-            const otherSymbol = mySymbol === '❤️' ? '💋' : '❤️';
+            const channelName = 'private-notifications-' + username.toLowerCase();
             
             let board = Array(9).fill(null);
-            let isMyTurn = username.toLowerCase() === 'bhondu'; // Bhondu starts first
+            let isMyTurn = username.toLowerCase() === 'bhondu'; 
             let gameActive = true;
 
             const cells = document.querySelectorAll('.cell');
@@ -147,15 +147,37 @@
             const p1Info = document.getElementById('p1-info');
             const p2Info = document.getElementById('p2-info');
 
+            function initGameSync() {
+                if (!window.globalPusher) return setTimeout(initGameSync, 500);
+                const channel = window.globalPusher.subscribe(channelName);
+                
+                channel.unbind('ttt-move');
+                channel.unbind('ttt-reset');
+
+                channel.bind('ttt-move', (data) => {
+                    console.log("🎮 TTT Move Received:", data);
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        makeMove(data.index, data.symbol);
+                    }
+                });
+
+                channel.bind('ttt-reset', (data) => {
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        resetBoard();
+                        showToast(`${otherUser} reset the board! 🔄`);
+                    }
+                });
+            }
+
             function updateUI() {
-                statusText.innerText = gameActive ? (isMyTurn ? "Your Turn! ❤️" : `Waiting for ${otherUser}... ⌛`) : statusText.innerText;
-                if (isMyTurn) {
-                    username.toLowerCase() === 'bhondu' ? p1Info.classList.add('active') : p2Info.classList.add('active');
-                    username.toLowerCase() === 'bhondu' ? p2Info.classList.remove('active') : p1Info.classList.remove('active');
-                } else {
-                    username.toLowerCase() === 'bhondu' ? p2Info.classList.add('active') : p1Info.classList.add('active');
-                    username.toLowerCase() === 'bhondu' ? p1Info.classList.remove('active') : p2Info.classList.remove('active');
-                }
+                if (!gameActive) return;
+                statusText.innerText = isMyTurn ? "Your Turn! ❤️" : `Waiting for ${otherUser}... ⌛`;
+                
+                const activePlayer = isMyTurn ? username : otherUser;
+                const isBhonduActive = activePlayer.toLowerCase() === 'bhondu';
+                
+                p1Info.classList.toggle('active', isBhonduActive);
+                p2Info.classList.toggle('active', !isBhonduActive);
             }
 
             cells.forEach(cell => {
@@ -169,12 +191,17 @@
             });
 
             function makeMove(idx, symbol) {
+                if (board[idx]) return;
                 board[idx] = symbol;
                 const cell = cells[idx];
+                
                 cell.innerText = symbol;
                 cell.classList.add('taken');
                 cell.classList.add(symbol === '❤️' ? 'symbol-heart' : 'symbol-kiss');
                 
+                // Animation for move
+                gsap.from(cell, { scale: 0, duration: 0.4, ease: "back.out(1.7)" });
+
                 checkWinner();
                 if (gameActive) {
                     isMyTurn = !isMyTurn;
@@ -194,19 +221,21 @@
 
             function checkWinner() {
                 const winPatterns = [
-                    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-                    [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
-                    [0, 4, 8], [2, 4, 6]             // diags
+                    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                    [0, 4, 8], [2, 4, 6]
                 ];
 
                 for (let pattern of winPatterns) {
                     const [a, b, c] = pattern;
                     if (board[a] && board[a] === board[b] && board[a] === board[c]) {
                         gameActive = false;
-                        cells[a].classList.add('win');
-                        cells[b].classList.add('win');
-                        cells[c].classList.add('win');
+                        const winCells = [cells[a], cells[b], cells[c]];
+                        winCells.forEach(c => c.classList.add('win'));
+                        
                         statusText.innerText = board[a] === mySymbol ? "🎉 You Won! ❤️" : `💔 ${otherUser} Won!`;
+                        statusText.style.color = board[a] === mySymbol ? "#00ffcc" : "#ff4d6d";
+                        
                         return;
                     }
                 }
@@ -239,27 +268,6 @@
                 updateUI();
             }
 
-            // Real-time Listeners
-            if (window.globalPusher) {
-                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                
-                // UNBIND first to avoid duplicate listeners when navigating back/forth via Barba
-                channel.unbind('ttt-move');
-                channel.unbind('ttt-reset');
-
-                channel.bind('ttt-move', (data) => {
-                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
-                        makeMove(data.index, data.symbol);
-                    }
-                });
-                channel.bind('ttt-reset', (data) => {
-                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
-                        resetBoard();
-                        showToast(`${otherUser} reset the board! 🔄`);
-                    }
-                });
-            }
-
             function showToast(msg) {
                 const toast = document.createElement('div');
                 toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:50px; z-index:10000; font-size:0.8rem; border:1px solid rgba(255,255,255,0.1);";
@@ -268,6 +276,7 @@
                 setTimeout(() => toast.remove(), 3000);
             }
 
+            initGameSync();
             updateUI();
         })();
     </script>

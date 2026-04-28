@@ -149,11 +149,10 @@
         (function() {
             const username = "<%= username %>";
             const otherUser = "<%= otherUser %>";
+            const channelName = 'private-notifications-' + username.toLowerCase();
             
             let myMove = null;
-            let myMoveIcon = '✊';
             let oppMove = null;
-            let oppMoveIcon = '✊';
             let gameEnded = false;
 
             const myHandEl = document.getElementById('my-hand');
@@ -163,21 +162,52 @@
             const playAgainBtn = document.getElementById('play-again-btn');
             const optionBtns = document.querySelectorAll('.option-btn');
 
+            // PROFESSIONAL SYNC: Ensure we only have ONE listener active
+            function initGameSync() {
+                if (!window.globalPusher) return setTimeout(initGameSync, 500);
+                
+                const channel = window.globalPusher.subscribe(channelName);
+                
+                // Clear any old listeners to prevent "stuck" state
+                channel.unbind('sps-move');
+                channel.unbind('sps-reset');
+
+                channel.bind('sps-move', (data) => {
+                    console.log("🎮 SPS Move Received:", data);
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        oppMove = data.move;
+                        if (myMove) revealResult();
+                        else {
+                            waitingMsg.innerHTML = `<span style="color: #00ffcc">✨ ${otherUser} has picked!</span> Your turn...`;
+                            oppHandEl.classList.add('shake');
+                        }
+                    }
+                });
+
+                channel.bind('sps-reset', (data) => {
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        location.reload();
+                    }
+                });
+            }
+
             window.makeMove = async (move, icon) => {
                 if (gameEnded || myMove) return;
                 
                 myMove = move;
-                myMoveIcon = icon;
                 
-                // Highlight button
+                // UI Feedback
                 optionBtns.forEach(btn => {
+                    btn.classList.remove('selected');
                     if (btn.innerText === icon) btn.classList.add('selected');
                     btn.disabled = true;
                 });
 
                 myHandEl.classList.add('shake');
-                oppHandEl.classList.add('shake');
                 waitingMsg.innerText = "Waiting for " + otherUser + "... ⌛";
+
+                // Haptic-like feedback (vibrate if supported)
+                if (navigator.vibrate) navigator.vibrate(50);
 
                 try {
                     await fetch('/api/games/sps/move', {
@@ -185,42 +215,74 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ move, to: otherUser })
                     });
-                } catch (e) {}
+                } catch (e) {
+                    waitingMsg.innerText = "Connection error. Retrying...";
+                }
 
                 if (oppMove) revealResult();
             };
 
             function revealResult() {
+                if (gameEnded) return;
                 gameEnded = true;
+                
                 myHandEl.classList.remove('shake');
                 oppHandEl.classList.remove('shake');
                 waitingMsg.innerText = "";
 
-                // Icon mapping
                 const icons = { 'stone': '✊', 'paper': '✋', 'scissors': '✌️' };
-                myHandEl.innerText = icons[myMove];
-                oppHandEl.innerText = icons[oppMove];
+                
+                // GSAP Reveal Animation
+                gsap.to([myHandEl, oppHandEl], {
+                    scale: 1.5,
+                    duration: 0.3,
+                    yoyo: true,
+                    repeat: 1,
+                    onComplete: () => {
+                        myHandEl.innerText = icons[myMove];
+                        oppHandEl.innerText = icons[oppMove];
+                        
+                        let result = "";
+                        let color = "#ffd700";
+                        if (myMove === oppMove) {
+                            result = "It's a Tie! 🤝";
+                        } else if (
+                            (myMove === 'stone' && oppMove === 'scissors') ||
+                            (myMove === 'paper' && oppMove === 'stone') ||
+                            (myMove === 'scissors' && oppMove === 'paper')
+                        ) {
+                            result = "🎉 You Won! 🏆";
+                            color = "#00ffcc";
+                            confettiEffect();
+                        } else {
+                            result = "💔 " + otherUser + " Won!";
+                            color = "#ff4d6d";
+                        }
 
-                // Determine winner
-                let result = "";
-                if (myMove === oppMove) {
-                    result = "It's a Tie! 🤝";
-                } else if (
-                    (myMove === 'stone' && oppMove === 'scissors') ||
-                    (myMove === 'paper' && oppMove === 'stone') ||
-                    (myMove === 'scissors' && oppMove === 'paper')
-                ) {
-                    result = "🎉 You Won! 🏆";
-                } else {
-                    result = "💔 " + otherUser + " Won!";
+                        statusText.innerText = result;
+                        statusText.style.color = color;
+                        playAgainBtn.style.display = 'inline-block';
+                    }
+                });
+            }
+
+            function confettiEffect() {
+                for(let i=0; i<20; i++) {
+                    const c = document.createElement('div');
+                    c.innerText = '✨';
+                    c.style.cssText = `position:fixed;left:${50 + (Math.random()-0.5)*100}%;top:50%;pointer-events:none;z-index:9999;`;
+                    document.body.appendChild(c);
+                    gsap.to(c, {
+                        y: -100 - Math.random()*200,
+                        x: (Math.random()-0.5)*400,
+                        opacity: 0,
+                        duration: 1 + Math.random(),
+                        onComplete: () => c.remove()
+                    });
                 }
-
-                statusText.innerText = result;
-                playAgainBtn.style.display = 'inline-block';
             }
 
             window.resetGame = async () => {
-                location.reload();
                 try {
                     await fetch('/api/games/sps/reset', {
                         method: 'POST',
@@ -228,32 +290,10 @@
                         body: JSON.stringify({ to: otherUser })
                     });
                 } catch (e) {}
+                location.reload();
             };
 
-            // Real-time Listeners
-            if (window.globalPusher) {
-                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                
-                // UNBIND first
-                channel.unbind('sps-move');
-                channel.unbind('sps-reset');
-
-                channel.bind('sps-move', (data) => {
-                    oppMove = data.move;
-                    if (myMove) revealResult();
-                    else waitingMsg.innerText = otherUser + " has picked! Your turn... 🔥";
-                });
-
-                channel.bind('sps-reset', () => location.reload());
-            }
-
-            function showToast(msg) {
-                const toast = document.createElement('div');
-                toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:50px; z-index:10000; font-size:0.8rem; border:1px solid rgba(255,255,255,0.1);";
-                toast.innerText = msg;
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
-            }
+            initGameSync();
         })();
     </script>
 </div>

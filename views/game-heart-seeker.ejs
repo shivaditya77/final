@@ -130,6 +130,7 @@
         (function() {
             const username = "<%= username %>";
             const otherUser = "<%= otherUser %>";
+            const channelName = 'private-notifications-' + username.toLowerCase();
             
             let myHearts = [];
             let opponentHits = 0;
@@ -143,6 +144,83 @@
             const statusText = document.getElementById('status-text');
             const readyBtn = document.getElementById('ready-btn');
             const oppGridWrapper = document.getElementById('opponent-grid-wrapper');
+
+            function initGameSync() {
+                if (!window.globalPusher) return setTimeout(initGameSync, 500);
+                const channel = window.globalPusher.subscribe(channelName);
+                
+                channel.unbind('heart-seeker-ready');
+                channel.unbind('heart-seeker-attack');
+                channel.unbind('heart-seeker-result');
+                channel.unbind('heart-seeker-reset');
+
+                channel.bind('heart-seeker-ready', (data) => {
+                    console.log("🎮 Heart Seeker Ready:", data);
+                    otherReady = true;
+                    if (phase === 2) startGame();
+                    else showToast(otherUser + " is ready! 🚀");
+                });
+
+                channel.bind('heart-seeker-attack', async (data) => {
+                    console.log("🎮 Heart Seeker Attack:", data);
+                    const idx = parseInt(data.index);
+                    const isHit = myHearts.includes(idx);
+                    const cell = myCells[idx];
+                    
+                    cell.classList.add('taken');
+                    
+                    // Reveal animation
+                    gsap.from(cell, { scale: 1.5, duration: 0.3, repeat: 1, yoyo: true });
+
+                    if (isHit) {
+                        cell.classList.add('hit');
+                        cell.innerText = '💥';
+                        opponentHits++;
+                    } else {
+                        cell.classList.add('miss');
+                        cell.innerText = '❌';
+                    }
+
+                    try {
+                        await fetch('/api/games/heart-seeker/result', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ index: idx, isHit, to: otherUser })
+                        });
+                    } catch (e) {}
+
+                    if (opponentHits === 3) {
+                        statusText.innerText = "💔 " + otherUser + " Won! Better luck next time.";
+                        statusText.style.color = "#ff4d6d";
+                        phase = 4;
+                    } else {
+                        isMyTurn = true;
+                        updateTurnUI();
+                    }
+                });
+
+                channel.bind('heart-seeker-result', (data) => {
+                    console.log("🎮 Heart Seeker Result:", data);
+                    const cell = oppCells[data.index];
+                    cell.classList.add('taken');
+                    
+                    if (data.isHit) {
+                        cell.classList.add('hit');
+                        cell.innerText = '💖';
+                        myHits++;
+                        if (myHits === 3) {
+                            statusText.innerText = "🎉 You Won! All hearts found! 🏆";
+                            statusText.style.color = "#00ffcc";
+                            phase = 4;
+                        }
+                    } else {
+                        cell.classList.add('miss');
+                        cell.innerText = '🌊';
+                    }
+                });
+
+                channel.bind('heart-seeker-reset', () => location.reload());
+            }
 
             myCells.forEach(cell => {
                 cell.addEventListener('click', () => {
@@ -168,7 +246,6 @@
                     if (phase !== 3 || !isMyTurn) return;
                     const idx = cell.getAttribute('data-index');
                     if (cell.classList.contains('taken')) return;
-
                     attackOpponent(idx);
                 });
             });
@@ -192,12 +269,13 @@
                 phase = 3;
                 oppGridWrapper.style.opacity = '1';
                 oppGridWrapper.style.pointerEvents = 'all';
-                // Bhondu starts first
                 isMyTurn = username.toLowerCase() === 'bhondu';
                 updateTurnUI();
+                gsap.from(oppGridWrapper, { opacity: 0, y: 20, duration: 0.6 });
             }
 
             function updateTurnUI() {
+                if (phase !== 3) return;
                 statusText.innerText = isMyTurn ? "Your Turn! Attack " + otherUser + "'s grid! 🎯" : "Waiting for " + otherUser + "'s move... ⌛";
             }
 
@@ -213,75 +291,6 @@
                 } catch (e) {}
             }
 
-            // Real-time Listeners
-            if (window.globalPusher) {
-                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                
-                // UNBIND first
-                channel.unbind('heart-seeker-ready');
-                channel.unbind('heart-seeker-attack');
-                channel.unbind('heart-seeker-result');
-                channel.unbind('heart-seeker-reset');
-
-                channel.bind('heart-seeker-ready', (data) => {
-                    otherReady = true;
-                    if (phase === 2) startGame();
-                    else showToast(otherUser + " is ready! 🚀");
-                });
-
-                channel.bind('heart-seeker-attack', async (data) => {
-                    const idx = parseInt(data.index);
-                    const isHit = myHearts.includes(idx);
-                    const cell = myCells[idx];
-                    
-                    cell.classList.add('taken');
-                    if (isHit) {
-                        cell.classList.add('hit');
-                        cell.innerText = '💥';
-                        opponentHits++;
-                    } else {
-                        cell.classList.add('miss');
-                        cell.innerText = '❌';
-                    }
-
-                    // Send result back
-                    try {
-                        await fetch('/api/games/heart-seeker/result', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ index: idx, isHit, to: otherUser })
-                        });
-                    } catch (e) {}
-
-                    if (opponentHits === 3) {
-                        statusText.innerText = "💔 " + otherUser + " Won! Better luck next time.";
-                        phase = 4;
-                    } else {
-                        isMyTurn = true;
-                        updateTurnUI();
-                    }
-                });
-
-                channel.bind('heart-seeker-result', (data) => {
-                    const cell = oppCells[data.index];
-                    cell.classList.add('taken');
-                    if (data.isHit) {
-                        cell.classList.add('hit');
-                        cell.innerText = '💖';
-                        myHits++;
-                        if (myHits === 3) {
-                            statusText.innerText = "🎉 You Won! All hearts found! 🏆";
-                            phase = 4;
-                        }
-                    } else {
-                        cell.classList.add('miss');
-                        cell.innerText = '🌊';
-                    }
-                });
-
-                channel.bind('heart-seeker-reset', () => location.reload());
-            }
-
             function showToast(msg) {
                 const toast = document.createElement('div');
                 toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:50px; z-index:10000; font-size:0.8rem; border:1px solid rgba(255,255,255,0.1);";
@@ -289,6 +298,8 @@
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
             }
+
+            initGameSync();
         })();
     </script>
 </div>
