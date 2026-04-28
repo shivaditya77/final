@@ -306,6 +306,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ to: otherUser })
                     });
+                    location.reload(); // Reload locally after sending signal
                 } catch (e) { location.reload(); }
             };
 

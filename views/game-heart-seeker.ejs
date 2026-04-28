@@ -54,24 +54,31 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
+            gap: 12px;
             background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            border-radius: 20px;
+            padding: 15px;
+            border-radius: 24px;
             border: 2px solid rgba(255, 255, 255, 0.1);
             width: 100%;
+            max-width: 350px;
+            margin: 0 auto;
             box-sizing: border-box;
         }
         .cell {
             position: relative;
             width: 100%;
-            padding-bottom: 100%; /* Robust square trick */
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 10px;
+            padding-bottom: 100%; /* Force perfect square */
+            background: rgba(255, 255, 255, 0.05); /* Visible even when empty */
+            border-radius: 12px;
             cursor: pointer;
             transition: all 0.3s;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow: hidden;
+            display: block; /* Ensure it takes space */
+        }
+        .cell:hover:not(.taken) {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: rgba(139, 92, 246, 0.4);
         }
         .cell-content {
             position: absolute;
@@ -79,20 +86,22 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            font-size: 1.5rem;
+            line-height: 1;
         }
         .cell.hidden-heart { background: rgba(139, 92, 246, 0.2); border-color: #a78bfa; }
         .cell.hit { background: rgba(255, 77, 109, 0.3); border-color: #ff4d6d; color: #ff4d6d; }
-        .cell.miss { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.3); }
+        .cell.miss { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.4); }
         .cell.taken { cursor: default; }
         
         .controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
         .btn-ready {
             background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-            border: none; color: white; padding: 14px 40px;
+            border: none; color: white; padding: 15px 45px;
             border-radius: 50px; font-weight: 700; cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+            letter-spacing: 1px;
         }
         .btn-ready:active { transform: scale(0.95); }
         .btn-ready:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
@@ -101,18 +110,18 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: rgba(255, 255, 255, 0.6);
-            padding: 10px 25px;
+            padding: 12px 30px;
             border-radius: 50px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
         }
-        .btn-emergency:hover { background: rgba(255, 77, 109, 0.1); border-color: #ff4d6d; color: white; }
+        .btn-emergency:hover { background: rgba(255, 77, 109, 0.15); border-color: #ff4d6d; color: white; }
 
         @media (min-width: 800px) {
-            .grids-container { flex-direction: row; max-width: 800px; justify-content: center; gap: 40px; }
-            .game-container { max-width: 900px; }
+            .grids-container { flex-direction: row; max-width: 850px; justify-content: center; gap: 60px; }
+            .game-container { max-width: 1000px; }
         }
     </style>
 
@@ -377,6 +386,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ to: otherUser })
                     });
+                    location.reload(); // Reload locally after sending signal
                 } catch (e) { location.reload(); }
             };
 
