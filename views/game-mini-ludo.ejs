@@ -4,7 +4,6 @@
         :root {
             --red: #ff4d6d; --blue: #00d2ff; --green: #00ff88; --yellow: #ffd700;
             --bg-dark: #0a0a0a; --border-glass: rgba(255, 255, 255, 0.1);
-            --neon-red: rgba(255, 77, 109, 0.3); --neon-blue: rgba(0, 210, 255, 0.3);
         }
 
         .game-body {
@@ -40,13 +39,13 @@
         .controls-area { display: flex; flex-direction: column; align-items: center; gap: 25px; width: 100%; }
         .dice-container { display: flex; align-items: center; gap: 25px; }
         .dice { width: 80px; height: 80px; background: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #1a1a1a; cursor: pointer; box-shadow: 0 15px 35px rgba(0,0,0,0.4); transition: all 0.2s; user-select: none; border: 1px solid #fff; }
-        .dice.rolling { animation: roll 0.5s infinite; pointer-events: none; }
-        @keyframes roll { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .dice.rolling { animation: shake 0.3s infinite; }
+        @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(10deg); } 75% { transform: rotate(-10deg); } }
 
         .btn-roll { background: linear-gradient(135deg, #6e45e2, #88d3ce); border: none; color: white; padding: 16px 45px; border-radius: 50px; font-weight: 800; font-size: 1.2rem; cursor: pointer; }
         .btn-roll:disabled { opacity: 0.4; }
 
-        .player-indicators { display: flex; gap: 20px; margin-bottom: 25px; }
+        .player-indicators { display: flex; gap: 20px; margin-bottom: 25px; position: relative; }
         .player-box { display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: 0.3; transition: all 0.4s; background: rgba(255,255,255,0.02); padding: 12px 20px; border-radius: 20px; }
         .player-box.active { opacity: 1; transform: scale(1.1); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
         .p-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
@@ -55,7 +54,7 @@
         .modal-content { background: #1a1a1a; padding: 50px; border-radius: 40px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; max-width: 420px; width: 90%; }
 
         .settings-bar { margin-top: 40px; display: flex; gap: 15px; }
-        .btn-setting { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.5); padding: 10px 25px; border-radius: 50px; cursor: pointer; }
+        .btn-setting { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.5); padding: 10px 25px; border-radius: 50px; cursor: pointer; font-size: 0.8rem; }
     </style>
 
     <div class="game-body">
@@ -73,8 +72,8 @@
                 </div>
             </div>
             <div class="settings-bar">
-                <button class="btn-setting" onclick="requestReset()">🔄 Restart Game</button>
-                <button class="btn-setting" onclick="location.reload()">🔄 Force Refresh</button>
+                <button class="btn-setting" onclick="requestReset()">🔄 Restart</button>
+                <button class="btn-setting" onclick="syncBoardState()">📡 Sync</button>
             </div>
         </div>
     </div>
@@ -82,8 +81,8 @@
     <div id="win-modal">
         <div class="modal-content">
             <span class="win-icon" id="win-icon" style="font-size: 5rem;">🏆</span>
-            <h2 class="win-title" id="win-title" style="font-size: 2rem; margin: 15px 0;">Victory!</h2>
-            <p class="win-desc" style="margin-bottom: 25px; opacity: 0.7;">You've claimed the mini crown!</p>
+            <h2 class="win-title" id="win-title" style="font-size: 2.5rem; margin: 15px 0; font-weight:900;">Victory!</h2>
+            <p class="win-desc" style="margin-bottom: 25px; opacity: 0.7;">The mini crown is yours!</p>
             <button class="btn-roll" onclick="location.reload()">Play Again</button>
         </div>
     </div>
@@ -101,45 +100,28 @@
             const otherUser = "<%= otherUser %>";
             const myPlayerIndex = username.toLowerCase() === 'bhondu' ? 0 : 1;
             
-            let players = [];
-            let currentPlayer = 0;
-            let currentRoll = 0;
-            let gameActive = false;
-            let isRolling = false;
-            let rollPromise = null, rollResolve = null;
-            let lastSeq = 0;
+            let players = [], currentPlayer = 0, currentRoll = 0, gameActive = false, isRolling = false;
+            let rollPromise = null, rollResolve = null, lastSeq = 0, messageQueue = [], isProcessingQueue = false;
 
-            const boardEl = document.getElementById('board');
-            const statusText = document.getElementById('status-text');
-            const diceEl = document.getElementById('dice');
-            const rollBtn = document.getElementById('roll-btn');
-            const indicatorsEl = document.getElementById('player-indicators');
-
-            const icons = ['❤️', '💋', '🍀', '☀️'];
-            const names = ['Bhondu', 'Vishu', 'Guest 1', 'Guest 2'];
+            const boardEl = document.getElementById('board'), statusText = document.getElementById('status-text'), diceEl = document.getElementById('dice'), rollBtn = document.getElementById('roll-btn'), indicatorsEl = document.getElementById('player-indicators');
+            const icons = ['❤️', '💋', '🍀', '☀️'], names = ['Bhondu', 'Vishu', 'Guest 1', 'Guest 2'];
 
             function initGame() {
-                boardEl.innerHTML = ''; indicatorsEl.innerHTML = ''; players = [];
-                currentPlayer = 0; gameActive = true;
-                
+                boardEl.innerHTML = ''; indicatorsEl.innerHTML = ''; players = []; currentPlayer = 0; gameActive = true;
                 for (let i = 0; i < 16; i++) {
                     const cell = document.createElement('div'); cell.className = 'cell';
                     if (PATH_INDICES.includes(i)) cell.classList.add('path');
                     if (i === PATH_INDICES[0]) cell.classList.add('start');
                     if (i === PATH_INDICES[PATH_INDICES.length - 1]) cell.classList.add('end');
-                    cell.innerHTML = `<span class="cell-index">${i}</span>`;
-                    cell.id = `cell-mini-${i}`; boardEl.appendChild(cell);
+                    cell.innerHTML = `<span class="cell-index">${i}</span>`; cell.id = `cell-mini-${i}`; boardEl.appendChild(cell);
                 }
-
                 for (let i = 0; i < 2; i++) {
                     const p = { id: i, pathIndex: 0, token: document.createElement('div') };
                     p.token.className = `token p${i}`; p.token.innerHTML = icons[i];
-                    document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
+                    p.token.id = `token-mini-${i}`; document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
                     players.push(p);
-
                     const box = document.createElement('div'); box.className = `player-box ${i === 0 ? 'active' : ''}`;
-                    box.id = `p-box-mini-${i}`;
-                    box.innerHTML = `<div class="p-dot" style="background:${i===0?'var(--red)':'var(--blue)'}"></div><span class="p-name">${names[i]}</span>`;
+                    box.id = `p-box-mini-${i}`; box.innerHTML = `<div class="p-dot" style="background:${i===0?'var(--red)':'var(--blue)'}"></div><span class="p-name">${names[i]}</span>`;
                     indicatorsEl.appendChild(box);
                 }
                 updateStatus(); updateTokenLayout();
@@ -154,72 +136,56 @@
 
             window.rollDice = async function(remoteVal = null) {
                 if (!gameActive || isRolling || (!remoteVal && currentPlayer !== myPlayerIndex)) return;
-                isRolling = true;
-                rollPromise = new Promise(resolve => rollResolve = resolve);
+                isRolling = true; rollPromise = new Promise(r => rollResolve = r);
                 diceEl.classList.add('rolling'); playSound('roll');
-                
                 setTimeout(async () => {
-                    const diceValue = remoteVal || Math.floor(Math.random() * 6) + 1;
-                    diceEl.innerText = getDiceEmoji(diceValue); diceEl.classList.remove('rolling');
-                    currentRoll = diceValue;
-                    if (!remoteVal) syncMove({ type: 'roll', dice: diceValue });
-                    await processMove(currentPlayer, diceValue);
+                    const val = remoteVal || Math.floor(Math.random() * 6) + 1;
+                    diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][val]; diceEl.classList.remove('rolling');
+                    currentRoll = val;
+                    if (!remoteVal) syncMove({ type:'roll', dice:val });
+                    await processMove(currentPlayer, val);
                     rollResolve();
                 }, 800);
             };
 
-            function getDiceEmoji(val) { return {1:'⚀', 2:'⚁', 3:'⚂', 4:'⚃', 5:'⚄', 6:'⚅'}[val] || '🎲'; }
-
-            async function processMove(playerIdx, diceValue) {
-                const player = players[playerIdx];
-                if (player.pathIndex + diceValue >= PATH_INDICES.length) {
-                    if (!window.isRemoteSync) syncMove({ type: 'move', dice: diceValue, nextTurnIdx: (playerIdx + 1) % 2 });
+            async function processMove(pIdx, val) {
+                const p = players[pIdx];
+                if (p.pathIndex + val >= PATH_INDICES.length) {
+                    if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:(pIdx+1)%2 });
                     setTimeout(nextTurn, 1000); return;
                 }
-                for (let i = 1; i <= diceValue; i++) {
-                    player.pathIndex++; await animateToken(player, player.pathIndex); playSound('move');
-                }
-                checkCollisions(player);
-                if (player.pathIndex === PATH_INDICES.length - 1) { gameActive = false; showWinner(playerIdx); return; }
-                
-                const nextIdx = (diceValue === 6) ? playerIdx : (playerIdx + 1) % 2;
-                if (!window.isRemoteSync) syncMove({ type: 'move', dice: diceValue, nextTurnIdx: nextIdx });
+                for (let i=1; i<=val; i++) { p.pathIndex++; await animateToken(p, p.pathIndex); playSound('move'); }
+                checkCollisions(p);
+                if (p.pathIndex === PATH_INDICES.length - 1) { gameActive = false; showWinner(pIdx); return; }
+                const nextIdx = (val === 6) ? pIdx : (pIdx + 1) % 2;
+                if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:nextIdx });
                 nextTurn(nextIdx);
             }
 
-            function animateToken(player, pathIdx) {
-                return new Promise(resolve => {
-                    const targetCell = document.getElementById(`cell-mini-${PATH_INDICES[pathIdx]}`);
-                    const oldRect = player.token.getBoundingClientRect();
-                    targetCell.appendChild(player.token); updateTokenLayout();
-                    const newRect = player.token.getBoundingClientRect();
-                    gsap.fromTo(player.token, { x: oldRect.left - newRect.left, y: oldRect.top - newRect.top }, { x: 0, y: 0, duration: 0.3, onComplete: resolve });
+            function animateToken(p, pathIdx) {
+                return new Promise(r => {
+                    const target = document.getElementById(`cell-mini-${PATH_INDICES[pathIdx]}`);
+                    const old = p.token.getBoundingClientRect(); target.appendChild(p.token); updateTokenLayout();
+                    const cur = p.token.getBoundingClientRect();
+                    gsap.fromTo(p.token, { x:old.left-cur.left, y:old.top-cur.top }, { x:0, y:0, duration:0.3, onComplete:r });
                 });
             }
 
             function checkCollisions(activeP) {
-                if (activeP.pathIndex === 0) return;
-                players.forEach(p => {
-                    if (p.id !== activeP.id && p.pathIndex === activeP.pathIndex) {
-                        p.pathIndex = 0; playSound('kick');
-                        document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
-                        updateTokenLayout();
-                    }
-                });
+                players.forEach(p => { if (p.id !== activeP.id && p.pathIndex === activeP.pathIndex && p.pathIndex !== 0) {
+                    p.pathIndex = 0; playSound('kick'); document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token); updateTokenLayout();
+                }});
             }
 
-            function nextTurn(forcedIdx = null) {
-                currentPlayer = (forcedIdx !== null) ? forcedIdx : (currentPlayer + 1) % 2;
-                isRolling = false; updateStatus();
-            }
-
+            function nextTurn(forcedIdx = null) { currentPlayer = (forcedIdx !== null) ? forcedIdx : (currentPlayer + 1) % 2; isRolling = false; updateStatus(); }
+            
             function updateTokenLayout() {
-                for (let i = 0; i < 16; i++) {
-                    const cell = document.getElementById(`cell-mini-${i}`); if (!cell) continue;
+                for (let i=0; i<16; i++) {
+                    const cell = document.getElementById(`cell-mini-${i}`); if(!cell) continue;
                     const tokens = cell.querySelectorAll('.token');
                     tokens.forEach((t, idx) => {
-                        const offset = (idx - (tokens.length-1)/2) * 12;
-                        t.style.transform = `translate(${offset}px, ${offset}px)`;
+                        const off = (idx - (tokens.length-1)/2) * 12;
+                        t.style.transform = `translate(${off}px, ${off}px)`;
                     });
                 }
             }
@@ -233,48 +199,34 @@
             function initSync() {
                 if (!window.globalPusher) return setTimeout(initSync, 500);
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                channel.bind('ludo-move', async (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    window.isRemoteSync = true;
-                    if (data.type === 'roll') rollDice(data.dice);
-                    else if (data.type === 'move') {
-                        if (rollPromise) await rollPromise;
-                        if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
-                    }
-                    window.isRemoteSync = false;
-                });
-                channel.bind('ludo-state-sync', (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase() || data.seq <= lastSeq) return;
-                    lastSeq = data.seq; currentPlayer = data.currentPlayer;
-                    data.players.forEach((rp, i) => {
-                        players[i].pathIndex = rp.pathIndex;
-                        document.getElementById(`cell-mini-${PATH_INDICES[rp.pathIndex]}`).appendChild(players[i].token);
-                    });
-                    updateTokenLayout(); updateStatus();
-                });
+                channel.bind('ludo-move', (data) => { if(data.from.toLowerCase() === otherUser.toLowerCase()) { messageQueue.push({event:'move', data}); processQueue(); }});
+                channel.bind('ludo-state-sync', (data) => { if(data.from.toLowerCase() === otherUser.toLowerCase() && data.seq > lastSeq) { messageQueue.push({event:'state', data}); processQueue(); }});
                 channel.bind('ludo-reset', () => location.reload());
             }
 
-            async function syncMove(data) {
-                try { await fetch('/api/games/ludo/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, to: otherUser }) }); } catch (e) {}
+            async function processQueue() {
+                if (isProcessingQueue || messageQueue.length === 0) return;
+                isProcessingQueue = true; const { event, data } = messageQueue.shift();
+                if (event === 'move') {
+                    window.isRemoteSync = true;
+                    if (data.type === 'roll') await rollDice(data.dice);
+                    else if (data.type === 'move') { if(rollPromise) await rollPromise; if(data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx); }
+                    window.isRemoteSync = false;
+                } else if (event === 'state') {
+                    lastSeq = data.seq; currentPlayer = data.currentPlayer;
+                    data.players.forEach((rp, i) => { players[i].pathIndex = rp.pathIndex; document.getElementById(`cell-mini-${PATH_INDICES[rp.pathIndex]}`).appendChild(players[i].token); });
+                    updateTokenLayout(); updateStatus();
+                }
+                isProcessingQueue = false; processQueue();
             }
 
-            async function syncBoardState() {
-                if (!gameActive) return;
-                const state = { type: 'state-sync', seq: ++lastSeq, currentPlayer, players: players.map(p => ({ pathIndex: p.pathIndex })) };
-                syncMove(state);
-            }
+            async function syncMove(data) { try { await fetch('/api/games/ludo/move', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...data, to:otherUser}) }); } catch(e){} }
+            async function syncBoardState() { if(!gameActive) return; syncMove({ type:'state-sync', seq:++lastSeq, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); }
+            window.requestReset = () => { if(confirm("Restart for both?")) { syncMove({ type:'reset' }); location.reload(); } };
 
-            window.requestReset = async () => {
-                if (!confirm("Restart for both?")) return;
-                try { await fetch('/api/games/ludo/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser }) }); } catch (e) {}
-                location.reload();
-            };
-
-            setInterval(() => { if (gameActive && currentPlayer === myPlayerIndex) syncBoardState(); }, 20000);
-            setTimeout(() => { if (gameActive) syncBoardState(); }, 1500);
-
-            function playSound(type) { const s = document.getElementById(`sound-${type}`); if (s) { s.currentTime = 0; s.play().catch(()=>{}); } }
+            setInterval(() => { if(gameActive && currentPlayer === myPlayerIndex) syncBoardState(); }, 20000);
+            setTimeout(() => { if(gameActive) syncBoardState(); }, 1500);
+            function playSound(type) { const s = document.getElementById(`sound-${type}`); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
 
             initGame(); initSync();
         })();
