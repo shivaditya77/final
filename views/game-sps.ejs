@@ -100,6 +100,20 @@
             display: none;
         }
         
+        .btn-emergency {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            padding: 10px 25px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        .btn-emergency:hover { background: rgba(255, 215, 0, 0.1); border-color: #ffd700; color: white; }
+
         .waiting-text {
             font-size: 0.8rem;
             color: #ffd700;
@@ -142,6 +156,8 @@
             </div>
 
             <button class="btn-play-again" id="play-again-btn" onclick="resetGame()">Play Again! 🔄</button>
+            <br>
+            <button class="btn-emergency" onclick="window.emergencyReset()">🔄 Stuck? Emergency Reset</button>
         </div>
     </div>
 
@@ -162,18 +178,14 @@
             const playAgainBtn = document.getElementById('play-again-btn');
             const optionBtns = document.querySelectorAll('.option-btn');
 
-            // PROFESSIONAL SYNC: Ensure we only have ONE listener active
             function initGameSync() {
                 if (!window.globalPusher) return setTimeout(initGameSync, 500);
-                
                 const channel = window.globalPusher.subscribe(channelName);
                 
-                // Clear any old listeners to prevent "stuck" state
                 channel.unbind('sps-move');
                 channel.unbind('sps-reset');
 
                 channel.bind('sps-move', (data) => {
-                    console.log("🎮 SPS Move Received:", data);
                     if (data.from.toLowerCase() === otherUser.toLowerCase()) {
                         oppMove = data.move;
                         if (myMove) revealResult();
@@ -185,9 +197,7 @@
                 });
 
                 channel.bind('sps-reset', (data) => {
-                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
-                        location.reload();
-                    }
+                    location.reload();
                 });
             }
 
@@ -196,7 +206,6 @@
                 
                 myMove = move;
                 
-                // UI Feedback
                 optionBtns.forEach(btn => {
                     btn.classList.remove('selected');
                     if (btn.innerText === icon) btn.classList.add('selected');
@@ -206,7 +215,6 @@
                 myHandEl.classList.add('shake');
                 waitingMsg.innerText = "Waiting for " + otherUser + "... ⌛";
 
-                // Haptic-like feedback (vibrate if supported)
                 if (navigator.vibrate) navigator.vibrate(50);
 
                 try {
@@ -215,9 +223,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ move, to: otherUser })
                     });
-                } catch (e) {
-                    waitingMsg.innerText = "Connection error. Retrying...";
-                }
+                } catch (e) {}
 
                 if (oppMove) revealResult();
             };
@@ -232,7 +238,6 @@
 
                 const icons = { 'stone': '✊', 'paper': '✋', 'scissors': '✌️' };
                 
-                // GSAP Reveal Animation
                 gsap.to([myHandEl, oppHandEl], {
                     scale: 1.5,
                     duration: 0.3,
@@ -291,6 +296,17 @@
                     });
                 } catch (e) {}
                 location.reload();
+            };
+
+            window.emergencyReset = async function() {
+                if (!confirm("This will reload the game for BOTH players. Continue?")) return;
+                try {
+                    await fetch('/api/games/sps/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser })
+                    });
+                } catch (e) { location.reload(); }
             };
 
             initGameSync();
