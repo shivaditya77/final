@@ -500,7 +500,18 @@
                 processQueue();
             }
 
-            window.requestReset = () => { if(confirm("Restart for both?")) { syncMove({ type:'reset' }); location.reload(); } };
+            window.requestReset = async function() { 
+                if(confirm("Restart for both?")) { 
+                    try {
+                        await fetch('/api/games/ludo/reset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: otherUser })
+                        });
+                    } catch (e) {}
+                    location.reload(); 
+                } 
+            };
             setInterval(() => { if(state.gameActive && players[state.currentPlayer].owner.toLowerCase() === username.toLowerCase()) syncBoardState(); }, 20000);
             setTimeout(() => { if(state.gameActive) syncBoardState(); }, 1500);
 

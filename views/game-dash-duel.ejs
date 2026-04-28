@@ -369,7 +369,6 @@
                     
                     if (!remoteVal) syncMove({ type:'roll', dice:val });
                     
-                    // Logic from Snake: Explicitly wait for movement to complete before releasing lock
                     await processMove(currentPlayer, val);
                     
                     isRolling = false;
@@ -380,7 +379,6 @@
             async function processMove(pIdx, val) {
                 const p = players[pIdx];
                 
-                // End game check
                 if (p.pathIndex + val >= PATH_INDICES.length) {
                     const nextIdx = (pIdx + 1) % 2;
                     if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:nextIdx });
@@ -388,7 +386,6 @@
                     return;
                 }
 
-                // Smooth sequential movement
                 for (let i=1; i<=val; i++) { 
                     p.pathIndex++; 
                     await animateToken(p, p.pathIndex); 
@@ -404,7 +401,6 @@
                     return; 
                 }
 
-                // Source of truth decided by player who moved
                 const nextIdx = (val === 6) ? pIdx : (pIdx + 1) % 2;
                 if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:nextIdx });
                 nextTurn(nextIdx);
@@ -462,12 +458,18 @@
                 });
 
                 channel.bind('ludo-state-sync', (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase() || data.seq <= lastSeq) return;
-                    messageQueue.push({ event:'state', data });
-                    processQueue();
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    // For manual sync button, we allow seq reset if it's explicitly higher or if it's forced
+                    if (data.force || data.seq > lastSeq) {
+                        messageQueue.push({ event:'state', data });
+                        processQueue();
+                    }
                 });
 
-                channel.bind('ludo-reset', () => location.reload());
+                channel.bind('ludo-reset', () => {
+                    // Force refresh for both
+                    location.reload();
+                });
             }
 
             async function processQueue() {
@@ -481,7 +483,6 @@
                         if (data.type === 'roll') {
                             await rollDice(data.dice);
                         } else if (data.type === 'move') {
-                            // Professional Lock: Ensure animation finished before checking next turn
                             if (rollPromise) await rollPromise;
                             if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
                         } else if (data.type === 'win') {
@@ -506,11 +507,28 @@
             }
 
             async function syncMove(data) { try { await fetch('/api/games/ludo/move', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...data, to:otherUser, from:username}) }); } catch(e){} }
-            async function syncBoardState() { if(!gameActive) return; syncMove({ type:'state-sync', seq:++lastSeq, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); }
-            window.requestReset = () => { if(confirm("Restart for both?")) { syncMove({ type:'reset' }); location.reload(); } };
+            
+            window.syncBoardState = async function() { 
+                if(!gameActive) return; 
+                // Manual sync uses a huge sequence increase and force flag to bypass sequence filtering
+                syncMove({ type:'state-sync', seq:++lastSeq, force: true, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); 
+            };
 
-            setInterval(() => { if(gameActive && currentPlayer === myPlayerIndex) syncBoardState(); }, 20000);
-            setTimeout(() => { if(gameActive) syncBoardState(); }, 1500);
+            window.requestReset = async function() { 
+                if(confirm("Restart for both?")) { 
+                    try {
+                        await fetch('/api/games/ludo/reset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: otherUser })
+                        });
+                    } catch (e) {}
+                    location.reload(); 
+                } 
+            };
+
+            setInterval(() => { if(gameActive && currentPlayer === myPlayerIndex) syncMove({ type:'state-sync', seq:++lastSeq, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); }, 20000);
+            setTimeout(() => { if(gameActive) syncMove({ type:'state-sync', seq:++lastSeq, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); }, 1500);
             function playSound(type) { const s = document.getElementById(`sound-${type}`); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
 
             initGame(); initSync();
