@@ -661,6 +661,15 @@ app.get("/games/snake", isAuth, (req, res) => {
     });
 });
 
+app.get("/games/ludo", isAuth, (req, res) => {
+    res.render("game-ludo", {
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
+});
+
 // API for Tic Tac Toe sync
 app.post("/api/games/ttt/move", isAuth, async (req, res) => {
     try {
@@ -780,6 +789,25 @@ app.post("/api/games/snake/reset", isAuth, async (req, res) => {
         const { to } = req.body;
         const from = req.session.username || "Bhondu";
         await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// API for Ludo sync
+app.post("/api/games/ludo/move", isAuth, async (req, res) => {
+    try {
+        const { playerIndex, dice, path, finalPos, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-move", { playerIndex, dice, path, finalPos, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-reset", { from });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
