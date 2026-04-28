@@ -805,9 +805,9 @@ app.post("/api/games/snake/reset", isAuth, async (req, res) => {
 // API for Ludo sync
 app.post("/api/games/ludo/move", isAuth, async (req, res) => {
     try {
-        const { playerIndex, dice, path, finalPos, to } = req.body;
+        const { to, ...data } = req.body;
         const from = req.session.username || "Bhondu";
-        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-move", { playerIndex, dice, path, finalPos, from });
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-move", { ...data, from });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
