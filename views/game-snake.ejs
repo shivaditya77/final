@@ -188,6 +188,16 @@
             let lastSeq = 0;
             const coordCache = {};
 
+            // ELEMENTS
+            const boardEl = document.getElementById('board');
+            const statusText = document.getElementById('status-text');
+            const diceBtn = document.getElementById('dice-btn');
+            const turnLabel = document.getElementById('turn-label');
+            const pawnMe = document.getElementById('pawn-me');
+            const pawnOpp = document.getElementById('pawn-opp');
+            const canvas = document.getElementById('special-lines');
+            const ctx = canvas.getContext('2d');
+
             // CONFIG
             const snakes = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
             const ladders = { 4: 14, 9: 31, 20: 38, 21: 42, 28: 84, 51: 67, 71: 91, 80: 100 };
