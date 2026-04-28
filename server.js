@@ -807,7 +807,8 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
     try {
         const { to, ...data } = req.body;
         const from = req.session.username || "Bhondu";
-        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-move", { ...data, from });
+        const eventName = data.type === 'state-sync' ? "ludo-state-sync" : "ludo-move";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), eventName, { ...data, from });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });

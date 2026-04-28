@@ -188,6 +188,9 @@
             let isRolling = false;
             let waitingForMove = false;
             let gameActive = false;
+            let rollResolve = null;
+            let rollPromise = null;
+            let lastSeq = 0;
 
             window.selectMode = function(mode) {
                 gameMode = mode;
@@ -209,7 +212,10 @@
                 initTokens();
                 createBoard();
                 updateUI();
-                if (!isRemote) syncMove({ type: 'start-game' });
+                if (!isRemote) {
+                    syncMove({ type: 'start-game', mode: gameMode });
+                    setTimeout(syncBoardState, 1000);
+                }
             };
 
             function initTokens() {
@@ -317,6 +323,7 @@
 
             function performRoll(remoteValue = null) {
                 isRolling = true;
+                rollPromise = new Promise(resolve => rollResolve = resolve);
                 const diceEl = document.getElementById('dice'); diceEl.classList.add('rolling'); playSound('roll');
                 let rollVal;
                 let rollInterval = setInterval(() => { diceEl.innerText = getDiceEmoji(Math.floor(Math.random() * 6) + 1); }, 80);
@@ -332,13 +339,16 @@
                         if (sixCount === 3) {
                             setStatus("3 Sixes! Turn Cancelled! 🚫"); sixCount = 0;
                             if (!remoteValue) syncMove({ type: 'roll', dice: rollVal, sixCount: 3 });
-                            setTimeout(nextTurn, 1500); return;
+                            setTimeout(nextTurn, 1500); 
+                            rollResolve();
+                            return;
                         }
                     } else { sixCount = 0; }
 
                     waitingForMove = true;
                     if (!remoteValue) syncMove({ type: 'roll', dice: rollVal, sixCount });
                     updateUI();
+                    rollResolve();
                 }, 800);
             }
 
@@ -369,6 +379,7 @@
             }
 
             async function handleTokenClick(token) {
+                if (rollPromise) await rollPromise;
                 if (!waitingForMove || token.playerIdx !== currentPlayer) return;
                 const p = players[currentPlayer];
                 if (p.owner.toLowerCase() !== username.toLowerCase() && !window.isRemoteSync) return;
@@ -377,12 +388,24 @@
                 if (!movable.includes(token)) return;
 
                 waitingForMove = false;
-                if (!window.isRemoteSync) syncMove({ type: 'move', tokenId: token.id });
-
                 const captured = await moveToken(token, currentRoll);
+                
                 if (gameActive) {
-                    if (currentRoll === 6 || captured) { setStatus(captured ? "Captured! Extra turn! ⚔️" : "Roll again! 🔥"); updateUI(); }
-                    else { nextTurn(); }
+                    if (!window.isRemoteSync) {
+                        if (currentRoll === 6 || captured) { 
+                            setStatus(captured ? "Captured! Extra turn! ⚔️" : "Roll again! 🔥"); 
+                            syncMove({ type: 'move', tokenId: token.id, nextTurnIdx: currentPlayer });
+                            updateUI(); 
+                        } else { 
+                            const nextIdx = getNextTurnIdx();
+                            syncMove({ type: 'move', tokenId: token.id, nextTurnIdx: nextIdx });
+                            nextTurn(nextIdx); 
+                        }
+                    } else {
+                        // Remote sync: update UI but don't advance turn here; initSync will force it
+                        if (currentRoll === 6 || captured) setStatus(captured ? "Captured! Extra turn! ⚔️" : "Roll again! 🔥");
+                        updateUI();
+                    }
                 }
             }
 
@@ -480,10 +503,17 @@
                 });
             }
 
-            function nextTurn() {
-                if (currentRoll !== 6) {
-                    let nextIdx = (activePlayerIndices.indexOf(currentPlayer) + 1) % activePlayerIndices.length;
-                    currentPlayer = activePlayerIndices[nextIdx];
+            function getNextTurnIdx() {
+                let nextIdx = (activePlayerIndices.indexOf(currentPlayer) + 1) % activePlayerIndices.length;
+                return activePlayerIndices[nextIdx];
+            }
+
+            function nextTurn(forcedIdx = null) {
+                if (forcedIdx !== null) {
+                    currentPlayer = forcedIdx;
+                    sixCount = 0;
+                } else if (currentRoll !== 6) {
+                    currentPlayer = getNextTurnIdx();
                     sixCount = 0;
                 }
                 waitingForMove = false; updateUI();
@@ -508,13 +538,87 @@
                     else if (data.type === 'start-game') startGame(true);
                     else if (data.type === 'roll') { performRoll(data.dice); sixCount = data.sixCount; }
                     else if (data.type === 'move') {
+                        if (rollPromise) await rollPromise;
                         const token = players[currentPlayer].tokens.find(t => t.id === data.tokenId);
-                        await handleTokenClick(token);
+                        if (token) await handleTokenClick(token);
+                        if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
                     }
-                    window.isRemoteSync = false;
                 });
-                channel.bind('ludo-reset', () => location.reload());
+
+                channel.bind('ludo-state-sync', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    if (data.seq <= lastSeq) return;
+                    lastSeq = data.seq;
+
+                    // Apply full state
+                    gameMode = data.gameMode;
+                    currentPlayer = data.currentPlayer;
+                    sixCount = data.sixCount;
+                    waitingForMove = data.waitingForMove;
+                    
+                    data.players.forEach((remoteP, pIdx) => {
+                        const localP = players[pIdx];
+                        localP.score = remoteP.score;
+                        localP.active = remoteP.active;
+                        remoteP.tokens.forEach((remoteT, tIdx) => {
+                            const localT = localP.tokens[tIdx];
+                            localT.status = remoteT.status;
+                            localT.pos = remoteT.pos;
+                            
+                            // Visually place tokens
+                            if (localT.status === 'home') {
+                                const slot = document.getElementById(`slot-${localP.color}-${localT.id}`);
+                                if (slot && localT.el.parentElement !== slot) slot.appendChild(localT.el);
+                            } else if (localT.status === 'finished') {
+                                localT.el.style.display = 'none';
+                            } else {
+                                const coord = localT.status === 'track' ? TRACK[localT.pos] : HOME_RUNS[localT.playerIdx][localT.pos];
+                                const cell = document.getElementById(`cell-${coord[0]}-${coord[1]}`);
+                                if (cell && localT.el.parentElement !== cell) cell.appendChild(localT.el);
+                            }
+                        });
+                    });
+                    updateStackedTokens();
+                    renderPlayerList();
+                    updateUI();
+                });
             }
+
+            async function syncBoardState() {
+                if (!gameActive) return;
+                const state = {
+                    type: 'state-sync',
+                    seq: ++lastSeq,
+                    gameMode,
+                    currentPlayer,
+                    sixCount,
+                    waitingForMove,
+                    players: players.map(p => ({
+                        id: p.id,
+                        score: p.score,
+                        active: p.active,
+                        tokens: p.tokens.map(t => ({ status: t.status, pos: t.pos }))
+                    }))
+                };
+                try {
+                    await fetch('/api/games/ludo/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...state, to: otherUser })
+                    });
+                } catch (e) {}
+            }
+
+            // Sync Heartbeat & Initial Handshake
+            setInterval(() => {
+                if (gameActive && players[currentPlayer].owner.toLowerCase() === username.toLowerCase()) {
+                    syncBoardState();
+                }
+            }, 20000);
+
+            setTimeout(() => {
+                if (gameActive) syncBoardState();
+            }, 1500);
 
             async function syncMove(data) {
                 try {
