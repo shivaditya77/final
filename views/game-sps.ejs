@@ -234,6 +234,10 @@
             if (window.globalPusher) {
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
                 
+                // UNBIND first
+                channel.unbind('sps-move');
+                channel.unbind('sps-reset');
+
                 channel.bind('sps-move', (data) => {
                     oppMove = data.move;
                     if (myMove) revealResult();

@@ -242,6 +242,11 @@
             // Real-time Listeners
             if (window.globalPusher) {
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
+                
+                // UNBIND first to avoid duplicate listeners when navigating back/forth via Barba
+                channel.unbind('ttt-move');
+                channel.unbind('ttt-reset');
+
                 channel.bind('ttt-move', (data) => {
                     if (data.from.toLowerCase() === otherUser.toLowerCase()) {
                         makeMove(data.index, data.symbol);

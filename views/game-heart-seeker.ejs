@@ -173,7 +173,7 @@
                 });
             });
 
-            async function sendReady() {
+            window.sendReady = async function() {
                 phase = 2;
                 readyBtn.style.display = 'none';
                 statusText.innerText = "Waiting for " + otherUser + "... ⌛";
@@ -186,7 +186,7 @@
                     });
                     if (otherReady) startGame();
                 } catch (e) {}
-            }
+            };
 
             function startGame() {
                 phase = 3;
@@ -217,6 +217,12 @@
             if (window.globalPusher) {
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
                 
+                // UNBIND first
+                channel.unbind('heart-seeker-ready');
+                channel.unbind('heart-seeker-attack');
+                channel.unbind('heart-seeker-result');
+                channel.unbind('heart-seeker-reset');
+
                 channel.bind('heart-seeker-ready', (data) => {
                     otherReady = true;
                     if (phase === 2) startGame();

@@ -252,6 +252,11 @@
         if (window.globalChannel) {
             const channel = window.globalChannel;
             
+            // UNBIND first to avoid duplicates on Barba transitions
+            channel.unbind('pusher:subscription_succeeded');
+            channel.unbind('pusher:member_added');
+            channel.unbind('pusher:member_removed');
+
             channel.bind('pusher:subscription_succeeded', (members) => {
                 // If count > 1, it means both are here (presence channel includes self)
                 updateGlobalStatus(members.count > 1);
