@@ -40,6 +40,7 @@ const Message = require("./models/Message");
 const User = require("./models/User");
 const Notification = require("./models/Notification");
 const Subscription = require("./models/Subscription");
+const GameState = require("./models/GameState");
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -819,7 +820,115 @@ app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
         const { to } = req.body;
         const from = req.session.username || "Bhondu";
         await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-reset", { from });
+        
+        // Also clear server-side state if it exists
+        const gameId = `dash-duel-${[from.toLowerCase(), to.toLowerCase()].sort().join('-')}`;
+        await GameState.deleteOne({ gameId });
+        
         res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// AUTHORITATIVE DASH DUEL ROUTES
+const getGameId = (u1, u2) => `dash-duel-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
+
+app.post("/api/games/dash-duel/roll", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = getGameId(from, to);
+
+        let game = await GameState.findOne({ gameId });
+        if (!game) {
+            game = new GameState({
+                gameId, gameType: 'dash-duel',
+                players: [
+                    { username: 'Bhondu', color: 'red', pathIndex: 0 },
+                    { username: 'Vishu', color: 'blue', pathIndex: 0 }
+                ],
+                currentPlayerIdx: 0
+            });
+        }
+
+        // Validation: Is it this player's turn?
+        if (game.players[game.currentPlayerIdx].username.toLowerCase() !== from.toLowerCase()) {
+            return res.status(403).json({ error: "Not your turn" });
+        }
+
+        const roll = Math.floor(Math.random() * 6) + 1;
+        game.currentRoll = roll;
+        game.waitingForMove = true;
+        game.lastUpdated = Date.now();
+        await game.save();
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "dash-duel-rolled", { roll, from });
+        res.json({ success: true, roll });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/dash-duel/move", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = getGameId(from, to);
+
+        let game = await GameState.findOne({ gameId });
+        if (!game || !game.waitingForMove) return res.status(400).json({ error: "Invalid move request" });
+
+        const pIdx = game.currentPlayerIdx;
+        const roll = game.currentRoll;
+        const PATH_LENGTH = 16; // Dash Duel path length
+
+        let newPathIndex = game.players[pIdx].pathIndex + roll;
+        
+        // Cap at end
+        if (newPathIndex >= PATH_LENGTH) {
+            newPathIndex = game.players[pIdx].pathIndex; // Stay put if overshot? Or just end?
+            // In Dash Duel we usually cap or stay. Let's stay put if roll is too high.
+        } else {
+            game.players[pIdx].pathIndex = newPathIndex;
+        }
+
+        // Collision Check
+        const otherIdx = (pIdx + 1) % 2;
+        if (game.players[pIdx].pathIndex !== 0 && game.players[pIdx].pathIndex === game.players[otherIdx].pathIndex) {
+            game.players[otherIdx].pathIndex = 0; // Kicked back to start
+        }
+
+        // Win Check
+        let winner = null;
+        if (game.players[pIdx].pathIndex === PATH_LENGTH - 1) {
+            winner = from;
+        }
+
+        // Next Turn
+        if (roll !== 6) {
+            game.currentPlayerIdx = (pIdx + 1) % 2;
+        }
+        
+        game.waitingForMove = false;
+        game.lastUpdated = Date.now();
+        await game.save();
+
+        const payload = {
+            from, roll,
+            players: game.players,
+            nextTurnIdx: game.currentPlayerIdx,
+            winner
+        };
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "dash-duel-moved", payload);
+        res.json({ success: true, ...payload });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/api/games/dash-duel/state", isAuth, async (req, res) => {
+    try {
+        const { otherUser } = req.query;
+        const from = req.session.username || "Bhondu";
+        const gameId = getGameId(from, otherUser);
+        const game = await GameState.findOne({ gameId });
+        res.json({ success: true, game });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
