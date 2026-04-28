@@ -603,6 +603,15 @@ app.post("/api/reels/send-state", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+app.post("/api/reels/force-sync", isAuth, async (req, res) => {
+    try {
+        const { leader, reelIndex, currentTime, isPaused } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-soul-connect", "force-sync", { leader, reelIndex, currentTime, isPaused });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 app.post("/api/reels/invite", isAuth, async (req, res) => {
     try {
         const username = req.session.username || "Bhondu";
@@ -649,6 +658,61 @@ app.put("/api/journal/edit/:id", isAuth, upload.single('media'), async (req, res
             updateData.type = req.file.mimetype.startsWith('video') ? 'video' : 'image';
         }
         await Journal.findByIdAndUpdate(req.params.id, updateData);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.post("/api/journal/comment/:id", isAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        const username = req.session.username || "Bhondu";
+        if (!text) return res.status(400).json({ success: false, error: "Comment text is required" });
+
+        const entry = await Journal.findById(req.params.id);
+        if (!entry) return res.status(404).json({ success: false, error: "Journal entry not found" });
+
+        entry.comments.push({ username, text });
+        await entry.save();
+
+        res.json({ success: true, comment: entry.comments[entry.comments.length - 1] });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.delete("/api/journal/comment/:journalId/:commentId", isAuth, async (req, res) => {
+    try {
+        const { journalId, commentId } = req.params;
+        const username = req.session.username || "Bhondu";
+        const entry = await Journal.findById(journalId);
+        if (!entry) return res.status(404).json({ success: false, error: "Journal not found" });
+
+        const comment = entry.comments.id(commentId);
+        if (!comment) return res.status(404).json({ success: false, error: "Comment not found" });
+
+        // Only author can delete
+        if (comment.username !== username) return res.status(403).json({ success: false, error: "Unauthorized" });
+
+        entry.comments.pull(commentId);
+        await entry.save();
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+app.put("/api/journal/comment/:journalId/:commentId", isAuth, async (req, res) => {
+    try {
+        const { journalId, commentId } = req.params;
+        const { text } = req.body;
+        const username = req.session.username || "Bhondu";
+        const entry = await Journal.findById(journalId);
+        if (!entry) return res.status(404).json({ success: false, error: "Journal not found" });
+
+        const comment = entry.comments.id(commentId);
+        if (!comment) return res.status(404).json({ success: false, error: "Comment not found" });
+
+        // Only author can edit
+        if (comment.username !== username) return res.status(403).json({ success: false, error: "Unauthorized" });
+
+        comment.text = text;
+        await entry.save();
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });

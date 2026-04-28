@@ -49,10 +49,43 @@
                                 <% } %>
                                 <div class="card-body">
                                     <div class="card-date">📅 <%= new Date(entry.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) %></div>
+                                    <div class="card-author">Posted by <%= entry.username || 'Bhondu' %></div>
                                     <div class="card-desc"><%= entry.description %></div>
                                     <div class="card-actions">
-                                        <button class="edit-btn" onclick="editEntry('<%= entry._id %>', '<%= entry.description %>', '<%= entry.date %>', '<%= entry.filename %>', '<%= entry.type %>')">✏️ Edit</button>
+                                        <button class="edit-btn" 
+                                                data-id="<%= entry._id %>" 
+                                                data-desc="<%= entry.description %>" 
+                                                data-date="<%= entry.date %>" 
+                                                data-filename="<%= entry.filename %>" 
+                                                data-type="<%= entry.type %>"
+                                                onclick="editEntry(this)">✏️ Edit</button>
                                         <button class="del-btn" onclick="deleteEntry('<%= entry._id %>')">🗑️ Delete</button>
+                                    </div>
+
+                                    <!-- Comment Section -->
+                                    <div class="comment-section">
+                                        <h4>💬 Comments (<%= (entry.comments || []).length %>)</h4>
+                                        <div class="comments-list" id="comments-list-<%= entry._id %>">
+                                            <% (entry.comments || []).forEach(comment => { %>
+                                                <div class="comment-item" id="comment-<%= comment._id %>">
+                                                    <div class="comment-header">
+                                                        <span class="comment-author"><%= comment.username %></span>
+                                                        <span class="comment-date"><%= new Date(comment.createdAt).toLocaleDateString() %></span>
+                                                    </div>
+                                                    <div class="comment-text"><%= comment.text %></div>
+                                                    <% if (comment.username === username) { %>
+                                                        <div class="comment-actions">
+                                                            <button class="comment-action-btn edit" onclick="editComment('<%= entry._id %>', '<%= comment._id %>')">✏️ Edit</button>
+                                                            <button class="comment-action-btn delete" onclick="deleteComment('<%= entry._id %>', '<%= comment._id %>')">🗑️ Delete</button>
+                                                        </div>
+                                                    <% } %>
+                                                </div>
+                                            <% }) %>
+                                        </div>
+                                        <div class="comment-input-wrap">
+                                            <input type="text" class="comment-input" id="comment-input-<%= entry._id %>" placeholder="Add a comment...">
+                                            <button class="comment-submit-btn" onclick="addComment('<%= entry._id %>')">🚀</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -196,7 +229,13 @@
                 });
             }
 
-            window.editEntry = (id, desc, date, filename, type) => {
+            window.editEntry = (btn) => {
+                const id = btn.getAttribute('data-id');
+                const desc = btn.getAttribute('data-desc');
+                const date = btn.getAttribute('data-date');
+                const filename = btn.getAttribute('data-filename');
+                const type = btn.getAttribute('data-type');
+
                 isEditMode = true;
                 const title = document.getElementById('modal-title');
                 const saveBtn = document.getElementById('save-btn');
@@ -206,7 +245,7 @@
                 document.getElementById('description-input').value = desc;
                 document.getElementById('date-input').value = date.substring(0,10);
                 
-                if (filename) {
+                if (filename && filename !== 'undefined' && filename !== 'null' && filename !== '') {
                     const fullUrl = filename.startsWith('http') ? filename : '/uploads/journal/' + filename;
                     previewBox.style.display = 'block';
                     if (type === 'video') {
@@ -223,6 +262,110 @@
                 }
                 
                 modalOverlay.classList.add('open');
+            };
+
+            window.addComment = async (id) => {
+                const input = document.getElementById(`comment-input-${id}`);
+                const text = input.value.trim();
+                if (!text) return;
+
+                const btn = input.nextElementSibling;
+                btn.disabled = true;
+                btn.innerText = '⌛';
+
+                const username = '<%= username %>';
+
+                try {
+                    const res = await fetch(`/api/journal/comment/${id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        const list = document.getElementById(`comments-list-${id}`);
+                        const commentHtml = `
+                            <div class="comment-item" id="comment-${data.comment._id}">
+                                <div class="comment-header">
+                                    <span class="comment-author">${data.comment.username}</span>
+                                    <span class="comment-date">${new Date(data.comment.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div class="comment-text">${data.comment.text}</div>
+                                ${data.comment.username === username ? `
+                                    <div class="comment-actions">
+                                        <button class="comment-action-btn edit" onclick="editComment('${id}', '${data.comment._id}')">✏️ Edit</button>
+                                        <button class="comment-action-btn delete" onclick="deleteComment('${id}', '${data.comment._id}')">🗑️ Delete</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        list.insertAdjacentHTML('beforeend', commentHtml);
+                        input.value = '';
+                        list.scrollTop = list.scrollHeight;
+                        
+                        // Update count
+                        const countEl = list.parentElement.querySelector('h4');
+                        if (countEl) {
+                            const currentCount = list.children.length;
+                            countEl.innerHTML = `💬 Comments (${currentCount})`;
+                        }
+                        
+                        showToast('Comment added! 🚀');
+                    }
+                } catch (err) {
+                    alert('Error adding comment');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = '🚀';
+                }
+            };
+
+            window.deleteComment = async (journalId, commentId) => {
+                if (!confirm('Delete this comment? 🗑️')) return;
+                try {
+                    const res = await fetch(`/api/journal/comment/${journalId}/${commentId}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    if (data.success) {
+                        const el = document.getElementById('comment-' + commentId);
+                        if (el) {
+                            const list = el.parentElement;
+                            el.remove();
+                            // Update count
+                            const countEl = list.parentElement.querySelector('h4');
+                            if (countEl) {
+                                const currentCount = list.children.length;
+                                countEl.innerHTML = `💬 Comments (${currentCount})`;
+                            }
+                        }
+                        showToast('Comment deleted! 🗑️');
+                    }
+                } catch (err) {
+                    alert('Error deleting comment');
+                }
+            };
+
+            window.editComment = async (journalId, commentId) => {
+                const el = document.getElementById('comment-' + commentId);
+                const textEl = el.querySelector('.comment-text');
+                const oldText = textEl.innerText;
+                const newText = prompt('Edit your comment:', oldText);
+                
+                if (newText === null || newText.trim() === '' || newText === oldText) return;
+
+                try {
+                    const res = await fetch(`/api/journal/comment/${journalId}/${commentId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: newText.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        textEl.innerText = newText.trim();
+                        showToast('Comment updated! ✨');
+                    }
+                } catch (err) {
+                    alert('Error updating comment');
+                }
             };
 
             window.deleteEntry = async (id) => {

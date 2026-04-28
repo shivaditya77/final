@@ -6,7 +6,12 @@ const journalSchema = new mongoose.Schema({
     description: { type: String, default: "" },
     date: { type: String, required: true },
     username: { type: String, default: "Bhondu" },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    comments: [{
+        username: String,
+        text: String,
+        createdAt: { type: Date, default: Date.now }
+    }]
 });
 
 module.exports = mongoose.model("Journal", journalSchema);

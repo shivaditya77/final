@@ -90,6 +90,7 @@
             let isGlobalMuted = true;
             let lastTapTime = 0;
             let isSyncEnabled = false;
+            let syncLeader = null;
             let isProcessingRemoteScroll = false;
             let isProcessingRemotePlayback = false;
             let activeCommentIndex = -1;
@@ -117,6 +118,7 @@
             // --- PUSHER SYNC ---
             if (channel) {
                 channel.bind('user-watching-reel', (data) => {
+                    if (isSyncEnabled) return;
                     if (data.username !== myUsername && data.reelIndex == currentActive - 1) {
                         document.getElementById('together-text').innerText = `${data.username} is watching ❤️`;
                         showTogetherIndicator(true);
@@ -130,7 +132,7 @@
                     }
                 });
                 channel.bind('user-scrolled-reel', (data) => {
-                    if (isSyncEnabled && data.username !== myUsername) {
+                    if (isSyncEnabled && data.username === syncLeader && data.username !== myUsername) {
                         isProcessingRemoteScroll = true;
                         scrollToIndex(data.reelIndex + 1);
                         setTimeout(() => { isProcessingRemoteScroll = false; }, 1000);
@@ -141,7 +143,7 @@
 
                 // Playback Sync
                 channel.bind('user-played-reel', (data) => {
-                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                    if (isSyncEnabled && data.username === syncLeader && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
                         isProcessingRemotePlayback = true;
                         const v = videoElements[data.reelIndex + 1];
                         v.currentTime = data.currentTime;
@@ -149,52 +151,30 @@
                     }
                 });
                 channel.bind('user-paused-reel', (data) => {
-                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                    if (isSyncEnabled && data.username === syncLeader && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
                         isProcessingRemotePlayback = true;
                         videoElements[data.reelIndex + 1].pause();
                         setTimeout(() => isProcessingRemotePlayback = false, 100);
                     }
                 });
                 channel.bind('user-seeked-reel', (data) => {
-                    if (isSyncEnabled && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
+                    if (isSyncEnabled && data.username === syncLeader && data.username !== myUsername && videoElements[data.reelIndex + 1]) {
                         isProcessingRemotePlayback = true;
                         videoElements[data.reelIndex + 1].currentTime = data.currentTime;
                         setTimeout(() => isProcessingRemotePlayback = false, 100);
                     }
                 });
 
-                // Together Mode Invitation
-                channel.bind('together-invitation', (data) => {
-                    if (data.username !== myUsername && !isSyncEnabled) {
+                // Together Mode Force Sync
+                channel.bind('force-sync', (data) => {
+                    if (data.leader !== myUsername) {
                         haptic('notif');
-                        document.getElementById('together-text').innerText = `${data.username} wants to watch together! ❤️`;
+                        isSyncEnabled = true;
+                        syncLeader = data.leader;
+                        updateSyncUI();
+                        document.getElementById('together-text').innerText = `${data.leader} is controlling the screen ❤️`;
                         showTogetherIndicator(true);
-                        // Highlight the together button
-                        document.querySelectorAll('.sync-btn').forEach(btn => btn.style.boxShadow = "0 0 20px #ff4d6d");
-                    }
-                });
 
-                // State Sharing
-                channel.bind('request-reel-state', (data) => {
-                    // Respond even if NOT enabled yet, so partner can catch up
-                    if (data.username !== myUsername && currentActive !== -1) {
-                        const v = videoElements[currentActive];
-                        if (v) {
-                            fetch('/api/reels/send-state', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    to: data.username,
-                                    reelIndex: currentActive - 1,
-                                    currentTime: v.currentTime,
-                                    isPaused: v.paused
-                                })
-                            });
-                        }
-                    }
-                });
-                channel.bind('receive-reel-state', (data) => {
-                    if (isSyncEnabled && data.to.toLowerCase() === myUsername.toLowerCase()) {
                         isProcessingRemoteScroll = true;
                         isProcessingRemotePlayback = true;
                         scrollToIndex(data.reelIndex + 1);
@@ -354,7 +334,7 @@
 
                 // Playback Listeners for Sync
                 video.onplay = () => {
-                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                    if (isSyncEnabled && syncLeader === myUsername && !isProcessingRemotePlayback) {
                         fetch('/api/reels/play', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -363,7 +343,7 @@
                     }
                 };
                 video.onpause = () => {
-                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                    if (isSyncEnabled && syncLeader === myUsername && !isProcessingRemotePlayback) {
                         fetch('/api/reels/pause', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -372,7 +352,7 @@
                     }
                 };
                 video.onseeked = () => {
-                    if (isSyncEnabled && !isProcessingRemotePlayback) {
+                    if (isSyncEnabled && syncLeader === myUsername && !isProcessingRemotePlayback) {
                         fetch('/api/reels/seek', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -487,30 +467,55 @@
                 setTimeout(() => { bubble.style.opacity = '0'; bubble.style.transform = 'translateY(-20px) scale(0.8)'; setTimeout(() => bubble.remove(), 500); }, 6000);
             }
 
+            function updateSyncUI() {
+                document.querySelectorAll('.sync-btn').forEach(btn => {
+                    if (isSyncEnabled) { 
+                        btn.classList.add('sync-active'); 
+                        btn.style.color = '#ff4d6d'; 
+                        btn.style.boxShadow = "0 0 20px #ff4d6d";
+                    } 
+                    else { 
+                        btn.classList.remove('sync-active'); 
+                        btn.style.color = 'white'; 
+                        btn.style.boxShadow = "none";
+                    }
+                });
+            }
+
             window.toggleSync = (e) => {
                 e.stopPropagation();
                 haptic('click');
-                isSyncEnabled = !isSyncEnabled;
-                document.querySelectorAll('.sync-btn').forEach(btn => {
-                    if (isSyncEnabled) { btn.classList.add('sync-active'); btn.style.color = '#ff4d6d'; } 
-                    else { btn.classList.remove('sync-active'); btn.style.color = 'white'; }
-                });
-                if (isSyncEnabled && currentActive !== -1) {
-                    notifyScroll(currentActive - 1);
-                    // Request current state from partner to catch up
-                    fetch('/api/reels/request-state', { method: 'POST' });
-                    // Invite partner to join Together Mode
-                    fetch('/api/reels/invite', { method: 'POST' });
+                
+                if (isSyncEnabled) {
+                    isSyncEnabled = false;
+                    syncLeader = null;
+                    updateSyncUI();
+                    showTogetherIndicator(false);
                 } else {
-                    // Reset highlight
-                    document.querySelectorAll('.sync-btn').forEach(btn => btn.style.boxShadow = "none");
+                    isSyncEnabled = true;
+                    syncLeader = myUsername;
+                    updateSyncUI();
+                    
+                    if (currentActive !== -1) {
+                        const v = videoElements[currentActive];
+                        fetch('/api/reels/force-sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                leader: myUsername,
+                                reelIndex: currentActive - 1,
+                                currentTime: v ? v.currentTime : 0,
+                                isPaused: v ? v.paused : false
+                            })
+                        });
+                    }
                 }
             };
 
             async function notifyWatching(index) { try { fetch('/api/reels/watching', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {} }
             async function notifyHearted(index) { try { fetch('/api/reels/heart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index - 1 }) }); } catch(e) {} }
             async function notifyScroll(index) {
-                if (!isSyncEnabled || isProcessingRemoteScroll || isTeleporting) return;
+                if (!isSyncEnabled || syncLeader !== myUsername || isProcessingRemoteScroll || isTeleporting) return;
                 try { fetch('/api/reels/sync-scroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reelIndex: index }) }); } catch(e) {}
             }
 
