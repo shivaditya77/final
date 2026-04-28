@@ -135,7 +135,7 @@
             let myHearts = [];
             let opponentHits = 0;
             let myHits = 0;
-            let phase = 1; // 1: Placing, 2: Waiting, 3: Playing
+            let phase = 1; // 1: Placing, 2: Waiting, 3: Playing, 4: Ended
             let isMyTurn = false;
             let otherReady = false;
 
@@ -144,12 +144,14 @@
             const statusText = document.getElementById('status-text');
             const readyBtn = document.getElementById('ready-btn');
             const oppGridWrapper = document.getElementById('opponent-grid-wrapper');
+            const oppGrid = document.getElementById('opponent-grid');
 
             function initGameSync() {
                 if (!window.globalPusher) return setTimeout(initGameSync, 500);
                 const channel = window.globalPusher.subscribe(channelName);
                 
                 channel.unbind('heart-seeker-ready');
+                channel.unbind('heart-seeker-start');
                 channel.unbind('heart-seeker-attack');
                 channel.unbind('heart-seeker-result');
                 channel.unbind('heart-seeker-reset');
@@ -157,19 +159,24 @@
                 channel.bind('heart-seeker-ready', (data) => {
                     console.log("🎮 Heart Seeker Ready:", data);
                     otherReady = true;
-                    if (phase === 2) startGame();
-                    else showToast(otherUser + " is ready! 🚀");
+                    if (phase === 2) {
+                        startGame(true); // If I'm already waiting, start and tell them
+                    } else {
+                        showToast(otherUser + " is ready! 🚀");
+                    }
+                });
+
+                channel.bind('heart-seeker-start', (data) => {
+                    console.log("🎮 Heart Seeker Force Start:", data);
+                    if (phase < 3) startGame(false); // Start without rebroadcasting
                 });
 
                 channel.bind('heart-seeker-attack', async (data) => {
-                    console.log("🎮 Heart Seeker Attack:", data);
                     const idx = parseInt(data.index);
                     const isHit = myHearts.includes(idx);
                     const cell = myCells[idx];
                     
                     cell.classList.add('taken');
-                    
-                    // Reveal animation
                     gsap.from(cell, { scale: 1.5, duration: 0.3, repeat: 1, yoyo: true });
 
                     if (isHit) {
@@ -190,7 +197,7 @@
                     } catch (e) {}
 
                     if (opponentHits === 3) {
-                        statusText.innerText = "💔 " + otherUser + " Won! Better luck next time.";
+                        statusText.innerText = "💔 " + otherUser + " Won!";
                         statusText.style.color = "#ff4d6d";
                         phase = 4;
                     } else {
@@ -200,7 +207,6 @@
                 });
 
                 channel.bind('heart-seeker-result', (data) => {
-                    console.log("🎮 Heart Seeker Result:", data);
                     const cell = oppCells[data.index];
                     cell.classList.add('taken');
                     
@@ -209,13 +215,19 @@
                         cell.innerText = '💖';
                         myHits++;
                         if (myHits === 3) {
-                            statusText.innerText = "🎉 You Won! All hearts found! 🏆";
+                            statusText.innerText = "🎉 You Won! 🏆";
                             statusText.style.color = "#00ffcc";
                             phase = 4;
                         }
                     } else {
                         cell.classList.add('miss');
                         cell.innerText = '🌊';
+                    }
+                    
+                    // After my result, it's not my turn anymore if I didn't win
+                    if (phase !== 4) {
+                        isMyTurn = false;
+                        updateTurnUI();
                     }
                 });
 
@@ -235,8 +247,8 @@
                         myHearts.push(idx);
                         cell.classList.add('hidden-heart');
                         cell.innerText = '💘';
+                        gsap.from(cell, { scale: 0.5, duration: 0.2 });
                     }
-                    
                     readyBtn.disabled = myHearts.length !== 3;
                 });
             });
@@ -244,8 +256,9 @@
             oppCells.forEach(cell => {
                 cell.addEventListener('click', () => {
                     if (phase !== 3 || !isMyTurn) return;
-                    const idx = cell.getAttribute('data-index');
                     if (cell.classList.contains('taken')) return;
+                    
+                    const idx = cell.getAttribute('data-index');
                     attackOpponent(idx);
                 });
             });
@@ -261,34 +274,66 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ to: otherUser })
                     });
-                    if (otherReady) startGame();
+                    if (otherReady) startGame(true);
                 } catch (e) {}
             };
 
-            function startGame() {
+            async function startGame(shouldBroadcast) {
                 phase = 3;
                 oppGridWrapper.style.opacity = '1';
                 oppGridWrapper.style.pointerEvents = 'all';
-                isMyTurn = username.toLowerCase() === 'bhondu';
+                isMyTurn = username.toLowerCase() === 'bhondu'; 
+                
                 updateTurnUI();
-                gsap.from(oppGridWrapper, { opacity: 0, y: 20, duration: 0.6 });
+                
+                // Entrance animation for attack grid
+                gsap.to(oppGridWrapper, { opacity: 1, scale: 1, duration: 0.5 });
+                gsap.from(oppCells, { scale: 0, stagger: 0.02, duration: 0.4, ease: "back.out" });
+
+                if (shouldBroadcast) {
+                    try {
+                        await fetch('/api/games/heart-seeker/start', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: otherUser })
+                        });
+                    } catch (e) {}
+                }
             }
 
             function updateTurnUI() {
                 if (phase !== 3) return;
-                statusText.innerText = isMyTurn ? "Your Turn! Attack " + otherUser + "'s grid! 🎯" : "Waiting for " + otherUser + "'s move... ⌛";
+                
+                if (isMyTurn) {
+                    statusText.innerText = "Your Turn! Attack! 🎯";
+                    statusText.style.color = "#00ffcc";
+                    oppGrid.style.boxShadow = "0 0 20px rgba(0, 255, 204, 0.3)";
+                    gsap.to(oppGrid, { borderColor: "#00ffcc", duration: 0.3 });
+                } else {
+                    statusText.innerText = `Waiting for ${otherUser}... ⌛`;
+                    statusText.style.color = "rgba(255,255,255,0.6)";
+                    oppGrid.style.boxShadow = "none";
+                    gsap.to(oppGrid, { borderColor: "rgba(255,255,255,0.1)", duration: 0.3 });
+                }
             }
 
             async function attackOpponent(index) {
+                if (!isMyTurn) return;
+                
+                // Optimistic UI: temporary disable
                 isMyTurn = false;
                 updateTurnUI();
+
                 try {
                     await fetch('/api/games/heart-seeker/attack', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ index, to: otherUser })
                     });
-                } catch (e) {}
+                } catch (e) {
+                    isMyTurn = true; // Rollback
+                    updateTurnUI();
+                }
             }
 
             function showToast(msg) {
