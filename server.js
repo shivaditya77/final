@@ -646,7 +646,18 @@ app.get("/games/heart-seeker", isAuth, (req, res) => {
 app.get("/games/sps", isAuth, (req, res) => {
     res.render("game-sps", { 
         username: req.session.username,
-        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY, 
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
+});
+
+app.get("/games/snake", isAuth, (req, res) => {
+    res.render("game-snake", { 
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY, 
+        pusherCluster: process.env.PUSHER_CLUSTER
     });
 });
 
@@ -740,6 +751,43 @@ app.post("/api/games/sps/reset", isAuth, async (req, res) => {
         const { to } = req.body;
         const from = req.session.username || "Bhondu";
         await pusher.trigger("private-notifications-" + to.toLowerCase(), "sps-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// API for Snake & Ladders sync
+app.post("/api/games/snake/roll", isAuth, async (req, res) => {
+    try {
+        const { dice, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-roll", { dice, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/snake/move", isAuth, async (req, res) => {
+    try {
+        const { fromPos, toPos, to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-move", { fromPos, toPos, from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/snake/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-reset", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/snake/sync", isAuth, async (req, res) => {
+    try {
+        const { to, myPos, oppPos, turn } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-sync", { myPos, oppPos, turn, from });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
