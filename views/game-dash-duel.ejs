@@ -1,0 +1,520 @@
+<%- include('partials/header') %>
+<div data-barba="container" data-barba-namespace="game-dash-duel">
+    <style>
+        :root {
+            --neon-pink: #ff007f;
+            --neon-cyan: #00f2ff;
+            --neon-purple: #bc13fe;
+            --neon-gold: #ffd700;
+            --bg-dark: #050505;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Outfit:wght@300;600;900&display=swap');
+
+        .game-body {
+            min-height: 100vh;
+            background: var(--bg-dark);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-bg {
+            position: fixed; inset: 0;
+            background: 
+                radial-gradient(circle at 10% 10%, rgba(255, 0, 127, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(0, 242, 255, 0.15) 0%, transparent 40%),
+                #050505;
+            z-index: 0;
+        }
+
+        .game-bg::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            mask-image: radial-gradient(circle at center, black, transparent 80%);
+        }
+
+        .game-container {
+            position: relative; z-index: 10;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-title {
+            font-family: 'Syncopate', sans-serif;
+            font-weight: 700;
+            font-size: 2rem;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            background: linear-gradient(to right, var(--neon-pink), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            filter: drop-shadow(0 0 10px rgba(255, 0, 127, 0.3));
+        }
+
+        .status-badge {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            padding: 10px 25px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            font-weight: 600;
+            letter-spacing: 1px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .board-canvas {
+            background: rgba(255,255,255,0.02);
+            padding: 30px;
+            border-radius: 40px;
+            border: 1px solid var(--border);
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
+            margin-bottom: 40px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 15px;
+            width: 320px;
+            height: 320px;
+            position: relative;
+        }
+
+        .cell {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cell.path { background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 2px 10px rgba(0,0,0,0.3); }
+        .cell.start { border-color: var(--neon-pink); box-shadow: 0 0 15px rgba(255, 0, 127, 0.2), inset 0 0 10px rgba(255, 0, 127, 0.1); }
+        .cell.end { border-color: var(--neon-gold); box-shadow: 0 0 20px rgba(255, 215, 0, 0.2); }
+        .cell.end::after { content: '👑'; font-size: 1.5rem; opacity: 0.3; filter: drop-shadow(0 0 5px var(--neon-gold)); }
+
+        .cell-index {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            font-size: 0.6rem;
+            opacity: 0.2;
+            font-weight: 900;
+            font-family: 'Syncopate', sans-serif;
+        }
+
+        .token {
+            width: 48px;
+            height: 48px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            position: absolute;
+            z-index: 20;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.8);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .token-p0 { background: linear-gradient(135deg, #ff007f, #ff5e3a); box-shadow: 0 0 20px rgba(255, 0, 127, 0.4); }
+        .token-p1 { background: linear-gradient(135deg, #00f2ff, #0072ff); box-shadow: 0 0 20px rgba(0, 242, 255, 0.4); }
+
+        .token.active-turn { animation: vibe 1.5s infinite alternate; }
+
+        @keyframes vibe {
+            0% { transform: scale(1) translateY(0); filter: brightness(1); }
+            100% { transform: scale(1.1) translateY(-8px); filter: brightness(1.3) drop-shadow(0 15px 15px rgba(0,0,0,0.5)); }
+        }
+
+        .controls-deck {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .dice-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            background: var(--glass);
+            padding: 20px 40px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .dice {
+            width: 70px;
+            height: 70px;
+            background: white;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            color: #1a1a1a;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 -4px 0 rgba(0,0,0,0.1);
+            transition: 0.2s;
+        }
+
+        .dice.rolling { animation: cubeSpin 0.4s infinite linear; }
+        @keyframes cubeSpin {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.2); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .btn-neon {
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+            border: none;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 100px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(255, 0, 127, 0.3);
+            transition: 0.3s;
+        }
+
+        .btn-neon:disabled { opacity: 0.3; filter: grayscale(1); }
+        .btn-neon:hover:not(:disabled) { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(255, 0, 127, 0.5); }
+
+        .player-chips { display: flex; gap: 15px; margin-bottom: 30px; }
+
+        .chip {
+            padding: 10px 20px;
+            background: var(--glass);
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0.4;
+            transition: 0.4s;
+        }
+
+        .chip.active {
+            opacity: 1;
+            background: rgba(255,255,255,0.08);
+            border-color: var(--neon-cyan);
+            transform: scale(1.05);
+        }
+
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        #win-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: none;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(20px);
+        }
+
+        .win-card {
+            background: linear-gradient(145deg, #1a0b2e, #050505);
+            padding: 60px;
+            border-radius: 50px;
+            border: 1px solid var(--neon-purple);
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.9), 0 0 50px rgba(188, 19, 254, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: rgba(255,255,255,0.5);
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: 0.3s;
+        }
+        .btn-secondary:hover { color: white; border-color: white; }
+    </style>
+
+    <div class="game-body">
+        <div class="game-bg"></div>
+        <%- include('partials/navbar') %>
+
+        <div class="game-container">
+            <h1 class="game-title">Dash Duel</h1>
+            
+            <div class="status-badge" id="status-text">
+                <span id="status-icon">🚀</span>
+                <span id="status-msg">LFG! Roll to start</span>
+            </div>
+
+            <div class="player-chips" id="player-chips"></div>
+
+            <div class="board-canvas">
+                <div class="board" id="board"></div>
+            </div>
+
+            <div class="controls-deck">
+                <div class="dice-wrapper">
+                    <div class="dice" id="dice" onclick="rollDice()">🎲</div>
+                    <button class="btn-neon" id="roll-btn" onclick="rollDice()">ROLL IT</button>
+                </div>
+                <div style="display:flex; gap:15px; margin-top:20px;">
+                    <button class="btn-secondary" onclick="requestReset()">🔄 RESET</button>
+                    <button class="btn-secondary" onclick="syncBoardState()">📡 SYNC</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="win-overlay">
+        <div class="win-card">
+            <span id="win-emoji" style="font-size: 6rem; display: block; margin-bottom: 20px;">🏆</span>
+            <h2 id="win-name" style="font-size: 3rem; font-weight: 900; color: var(--neon-gold); margin-bottom: 15px;">W</h2>
+            <p style="opacity: 0.6; margin-bottom: 40px; font-size: 1.2rem;">Absolute Legend behavior.</p>
+            <button class="btn-neon" style="width: 100%;" onclick="location.reload()">REMATCH</button>
+        </div>
+    </div>
+
+    <audio id="sound-roll" src="https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3"></audio>
+    <audio id="sound-move" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
+    <audio id="sound-win" src="https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"></audio>
+    <audio id="sound-kick" src="https://assets.mixkit.co/active_storage/sfx/2658/2658-preview.mp3"></audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        (function() {
+            const PATH_INDICES = [0, 1, 2, 3, 7, 11, 15, 14, 13, 12, 8, 4, 5, 6, 10, 9];
+            const username = "<%= username %>";
+            const otherUser = "<%= otherUser %>";
+            const myPlayerIndex = username.toLowerCase() === 'bhondu' ? 0 : 1;
+            
+            let players = [], currentPlayer = 0, currentRoll = 0, gameActive = false, isRolling = false;
+            let rollPromise = null, rollResolve = null, lastSeq = 0, messageQueue = [], isProcessingQueue = false;
+
+            const boardEl = document.getElementById('board'), statusMsg = document.getElementById('status-msg'), diceEl = document.getElementById('dice'), rollBtn = document.getElementById('roll-btn'), chipsEl = document.getElementById('player-chips');
+            const icons = ['❤️', '💋', '🍀', '☀️'], names = ['Bhondu', 'Vishu', 'Guest 1', 'Guest 2'];
+
+            function initGame() {
+                boardEl.innerHTML = ''; chipsEl.innerHTML = ''; players = []; currentPlayer = 0; gameActive = true;
+                for (let i = 0; i < 16; i++) {
+                    const cell = document.createElement('div'); cell.className = 'cell';
+                    if (PATH_INDICES.includes(i)) cell.classList.add('path');
+                    if (i === PATH_INDICES[0]) cell.classList.add('start');
+                    if (i === PATH_INDICES[PATH_INDICES.length - 1]) cell.classList.add('end');
+                    cell.innerHTML = `<span class="cell-index">${i}</span>`; cell.id = `cell-mini-${i}`; boardEl.appendChild(cell);
+                }
+                for (let i = 0; i < 2; i++) {
+                    const p = { id: i, pathIndex: 0, token: document.createElement('div') };
+                    p.token.className = `token token-p${i}`; p.token.innerHTML = icons[i];
+                    p.token.id = `token-mini-${i}`; document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
+                    players.push(p);
+                    const chip = document.createElement('div'); chip.className = `chip ${i === 0 ? 'active' : ''}`;
+                    chip.id = `chip-mini-${i}`; chip.innerHTML = `<div class="dot" style="background:${i===0?'var(--neon-pink)':'var(--neon-cyan)'}"></div><span style="font-weight:700;">${names[i]}</span>`;
+                    chipsEl.appendChild(chip);
+                }
+                updateStatus(); updateTokenLayout();
+            }
+
+            function updateStatus() {
+                const isMyTurn = currentPlayer === myPlayerIndex;
+                statusMsg.innerText = isMyTurn ? `Your Turn! 🎲` : `Waiting for ${names[currentPlayer]}...`;
+                document.querySelectorAll('.chip').forEach((c, i) => c.classList.toggle('active', i === currentPlayer));
+                rollBtn.disabled = !isMyTurn || isRolling;
+                document.querySelectorAll('.token').forEach(t => t.classList.remove('active-turn'));
+                if (isMyTurn && !isRolling) players[myPlayerIndex].token.classList.add('active-turn');
+            }
+
+            window.rollDice = async function(remoteVal = null) {
+                if (!gameActive || isRolling || (!remoteVal && currentPlayer !== myPlayerIndex)) return;
+                isRolling = true; rollPromise = new Promise(r => rollResolve = r);
+                diceEl.classList.add('rolling'); playSound('roll');
+                
+                setTimeout(async () => {
+                    const val = remoteVal || Math.floor(Math.random() * 6) + 1;
+                    diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][val]; diceEl.classList.remove('rolling');
+                    currentRoll = val;
+                    
+                    if (!remoteVal) syncMove({ type:'roll', dice:val });
+                    
+                    // Logic from Snake: Explicitly wait for movement to complete before releasing lock
+                    await processMove(currentPlayer, val);
+                    
+                    isRolling = false;
+                    rollResolve();
+                }, 800);
+            };
+
+            async function processMove(pIdx, val) {
+                const p = players[pIdx];
+                
+                // End game check
+                if (p.pathIndex + val >= PATH_INDICES.length) {
+                    const nextIdx = (pIdx + 1) % 2;
+                    if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:nextIdx });
+                    setTimeout(() => nextTurn(nextIdx), 1000); 
+                    return;
+                }
+
+                // Smooth sequential movement
+                for (let i=1; i<=val; i++) { 
+                    p.pathIndex++; 
+                    await animateToken(p, p.pathIndex); 
+                    playSound('move'); 
+                }
+
+                checkCollisions(p);
+
+                if (p.pathIndex === PATH_INDICES.length - 1) { 
+                    gameActive = false; 
+                    showWinner(pIdx); 
+                    if (!window.isRemoteSync) syncMove({ type:'win', winner:pIdx });
+                    return; 
+                }
+
+                // Source of truth decided by player who moved
+                const nextIdx = (val === 6) ? pIdx : (pIdx + 1) % 2;
+                if (!window.isRemoteSync) syncMove({ type:'move', dice:val, nextTurnIdx:nextIdx });
+                nextTurn(nextIdx);
+            }
+
+            function animateToken(p, pathIdx) {
+                return new Promise(r => {
+                    const target = document.getElementById(`cell-mini-${PATH_INDICES[pathIdx]}`);
+                    const old = p.token.getBoundingClientRect(); target.appendChild(p.token); updateTokenLayout();
+                    const cur = p.token.getBoundingClientRect();
+                    gsap.fromTo(p.token, { x:old.left-cur.left, y:old.top-cur.top }, { x:0, y:0, duration:0.25, onComplete:r });
+                });
+            }
+
+            function checkCollisions(activeP) {
+                players.forEach(p => { if (p.id !== activeP.id && p.pathIndex === activeP.pathIndex && p.pathIndex !== 0) {
+                    p.pathIndex = 0; playSound('kick'); document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token); updateTokenLayout();
+                }});
+            }
+
+            function nextTurn(forcedIdx = null) { 
+                currentPlayer = (forcedIdx !== null) ? forcedIdx : (currentPlayer + 1) % 2; 
+                updateStatus(); 
+            }
+            
+            function updateTokenLayout() {
+                for (let i=0; i<16; i++) {
+                    const cell = document.getElementById(`cell-mini-${i}`); if(!cell) continue;
+                    const tokens = cell.querySelectorAll('.token');
+                    tokens.forEach((t, idx) => {
+                        const off = (idx - (tokens.length-1)/2) * 12;
+                        t.style.transform = `translate(${off}px, ${off}px)`;
+                    });
+                }
+            }
+
+            function showWinner(idx) {
+                gameActive = false;
+                playSound('win'); document.getElementById('win-name').innerText = `${names[idx].toUpperCase()} WINS`;
+                document.getElementById('win-emoji').innerText = icons[idx];
+                document.getElementById('win-overlay').style.display = 'flex';
+                gsap.from('.win-card', { scale: 0.5, opacity: 0, duration: 0.5, ease: "back.out(1.7)" });
+            }
+
+            // --- ELITE SYNC (TTT/SNAKE/SPS Logic) ---
+            function initSync() {
+                if (!window.globalPusher) return setTimeout(initSync, 500);
+                const channelName = 'private-notifications-' + username.toLowerCase();
+                const channel = window.globalPusher.subscribe(channelName);
+                
+                channel.bind('ludo-move', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    messageQueue.push({ event:'move', data });
+                    processQueue();
+                });
+
+                channel.bind('ludo-state-sync', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase() || data.seq <= lastSeq) return;
+                    messageQueue.push({ event:'state', data });
+                    processQueue();
+                });
+
+                channel.bind('ludo-reset', () => location.reload());
+            }
+
+            async function processQueue() {
+                if (isProcessingQueue || messageQueue.length === 0) return;
+                isProcessingQueue = true; 
+                const { event, data } = messageQueue.shift();
+                
+                try {
+                    if (event === 'move') {
+                        window.isRemoteSync = true;
+                        if (data.type === 'roll') {
+                            await rollDice(data.dice);
+                        } else if (data.type === 'move') {
+                            // Professional Lock: Ensure animation finished before checking next turn
+                            if (rollPromise) await rollPromise;
+                            if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
+                        } else if (data.type === 'win') {
+                            showWinner(data.winner);
+                        }
+                        window.isRemoteSync = false;
+                    } else if (event === 'state') {
+                        lastSeq = data.seq; 
+                        currentPlayer = data.currentPlayer;
+                        data.players.forEach((rp, i) => { 
+                            players[i].pathIndex = rp.pathIndex; 
+                            const cell = document.getElementById(`cell-mini-${PATH_INDICES[rp.pathIndex]}`);
+                            if (cell) cell.appendChild(players[i].token); 
+                        });
+                        updateTokenLayout(); 
+                        updateStatus();
+                    }
+                } catch (e) { console.error("Sync Stream Error:", e); }
+                
+                isProcessingQueue = false; 
+                processQueue();
+            }
+
+            async function syncMove(data) { try { await fetch('/api/games/ludo/move', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...data, to:otherUser, from:username}) }); } catch(e){} }
+            async function syncBoardState() { if(!gameActive) return; syncMove({ type:'state-sync', seq:++lastSeq, currentPlayer, players:players.map(p=>({pathIndex:p.pathIndex})) }); }
+            window.requestReset = () => { if(confirm("Restart for both?")) { syncMove({ type:'reset' }); location.reload(); } };
+
+            setInterval(() => { if(gameActive && currentPlayer === myPlayerIndex) syncBoardState(); }, 20000);
+            setTimeout(() => { if(gameActive) syncBoardState(); }, 1500);
+            function playSound(type) { const s = document.getElementById(`sound-${type}`); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
+
+            initGame(); initSync();
+        })();
+    </script>
+</div>
+<%- include('partials/footer') %>

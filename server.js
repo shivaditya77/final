@@ -296,6 +296,7 @@ app.post("/api/chat/star", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+
 app.get("/api/chat/starred", isAuth, async (req, res) => {
     const username = req.session.username || "Bhondu";
     const starred = await Message.find({ isStarredBy: username }).sort({ timestamp: -1 });
@@ -670,8 +671,8 @@ app.get("/games/ludo", isAuth, (req, res) => {
     });
 });
 
-app.get("/games/mini-ludo", isAuth, (req, res) => {
-    res.render("game-mini-ludo", {
+app.get("/games/dash-duel", isAuth, (req, res) => {
+    res.render("game-dash-duel", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
         pusherKey: process.env.PUSHER_KEY,
