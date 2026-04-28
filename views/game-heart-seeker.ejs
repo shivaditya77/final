@@ -54,28 +54,29 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr); /* Explicit rows for permanent fix */
             gap: 12px;
             background: rgba(255, 255, 255, 0.05);
             padding: 15px;
             border-radius: 24px;
             border: 2px solid rgba(255, 255, 255, 0.1);
             width: 100%;
-            max-width: 350px;
+            aspect-ratio: 1 / 1; /* Force the whole container to be square */
+            max-width: 400px;
             margin: 0 auto;
             box-sizing: border-box;
         }
         .cell {
             position: relative;
             width: 100%;
-            padding-bottom: 100%; /* Force perfect square */
-            min-height: 50px; /* HEAVY DUTY: Prevent collapse */
+            height: 100%; /* Fill the grid slot perfectly */
             background: rgba(255, 255, 255, 0.06); 
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             border: 1px solid rgba(255, 255, 255, 0.1);
             overflow: hidden;
-            display: block;
+            min-width: 0; min-height: 0; /* Prevent content stretching */
         }
         .cell:hover:not(.taken) {
             background: rgba(139, 92, 246, 0.15);
@@ -123,8 +124,9 @@
         .btn-emergency:hover { background: rgba(255, 77, 109, 0.15); border-color: #ff4d6d; color: white; }
 
         @media (min-width: 800px) {
-            .grids-container { flex-direction: row; max-width: 850px; justify-content: center; gap: 60px; }
-            .game-container { max-width: 1000px; }
+            .grids-container { flex-direction: row; max-width: 100%; justify-content: center; gap: 60px; padding: 0 20px; }
+            .game-container { max-width: 1200px; }
+            .grid { width: 350px; height: 350px; } /* Fixed square size for desktop */
         }
     </style>
 
@@ -314,7 +316,11 @@
                         myHearts.push(idx);
                         cell.classList.add('hidden-heart');
                         content.innerText = '💘';
-                        gsap.from(cell, { scale: 0.5, duration: 0.2 });
+                        gsap.from(cell, { 
+                            scale: 0.5, 
+                            duration: 0.2,
+                            onComplete: () => gsap.set(cell, { clearProps: "all" })
+                        });
                     }
                     readyBtn.disabled = myHearts.length !== 3;
                 });
@@ -355,7 +361,15 @@
                 
                 // Entrance animation for attack grid
                 gsap.to(oppGridWrapper, { opacity: 1, scale: 1, duration: 0.5 });
-                gsap.from(oppCells, { scale: 0, stagger: 0.02, duration: 0.4, ease: "back.out" });
+                gsap.from(oppCells, { 
+                    scale: 0, 
+                    stagger: 0.02, 
+                    duration: 0.4, 
+                    ease: "back.out",
+                    onComplete: () => {
+                        gsap.set(oppCells, { clearProps: "all" });
+                    }
+                });
 
                 if (shouldBroadcast) {
                     try {
