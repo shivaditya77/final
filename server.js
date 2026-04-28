@@ -92,7 +92,7 @@ app.use(helmet({
 }));
 
 // Serve static files from the root public directory
-const publicDir = "public"; 
+const publicDir = "public";
 app.use(express.static(path.join(__dirname, publicDir)));
 
 app.set("view engine", "ejs");
@@ -117,7 +117,7 @@ app.use(async (req, res, next) => {
     res.locals.pusherKey = process.env.PUSHER_KEY || "";
     res.locals.pusherCluster = process.env.PUSHER_CLUSTER || "ap2";
     res.locals.username = req.session.username || "";
-    
+
     // Update Last Seen for authenticated users
     if (req.session.isAuth && req.session.username) {
         try {
@@ -159,8 +159,8 @@ app.use("/", authRoutes);
 app.get("/", isAuth, (req, res) => {
     res.render("home", {
         username: req.session.username,
-        pusherKey: process.env.PUSHER_KEY, 
-        pusherCluster: process.env.PUSHER_CLUSTER 
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
     });
 });
 
@@ -168,23 +168,23 @@ app.get("/", isAuth, (req, res) => {
 app.get("/chat", isAuth, async (req, res) => {
     try {
         const username = req.session.username || "Bhondu";
-        const history = await Message.find({ 
+        const history = await Message.find({
             deletedBy: { $ne: username },
-            isDeletedForEveryone: false 
+            isDeletedForEveryone: false
         }).sort({ timestamp: 1 }).populate('replyTo');
-        
+
         const user = await User.findOne({ username: username.toLowerCase() });
         const wallpaper = user ? user.chatWallpaper : '';
 
         const otherUser = username.toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu';
 
-        res.render("chat", { 
-            history, 
+        res.render("chat", {
+            history,
             username,
             otherUser,
             wallpaper,
-            pusherKey: process.env.PUSHER_KEY, 
-            pusherCluster: process.env.PUSHER_CLUSTER 
+            pusherKey: process.env.PUSHER_KEY,
+            pusherCluster: process.env.PUSHER_CLUSTER
         });
     } catch (err) { res.status(500).send("Chat error 💔"); }
 });
@@ -254,7 +254,7 @@ app.post("/api/chat/react", isAuth, async (req, res) => {
         if (existingIndex > -1) message.reactions.splice(existingIndex, 1);
         else {
             message.reactions.push({ emoji, username });
-            
+
             // Notify recipient if they are not the sender
             if (message.sender !== username) {
                 const notif = new Notification({
@@ -266,7 +266,7 @@ app.post("/api/chat/react", isAuth, async (req, res) => {
                 });
                 await notif.save();
                 await pusher.trigger("private-notifications-" + message.sender.toLowerCase(), "new-notification", notif);
-                
+
                 // Send Background Push
                 sendWebPush(message.sender, {
                     title: `New reaction ❤️`,
@@ -378,12 +378,12 @@ app.post("/pusher/auth", isAuth, (req, res) => {
         const socketId = req.body.socket_id;
         const channel = req.body.channel_name;
         const username = req.session.username || "Bhondu";
-        
-        const presenceData = { 
-            user_id: username.toLowerCase(), 
-            user_info: { name: username } 
+
+        const presenceData = {
+            user_id: username.toLowerCase(),
+            user_info: { name: username }
         };
-        
+
         const authResponse = pusher.authorizeChannel(socketId, channel, presenceData);
         console.log("📡 Auth Response Generated:", authResponse);
         res.setHeader('Content-Type', 'application/json');
@@ -399,8 +399,8 @@ async function sendWebPush(recipient, data) {
     try {
         const subscriptions = await Subscription.find({ username: recipient.toLowerCase() });
         const payload = JSON.stringify(data);
-        
-        const pushPromises = subscriptions.map(sub => 
+
+        const pushPromises = subscriptions.map(sub =>
             webpush.sendNotification(sub.subscription, payload)
                 .catch(async (err) => {
                     if (err.statusCode === 410 || err.statusCode === 404) {
@@ -423,7 +423,7 @@ app.post("/api/video/signal", isAuth, async (req, res) => {
 
         // Create notification for incoming call
         if (type === 'offer') {
-             const notif = new Notification({
+            const notif = new Notification({
                 recipient: to.toLowerCase(),
                 sender: from,
                 type: 'call',
@@ -432,7 +432,7 @@ app.post("/api/video/signal", isAuth, async (req, res) => {
             });
             await notif.save();
             await pusher.trigger("private-notifications-" + to.toLowerCase(), "new-notification", notif);
-            
+
             // Send Background Push
             sendWebPush(to, {
                 title: `Incoming Call 📞`,
@@ -503,7 +503,7 @@ app.post("/api/notifications/subscribe", isAuth, async (req, res) => {
     try {
         const { subscription } = req.body;
         const username = req.session.username.toLowerCase();
-        
+
         await Subscription.findOneAndUpdate(
             { "subscription.endpoint": subscription.endpoint },
             { username, subscription },
@@ -630,33 +630,33 @@ app.get("/games", isAuth, (req, res) => {
 });
 
 app.get("/games/ttt", isAuth, (req, res) => {
-    res.render("game-ttt", { 
+    res.render("game-ttt", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
     });
 });
 
 app.get("/games/heart-seeker", isAuth, (req, res) => {
-    res.render("game-heart-seeker", { 
+    res.render("game-heart-seeker", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu'
     });
 });
 
 app.get("/games/sps", isAuth, (req, res) => {
-    res.render("game-sps", { 
+    res.render("game-sps", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
-        pusherKey: process.env.PUSHER_KEY, 
+        pusherKey: process.env.PUSHER_KEY,
         pusherCluster: process.env.PUSHER_CLUSTER
     });
 });
 
 app.get("/games/snake", isAuth, (req, res) => {
-    res.render("game-snake", { 
+    res.render("game-snake", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
-        pusherKey: process.env.PUSHER_KEY, 
+        pusherKey: process.env.PUSHER_KEY,
         pusherCluster: process.env.PUSHER_CLUSTER
     });
 });
@@ -758,9 +758,10 @@ app.post("/api/games/sps/reset", isAuth, async (req, res) => {
 // API for Snake & Ladders sync
 app.post("/api/games/snake/roll", isAuth, async (req, res) => {
     try {
-        const { dice, to } = req.body;
+        const { dice, path, finalPos, seq, to } = req.body;
         const from = req.session.username || "Bhondu";
-        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-roll", { dice, from });
+        // Forward full roll payload so opponent can animate the pawn correctly
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "snake-roll", { dice, path, finalPos, seq, from });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
@@ -933,9 +934,9 @@ app.get("/final", isAuth, (req, res) => res.render("final"));
 // Error & Health
 app.get("/api/ping", (req, res) => res.send("pong root production final"));
 app.get("/api/health", (req, res) => res.json({ status: "alive", mongodb: mongoose.connection.readyState === 1 }));
-app.use((err, req, res, next) => { 
+app.use((err, req, res, next) => {
     console.error("🔥 DETAILED ERROR LOG:", err);
-    res.status(500).send("Something went wrong! 💔 Error: " + err.message); 
+    res.status(500).send("Something went wrong! 💔 Error: " + err.message);
 });
 
 // Only start the server locally (Vercel will ignore this)

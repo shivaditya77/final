@@ -1,425 +1,523 @@
 <%- include('partials/header') %>
-<div data-barba="container" data-barba-namespace="game-snake">
-    <style>
-        .game-body {
-            min-height: 100vh;
-            background: #0a0a0a;
-            color: white;
-            font-family: 'Poppins', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 80px;
-            padding-bottom: 40px;
-            position: relative;
-            overflow-x: hidden;
-        }
-        .game-bg {
-            position: fixed; inset: 0;
-            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0a 100%);
-            z-index: 0;
-        }
-        .game-container {
-            position: relative; z-index: 10;
-            text-align: center;
-            width: 100%;
-            max-width: 500px;
-            padding: 15px;
-        }
-        .status-badge {
-            background: rgba(139, 92, 246, 0.15);
-            padding: 8px 20px;
-            border-radius: 50px;
-            border: 1px solid rgba(139, 92, 246, 0.3);
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-            color: #a78bfa;
-            display: inline-block;
-        }
-        
-        /* BOARD ARCHITECTURE */
-        .board-wrapper {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 10px;
-            border-radius: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-        .board {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            grid-template-rows: repeat(10, 1fr);
-            width: 100%;
-            height: 100%;
-            gap: 4px;
-        }
-        .cell {
-            position: relative;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.6rem;
-            color: rgba(255, 255, 255, 0.2);
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        .cell.highlight { background: rgba(139, 92, 246, 0.1); }
-        
-        /* PAWNS */
-        .pawn {
-            position: absolute;
-            width: 8%;
-            height: 8%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            z-index: 100;
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
-        }
-        #pawn-me { transform: translate(-50%, -50%); }
-        #pawn-opp { transform: translate(-50%, -50%); }
-
-        /* DICE */
-        .controls {
-            margin-top: 30px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-        }
-        .dice-container {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: white;
-            cursor: pointer;
-            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
-            transition: all 0.2s;
-            border: 3px solid rgba(255,255,255,0.2);
-        }
-        .dice-container:active { transform: scale(0.9); }
-        .dice-container.rolling { animation: shakeDice 0.3s infinite; }
-        @keyframes shakeDice {
-            0%, 100% { transform: rotate(0); }
-            25% { transform: rotate(10deg) scale(1.1); }
-            75% { transform: rotate(-10deg) scale(1.1); }
-        }
-        .dice-container.disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-
-        .btn-action {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.6);
-            padding: 10px 25px;
-            border-radius: 50px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-action:hover { background: rgba(255, 255, 255, 0.1); color: white; }
-
-        /* SPECIAL TILES (SNAKES/LADDERS) */
-        .tile-special { font-size: 0.8rem; position: absolute; bottom: 2px; right: 2px; opacity: 0.8; }
-        .ladder { color: #10b981; }
-        .snake { color: #ef4444; }
-
-        @media (min-width: 800px) {
-            .game-container { max-width: 600px; }
-            .board-wrapper { width: 500px; margin: 0 auto; }
-            .cell { font-size: 0.8rem; }
-        }
-    </style>
-
-    <div class="game-body">
-        <div class="game-bg"></div>
-        <%- include('partials/navbar') %>
-
-        <div class="game-container">
-            <div class="status-badge" id="status-text">Your Turn! Roll the dice! 🎲</div>
-
-            <div class="board-wrapper">
-                <div class="board" id="board">
-                    <!-- 100 Cells generated via JS -->
-                </div>
-                <div id="pawn-me" class="pawn">❤️</div>
-                <div id="pawn-opp" class="pawn">💋</div>
-                <canvas id="special-lines" style="position:absolute; inset:0; pointer-events:none; z-index:50;"></canvas>
-            </div>
-
-            <div class="controls">
-                <div class="dice-container" id="dice-btn" onclick="window.rollDice()">?</div>
-                <p id="turn-label" style="font-size: 0.8rem; opacity: 0.6;">Tap the dice to play</p>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-action" onclick="window.syncGameState()">🔄 Sync Game</button>
-                    <button class="btn-action" onclick="window.emergencyReset()">🛑 Emergency Reset</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        (function() {
-            const username = "<%= username %>";
-            const otherUser = "<%= otherUser %>";
-            const channelName = 'private-notifications-' + username.toLowerCase();
-            
-            // ZEN-LEVEL STATE
-            let myPos = 1;
-            let oppPos = 1;
-            let isMyTurn = username.toLowerCase() === 'bhondu'; 
-            let gameActive = true;
-            let isRolling = false;
-            let boardReady = false;
-            let lastSeq = 0;
-            const coordCache = {};
-
-            // ELEMENTS
-            const boardEl = document.getElementById('board');
-            const statusText = document.getElementById('status-text');
-            const diceBtn = document.getElementById('dice-btn');
-            const turnLabel = document.getElementById('turn-label');
-            const pawnMe = document.getElementById('pawn-me');
-            const pawnOpp = document.getElementById('pawn-opp');
-            const canvas = document.getElementById('special-lines');
-            const ctx = canvas.getContext('2d');
-
-            // CONFIG
-            const snakes = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
-            const ladders = { 4: 14, 9: 31, 20: 38, 21: 42, 28: 84, 51: 67, 71: 91, 80: 100 };
-
-            function initBoard() {
-                boardEl.innerHTML = '';
-                for (let r = 9; r >= 0; r--) {
-                    if (r % 2 === 0) { for (let c = 0; c < 10; c++) createCell(r, c); }
-                    else { for (let c = 9; c >= 0; c--) createCell(r, c); }
-                }
-                
-                requestAnimationFrame(() => {
-                    cacheAllCoords();
-                    boardReady = true;
-                    updatePawnPositions(false);
-                    drawSpecials();
-                });
+    <div data-barba="container" data-barba-namespace="game-snake">
+        <style>
+            .game-body {
+                min-height: 100vh;
+                background: #0a0a0a;
+                color: white;
+                font-family: 'Poppins', sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding-top: 80px;
+                padding-bottom: 40px;
+                position: relative;
+                overflow-x: hidden;
             }
 
-            function cacheAllCoords() {
-                const boardRect = boardEl.getBoundingClientRect();
-                for(let i=1; i<=100; i++) {
-                    const cell = document.getElementById(`cell-${i}`);
-                    if(cell) {
-                        const rect = cell.getBoundingClientRect();
-                        coordCache[i] = {
-                            x: rect.left - boardRect.left + rect.width / 2,
-                            y: rect.top - boardRect.top + rect.height / 2
-                        };
+            .game-bg {
+                position: fixed;
+                inset: 0;
+                background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0a 100%);
+                z-index: 0;
+            }
+
+            .game-container {
+                position: relative;
+                z-index: 10;
+                text-align: center;
+                width: 100%;
+                max-width: 500px;
+                padding: 15px;
+            }
+
+            .status-badge {
+                background: rgba(139, 92, 246, 0.15);
+                padding: 8px 20px;
+                border-radius: 50px;
+                border: 1px solid rgba(139, 92, 246, 0.3);
+                margin-bottom: 20px;
+                font-size: 0.9rem;
+                color: #a78bfa;
+                display: inline-block;
+            }
+
+            /* BOARD ARCHITECTURE */
+            .board-wrapper {
+                position: relative;
+                width: 100%;
+                aspect-ratio: 1 / 1;
+                background: rgba(255, 255, 255, 0.05);
+                padding: 10px;
+                border-radius: 20px;
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            }
+
+            .board {
+                display: grid;
+                grid-template-columns: repeat(10, 1fr);
+                grid-template-rows: repeat(10, 1fr);
+                width: 100%;
+                height: 100%;
+                gap: 4px;
+            }
+
+            .cell {
+                position: relative;
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.6rem;
+                color: rgba(255, 255, 255, 0.2);
+                font-weight: 600;
+                transition: all 0.3s;
+            }
+
+            .cell.highlight {
+                background: rgba(139, 92, 246, 0.1);
+            }
+
+            /* PAWNS */
+            .pawn {
+                position: absolute;
+                width: 8%;
+                height: 8%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.2rem;
+                z-index: 100;
+                transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+            }
+
+            #pawn-me {
+                transform: translate(-50%, -50%);
+            }
+
+            #pawn-opp {
+                transform: translate(-50%, -50%);
+            }
+
+            /* DICE */
+            .controls {
+                margin-top: 30px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .dice-container {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                border-radius: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 2.5rem;
+                font-weight: 800;
+                color: white;
+                cursor: pointer;
+                box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+                transition: all 0.2s;
+                border: 3px solid rgba(255, 255, 255, 0.2);
+            }
+
+            .dice-container:active {
+                transform: scale(0.9);
+            }
+
+            .dice-container.rolling {
+                animation: shakeDice 0.3s infinite;
+            }
+
+            @keyframes shakeDice {
+
+                0%,
+                100% {
+                    transform: rotate(0);
+                }
+
+                25% {
+                    transform: rotate(10deg) scale(1.1);
+                }
+
+                75% {
+                    transform: rotate(-10deg) scale(1.1);
+                }
+            }
+
+            .dice-container.disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                filter: grayscale(1);
+            }
+
+            .btn-action {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.6);
+                padding: 10px 25px;
+                border-radius: 50px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+            .btn-action:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+            }
+
+            /* SPECIAL TILES (SNAKES/LADDERS) */
+            .tile-special {
+                font-size: 0.8rem;
+                position: absolute;
+                bottom: 2px;
+                right: 2px;
+                opacity: 0.8;
+            }
+
+            .ladder {
+                color: #10b981;
+            }
+
+            .snake {
+                color: #ef4444;
+            }
+
+            @media (min-width: 800px) {
+                .game-container {
+                    max-width: 600px;
+                }
+
+                .board-wrapper {
+                    width: 500px;
+                    margin: 0 auto;
+                }
+
+                .cell {
+                    font-size: 0.8rem;
+                }
+            }
+        </style>
+
+        <div class="game-body">
+            <div class="game-bg"></div>
+            <%- include('partials/navbar') %>
+
+                <div class="game-container">
+                    <div class="status-badge" id="status-text">Your Turn! Roll the dice! 🎲</div>
+
+                    <div class="board-wrapper">
+                        <div class="board" id="board">
+                            <!-- 100 Cells generated via JS -->
+                        </div>
+                        <div id="pawn-me" class="pawn">❤️</div>
+                        <div id="pawn-opp" class="pawn">💋</div>
+                        <canvas id="special-lines"
+                            style="position:absolute; inset:0; pointer-events:none; z-index:50;"></canvas>
+                    </div>
+
+                    <div class="controls">
+                        <div class="dice-container" id="dice-btn" onclick="window.rollDice()">?</div>
+                        <p id="turn-label" style="font-size: 0.8rem; opacity: 0.6;">Tap the dice to play</p>
+
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-action" onclick="window.syncGameState()">🔄 Sync Game</button>
+                            <button class="btn-action" onclick="window.emergencyReset()">🛑 Emergency Reset</button>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <script>
+            (function () {
+                const username = "<%= username %>";
+                const otherUser = "<%= otherUser %>";
+                const channelName = 'private-notifications-' + username.toLowerCase();
+
+                // ZEN-LEVEL STATE
+                let myPos = 1;
+                let oppPos = 1;
+                let isMyTurn = username.toLowerCase() === 'bhondu';
+                let gameActive = true;
+                let isRolling = false;
+                let boardReady = false;
+                let lastSeq = 0;
+                const coordCache = {};
+
+                // ELEMENTS
+                const boardEl = document.getElementById('board');
+                const statusText = document.getElementById('status-text');
+                const diceBtn = document.getElementById('dice-btn');
+                const turnLabel = document.getElementById('turn-label');
+                const pawnMe = document.getElementById('pawn-me');
+                const pawnOpp = document.getElementById('pawn-opp');
+                const canvas = document.getElementById('special-lines');
+                const ctx = canvas.getContext('2d');
+
+                // CONFIG
+                const snakes = { 17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
+                const ladders = { 4: 14, 9: 31, 20: 38, 21: 42, 28: 84, 51: 67, 71: 91, 80: 100 };
+
+                function initBoard() {
+                    boardEl.innerHTML = '';
+                    for (let r = 9; r >= 0; r--) {
+                        if (r % 2 === 0) { for (let c = 0; c < 10; c++) createCell(r, c); }
+                        else { for (let c = 9; c >= 0; c--) createCell(r, c); }
+                    }
+
+                    requestAnimationFrame(() => {
+                        cacheAllCoords();
+                        boardReady = true;
+                        updatePawnPositions(false);
+                        drawSpecials();
+                    });
+                }
+
+                function cacheAllCoords() {
+                    const boardRect = boardEl.getBoundingClientRect();
+                    for (let i = 1; i <= 100; i++) {
+                        const cell = document.getElementById(`cell-${i}`);
+                        if (cell) {
+                            const rect = cell.getBoundingClientRect();
+                            coordCache[i] = {
+                                x: rect.left - boardRect.left + rect.width / 2,
+                                y: rect.top - boardRect.top + rect.height / 2
+                            };
+                        }
                     }
                 }
-            }
 
-            function createCell(r, c) {
-                const val = r * 10 + c + 1;
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.id = `cell-${val}`;
-                cell.innerHTML = `<span style="opacity: 0.3; font-size: 0.5rem; position:absolute; top:4px; left:4px;">${val}</span>`;
-                if (snakes[val]) cell.innerHTML += `<span class="tile-special snake">🐍</span>`;
-                if (ladders[val]) cell.innerHTML += `<span class="tile-special ladder">🪜</span>`;
-                boardEl.appendChild(cell);
-            }
-
-            function getPos(val) { return coordCache[val] || { x: 0, y: 0 }; }
-
-            function updatePawnPositions(animate = true) {
-                if(!boardReady) return;
-                const me = getPos(myPos), opp = getPos(oppPos);
-                let meX = me.x, oppX = opp.x;
-                if (myPos === oppPos && myPos !== 1) { meX -= 10; oppX += 10; }
-                
-                if (animate) {
-                    gsap.to(pawnMe, { left: meX, top: me.y, xPercent: -50, yPercent: -50, duration: 0.4 });
-                    gsap.to(pawnOpp, { left: oppX, top: opp.y, xPercent: -50, yPercent: -50, duration: 0.4 });
-                } else {
-                    gsap.set(pawnMe, { left: meX, top: me.y, xPercent: -50, yPercent: -50 });
-                    gsap.set(pawnOpp, { left: oppX, top: opp.y, xPercent: -50, yPercent: -50 });
+                function createCell(r, c) {
+                    const val = r * 10 + c + 1;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${val}`;
+                    cell.innerHTML = `<span style="opacity: 0.3; font-size: 0.5rem; position:absolute; top:4px; left:4px;">${val}</span>`;
+                    if (snakes[val]) cell.innerHTML += `<span class="tile-special snake">🐍</span>`;
+                    if (ladders[val]) cell.innerHTML += `<span class="tile-special ladder">🪜</span>`;
+                    boardEl.appendChild(cell);
                 }
-            }
 
-            function drawSpecials() {
-                const rect = boardEl.getBoundingClientRect();
-                if (rect.width === 0) return;
-                canvas.width = rect.width; canvas.height = rect.height;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.lineWidth = 3; ctx.lineCap = "round";
-                ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
-                for (let s in ladders) {
-                    const start = getPos(s), end = getPos(ladders[s]);
-                    ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+                function getPos(val) { return coordCache[val] || { x: 0, y: 0 }; }
+
+                function updatePawnPositions(animate = true) {
+                    if (!boardReady) return;
+                    const me = getPos(myPos), opp = getPos(oppPos);
+                    let meX = me.x, oppX = opp.x;
+                    if (myPos === oppPos && myPos !== 1) { meX -= 10; oppX += 10; }
+
+                    if (animate) {
+                        gsap.to(pawnMe, { left: meX, top: me.y, xPercent: -50, yPercent: -50, duration: 0.4 });
+                        gsap.to(pawnOpp, { left: oppX, top: opp.y, xPercent: -50, yPercent: -50, duration: 0.4 });
+                    } else {
+                        gsap.set(pawnMe, { left: meX, top: me.y, xPercent: -50, yPercent: -50 });
+                        gsap.set(pawnOpp, { left: oppX, top: opp.y, xPercent: -50, yPercent: -50 });
+                    }
                 }
-                ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
-                for (let s in snakes) {
-                    const start = getPos(s), end = getPos(snakes[s]);
-                    ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+
+                function drawSpecials() {
+                    const rect = boardEl.getBoundingClientRect();
+                    if (rect.width === 0) return;
+                    canvas.width = rect.width; canvas.height = rect.height;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.lineWidth = 3; ctx.lineCap = "round";
+                    ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+                    for (let s in ladders) {
+                        const start = getPos(s), end = getPos(ladders[s]);
+                        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+                    }
+                    ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
+                    for (let s in snakes) {
+                        const start = getPos(s), end = getPos(snakes[s]);
+                        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+                    }
                 }
-            }
 
-            window.rollDice = async function() {
-                if (!gameActive || !isMyTurn || isRolling || !boardReady) return;
-                isRolling = true;
-                diceBtn.classList.add('rolling'); diceBtn.innerText = "?";
-                
-                setTimeout(async () => {
-                    const roll = Math.floor(Math.random() * 6) + 1;
-                    diceBtn.classList.remove('rolling'); diceBtn.innerText = roll;
-                    
-                    const path = [];
-                    let curr = myPos;
-                    for(let i=1; i<=roll; i++) { if (curr + i <= 100) path.push(curr + i); }
-                    const land = path[path.length - 1] || myPos;
-                    let final = land;
-                    if (ladders[land]) final = ladders[land];
-                    else if (snakes[land]) final = snakes[land];
+                window.rollDice = async function () {
+                    if (!gameActive || !isMyTurn || isRolling || !boardReady) return;
+                    isRolling = true;
+                    diceBtn.classList.add('rolling'); diceBtn.innerText = "?";
 
-                    const seq = ++lastSeq;
+                    setTimeout(async () => {
+                        const roll = Math.floor(Math.random() * 6) + 1;
+                        diceBtn.classList.remove('rolling'); diceBtn.innerText = roll;
+
+                        const path = [];
+                        let curr = myPos;
+                        for (let i = 1; i <= roll; i++) { if (curr + i <= 100) path.push(curr + i); }
+                        const land = path[path.length - 1] || myPos;
+                        let final = land;
+                        if (ladders[land]) final = ladders[land];
+                        else if (snakes[land]) final = snakes[land];
+
+                        const seq = ++lastSeq;
+                        try {
+                            fetch('/api/games/snake/roll', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ dice: roll, path, finalPos: final, seq, to: otherUser })
+                            });
+                        } catch (e) { }
+                        animatePawn('me', path, final);
+                    }, 800);
+                };
+
+                function animatePawn(who, path, final) {
+                    if (!boardReady) return;
+                    const p = (who === 'me') ? pawnMe : pawnOpp;
+                    const tl = gsap.timeline({
+                        onComplete: () => {
+                            if (who === 'me') myPos = final; else oppPos = final;
+                            updatePawnPositions(true); checkWin(who); finishTurn();
+                        }
+                    });
+
+                    path.forEach((step) => {
+                        tl.to(p, {
+                            left: () => getPos(step).x,
+                            top: () => getPos(step).y,
+                            xPercent: -50, yPercent: -50,
+                            duration: 0.25, ease: "power1.inOut",
+                            onStart: () => {
+                                const cell = document.getElementById(`cell-${step}`);
+                                if (cell) gsap.fromTo(cell, { background: "rgba(255,255,255,0.2)" }, { background: "rgba(255,255,255,0.03)", duration: 0.4 });
+                            }
+                        });
+                    });
+
+                    tl.to({}, { duration: 0.3 });
+                    const land = path[path.length - 1];
+                    if (final !== land) {
+                        tl.to(p, {
+                            left: () => getPos(final).x,
+                            top: () => getPos(final).y,
+                            xPercent: -50, yPercent: -50,
+                            duration: 0.7, ease: "back.inOut",
+                            onStart: () => {
+                                if (final > land) showToast("🪜 Climbing high! ❤️");
+                                else {
+                                    showToast("🐍 Oh no! Sliding down... 💔");
+                                    gsap.to(".board-wrapper", { x: 5, y: 5, duration: 0.05, repeat: 5, yoyo: true });
+                                }
+                            }
+                        });
+                    }
+                }
+
+                function checkWin(who) {
+                    const pos = (who === 'me') ? myPos : oppPos;
+                    if (pos === 100) {
+                        gameActive = false;
+                        statusText.innerText = (who === 'me') ? "🎉 YOU WON! ❤️" : `💔 ${otherUser} WON!`;
+                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    }
+                }
+
+                function finishTurn() { isRolling = false; isMyTurn = !isMyTurn; updateTurnUI(); }
+
+                function updateTurnUI() {
+                    diceBtn.classList.toggle('disabled', !isMyTurn);
+                    statusText.innerText = isMyTurn ? "Your Turn! Roll the dice! 🎲" : `Waiting for ${otherUser}... ⌛`;
+                    turnLabel.innerText = isMyTurn ? "Tap to roll!" : "Waiting...";
+                }
+
+                function initGameSync() {
+                    if (!window.globalPusher) return setTimeout(initGameSync, 500);
+                    const channel = window.globalPusher.subscribe(channelName);
+                    channel.bind('snake-roll', (data) => {
+                        console.log('pusher snake-roll received', data, 'my username', username, 'otherUser', otherUser);
+                        if (data.seq <= lastSeq && data.seq !== 0) return; // Prevent old msg replay
+                        lastSeq = data.seq;
+                        diceBtn.innerText = data.dice;
+                        // Determine who rolled — prefer explicit check instead of assuming it's always opponent
+                        const sender = (data.from || '').toLowerCase();
+                        const meLower = username.toLowerCase();
+                        const target = (sender === meLower) ? 'me' : 'opp';
+                        animatePawn(target, data.path, data.finalPos);
+                    });
+                    channel.bind('snake-reset', () => location.reload());
+                    channel.bind('snake-sync', (data) => {
+                        console.log('pusher snake-sync received', data, 'my username', username, 'otherUser', otherUser);
+                        const sender = (data.from || '').toLowerCase();
+                        const meLower = username.toLowerCase();
+                        // If the sync came from the other player, map their my/opp to our opp/my
+                        if (sender === otherUser.toLowerCase()) {
+                            myPos = data.oppPos; oppPos = data.myPos; isMyTurn = !data.turn;
+                        } else if (sender === meLower) {
+                            // Sync from myself — keep positions as provided
+                            myPos = data.myPos; oppPos = data.oppPos; isMyTurn = data.turn;
+                        } else {
+                            // Unknown sender — ignore
+                            return;
+                        }
+                        updatePawnPositions(false); updateTurnUI();
+                    });
+                }
+
+                // Make pawn icons reflect the local user so movement looks correct locally
+                (function setPawnIcons() {
+                    const meLower = username.toLowerCase();
+                    // default mapping: Bhondu -> ❤️, Vishu -> 💋
+                    if (meLower === 'bhondu') {
+                        pawnMe.innerText = '❤️';
+                        pawnOpp.innerText = '💋';
+                    } else {
+                        pawnMe.innerText = '💋';
+                        pawnOpp.innerText = '❤️';
+                    }
+                })();
+
+                // After subscribing to pusher, send an initial sync to ensure both clients align
+                setTimeout(() => {
+                    try { window.syncGameState(); } catch (e) { /* ignore */ }
+                }, 1000);
+
+                window.syncGameState = async function () {
                     try {
-                        fetch('/api/games/snake/roll', {
+                        await fetch('/api/games/snake/sync', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ dice: roll, path, finalPos: final, seq, to: otherUser })
+                            body: JSON.stringify({ to: otherUser, myPos, oppPos, turn: isMyTurn })
                         });
-                    } catch (e) {}
-                    animatePawn('me', path, final);
-                }, 800);
-            };
+                        showToast("Sync signal sent! 📡");
+                    } catch (e) { }
+                };
 
-            function animatePawn(who, path, final) {
-                if(!boardReady) return;
-                const p = (who === 'me') ? pawnMe : pawnOpp;
-                const tl = gsap.timeline({
-                    onComplete: () => {
-                        if (who === 'me') myPos = final; else oppPos = final;
-                        updatePawnPositions(true); checkWin(who); finishTurn();
-                    }
+                window.emergencyReset = async function () {
+                    if (!confirm("Reset game for BOTH players?")) return;
+                    try {
+                        await fetch('/api/games/snake/reset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: otherUser })
+                        });
+                        location.reload();
+                    } catch (e) { location.reload(); }
+                };
+
+                const resizeObserver = new ResizeObserver(() => {
+                    cacheAllCoords(); drawSpecials(); updatePawnPositions(false);
                 });
+                resizeObserver.observe(boardEl);
 
-                path.forEach((step) => {
-                    tl.to(p, { 
-                        left: () => getPos(step).x, 
-                        top: () => getPos(step).y, 
-                        xPercent: -50, yPercent: -50,
-                        duration: 0.25, ease: "power1.inOut",
-                        onStart: () => {
-                            const cell = document.getElementById(`cell-${step}`);
-                            if(cell) gsap.fromTo(cell, { background: "rgba(255,255,255,0.2)" }, { background: "rgba(255,255,255,0.03)", duration: 0.4 });
-                        }
-                    });
-                });
+                // BACKGROUND HEARTBEAT (Elite Sync)
+                setInterval(() => {
+                    if (isMyTurn && gameActive) window.syncGameState();
+                }, 20000);
 
-                tl.to({}, { duration: 0.3 });
-                const land = path[path.length - 1];
-                if (final !== land) {
-                    tl.to(p, { 
-                        left: () => getPos(final).x, 
-                        top: () => getPos(final).y, 
-                        xPercent: -50, yPercent: -50,
-                        duration: 0.7, ease: "back.inOut",
-                        onStart: () => {
-                            if (final > land) showToast("🪜 Climbing high! ❤️");
-                            else {
-                                showToast("🐍 Oh no! Sliding down... 💔");
-                                gsap.to(".board-wrapper", { x: 5, y: 5, duration: 0.05, repeat: 5, yoyo: true });
-                            }
-                        }
-                    });
-                }
-            }
-
-            function checkWin(who) {
-                const pos = (who === 'me') ? myPos : oppPos;
-                if (pos === 100) {
-                    gameActive = false;
-                    statusText.innerText = (who === 'me') ? "🎉 YOU WON! ❤️" : `💔 ${otherUser} WON!`;
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                }
-            }
-
-            function finishTurn() { isRolling = false; isMyTurn = !isMyTurn; updateTurnUI(); }
-
-            function updateTurnUI() {
-                diceBtn.classList.toggle('disabled', !isMyTurn);
-                statusText.innerText = isMyTurn ? "Your Turn! Roll the dice! 🎲" : `Waiting for ${otherUser}... ⌛`;
-                turnLabel.innerText = isMyTurn ? "Tap to roll!" : "Waiting...";
-            }
-
-            function initGameSync() {
-                if (!window.globalPusher) return setTimeout(initGameSync, 500);
-                const channel = window.globalPusher.subscribe(channelName);
-                channel.bind('snake-roll', (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    if (data.seq <= lastSeq && data.seq !== 0) return; // Prevent old msg replay
-                    lastSeq = data.seq;
-                    diceBtn.innerText = data.dice;
-                    animatePawn('opp', data.path, data.finalPos);
-                });
-                channel.bind('snake-reset', () => location.reload());
-                channel.bind('snake-sync', (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    myPos = data.oppPos; oppPos = data.myPos; isMyTurn = !data.turn;
-                    updatePawnPositions(false); updateTurnUI();
-                });
-            }
-
-            window.syncGameState = async function() {
-                try {
-                    await fetch('/api/games/snake/sync', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ to: otherUser, myPos, oppPos, turn: isMyTurn })
-                    });
-                    showToast("Sync signal sent! 📡");
-                } catch (e) {}
-            };
-
-            window.emergencyReset = async function() {
-                if (!confirm("Reset game for BOTH players?")) return;
-                try {
-                    await fetch('/api/games/snake/reset', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ to: otherUser })
-                    });
-                    location.reload();
-                } catch (e) { location.reload(); }
-            };
-
-            const resizeObserver = new ResizeObserver(() => {
-                cacheAllCoords(); drawSpecials(); updatePawnPositions(false);
-            });
-            resizeObserver.observe(boardEl);
-
-            // BACKGROUND HEARTBEAT (Elite Sync)
-            setInterval(() => {
-                if(isMyTurn && gameActive) window.syncGameState();
-            }, 20000);
-
-            initBoard();
-            initGameSync();
-            updateTurnUI();
-        })();
-    </script>
-</div>
-<%- include('partials/footer') %>
+                initBoard();
+                initGameSync();
+                updateTurnUI();
+            })();
+        </script>
+    </div>
+    <%- include('partials/footer') %>
