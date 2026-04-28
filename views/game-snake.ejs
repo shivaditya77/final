@@ -203,16 +203,17 @@
 
             function initBoard() {
                 boardEl.innerHTML = '';
-                // Generate 100 cells in snake pattern (Boustrophedon)
+                // Generate 100 cells in correct zigzag pattern
                 for (let r = 9; r >= 0; r--) {
-                    if (r % 2 === 1) { // Left to Right
+                    // Even rows (0, 2, 4...) go L-R | Odd rows (1, 3, 5...) go R-L
+                    if (r % 2 === 0) { 
                         for (let c = 0; c < 10; c++) createCell(r, c);
-                    } else { // Right to Left
+                    } else { 
                         for (let c = 9; c >= 0; c--) createCell(r, c);
                     }
                 }
                 updatePawnPositions();
-                setTimeout(drawSpecials, 500);
+                setTimeout(drawSpecials, 800);
             }
 
             function createCell(r, c) {
@@ -244,15 +245,15 @@
                 const opp = getCellPos(oppPos);
                 
                 gsap.to(pawnMe, { left: me.x, top: me.y, duration: 0.5, ease: "power2.out" });
-                gsap.to(pawnOpp, { left: opp.x, top: opp.y, duration: 0.5, ease: "power2.out", delay: 0.1 });
+                gsap.to(pawnOpp, { left: opp.x, top: opp.y, duration: 0.5, ease: "power2.out" });
             }
 
             function drawSpecials() {
                 const rect = boardEl.getBoundingClientRect();
+                if (!rect.width) return;
                 canvas.width = rect.width;
                 canvas.height = rect.height;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.setLineDash([5, 5]);
                 
                 // Draw Ladders
                 ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
@@ -285,57 +286,62 @@
                 diceBtn.classList.add('rolling');
                 diceBtn.innerText = "?";
                 
-                // Fake roll delay
                 setTimeout(async () => {
                     const roll = Math.floor(Math.random() * 6) + 1;
                     diceBtn.classList.remove('rolling');
                     diceBtn.innerText = roll;
                     
+                    // Calculate target first to ensure sync
+                    let target = myPos + roll;
+                    if (target > 100) target = myPos; // overshoot
+                    
+                    // Check for snake/ladder immediately for sync
+                    let finalTarget = target;
+                    if (ladders[target]) finalTarget = ladders[target];
+                    else if (snakes[target]) finalTarget = snakes[target];
+
                     try {
                         await fetch('/api/games/snake/roll', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ dice: roll, to: otherUser })
+                            body: JSON.stringify({ dice: roll, finalPos: finalTarget, to: otherUser })
                         });
                     } catch (e) {}
                     
-                    movePlayer('me', roll);
+                    movePlayer('me', roll, finalTarget);
                 }, 800);
             };
 
-            async function movePlayer(who, roll) {
+            async function movePlayer(who, roll, forcedFinalPos) {
                 let current = who === 'me' ? myPos : oppPos;
                 let target = current + roll;
                 
                 if (target > 100) {
-                    // Stay put if overshoot
                     finishTurn();
                     return;
                 }
 
-                // Animate step by step
+                // Step by step visual move
                 for (let i = current + 1; i <= target; i++) {
                     if (who === 'me') myPos = i; else oppPos = i;
                     updatePawnPositions();
                     await new Promise(r => setTimeout(r, 200));
                 }
 
-                // Check for snake/ladder
-                let finalPos = who === 'me' ? myPos : oppPos;
-                if (ladders[finalPos]) {
-                    showToast("🪜 Up we go! ❤️");
-                    if (who === 'me') myPos = ladders[finalPos]; else oppPos = ladders[finalPos];
-                    updatePawnPositions();
-                } else if (snakes[finalPos]) {
-                    showToast("🐍 Oops! Sliding down... 💔");
-                    if (who === 'me') myPos = snakes[finalPos]; else oppPos = snakes[finalPos];
-                    updatePawnPositions();
-                }
+                // Pause at the landing spot
+                await new Promise(r => setTimeout(r, 400));
+
+                // Apply the "Forced" final position (handles snake/ladder)
+                if (who === 'me') myPos = forcedFinalPos; else oppPos = forcedFinalPos;
+                
+                if (forcedFinalPos > target) showToast("🪜 Up we go! ❤️");
+                else if (forcedFinalPos < target) showToast("🐍 Oops! Sliding down... 💔");
+
+                updatePawnPositions();
 
                 if ((who === 'me' ? myPos : oppPos) === 100) {
                     gameActive = false;
                     statusText.innerText = who === 'me' ? "🎉 YOU WON! ❤️" : `💔 ${otherUser} WON!`;
-                    statusText.style.background = who === 'me' ? "rgba(0, 255, 204, 0.2)" : "rgba(255, 77, 109, 0.2)";
                     return;
                 }
 
@@ -354,7 +360,6 @@
                 turnLabel.innerText = isMyTurn ? "Tap to roll!" : "Waiting...";
             }
 
-            // SYNC LOGIC
             function initGameSync() {
                 if (!window.globalPusher) return setTimeout(initGameSync, 500);
                 const channel = window.globalPusher.subscribe(channelName);
@@ -362,7 +367,7 @@
                 channel.bind('snake-roll', (data) => {
                     if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
                     diceBtn.innerText = data.dice;
-                    movePlayer('opp', data.dice);
+                    movePlayer('opp', data.dice, data.finalPos);
                 });
 
                 channel.bind('snake-reset', (data) => {
@@ -403,7 +408,6 @@
             };
 
             window.addEventListener('resize', drawSpecials);
-            
             initBoard();
             initGameSync();
             updateTurnUI();
