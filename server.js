@@ -922,11 +922,155 @@ app.post("/api/games/dash-duel/move", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.get("/api/games/dash-duel/state", isAuth, async (req, res) => {
+// AUTHORITATIVE CLASSIC LUDO ROUTES
+const getLudoGameId = (u1, u2) => `classic-ludo-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
+const LUDO_TRACK_LENGTH = 52;
+const LUDO_SAFE_ZONES = [[6,1],[1,8],[8,13],[13,6],[6,12],[12,8],[8,2],[2,6]];
+const LUDO_START_INDICES = { 0:0, 1:13, 2:26, 3:39 };
+const LUDO_TRACK = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
+
+app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = getLudoGameId(from, to);
+
+        let game = await GameState.findOne({ gameId });
+        if (!game) {
+            game = new GameState({
+                gameId, gameType: 'ludo',
+                players: [
+                    { username: 'Bhondu', color: 'red', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Bhondu', color: 'blue', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Vishu', color: 'yellow', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Vishu', color: 'green', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) }
+                ],
+                currentPlayerIdx: 0,
+                waitingForMove: false
+            });
+        }
+
+        // Check if it's the player's turn (simplified for 2 users, but 4 colors)
+        const activePlayer = game.players[game.currentPlayerIdx];
+        if (activePlayer.username.toLowerCase() !== from.toLowerCase()) {
+            return res.status(403).json({ error: "Not your turn" });
+        }
+
+        const roll = Math.floor(Math.random() * 6) + 1;
+        game.currentRoll = roll;
+        game.isRolling = false;
+        
+        if (roll === 6) {
+            game.sixCount++;
+            if (game.sixCount === 3) {
+                game.sixCount = 0;
+                game.waitingForMove = false;
+                game.currentPlayerIdx = (game.currentPlayerIdx + 1) % game.players.length;
+                // Keep cycling until we find an active player if needed (but here all 4 are active)
+            } else {
+                game.waitingForMove = true;
+            }
+        } else {
+            game.sixCount = 0;
+            game.waitingForMove = true;
+        }
+
+        game.lastUpdated = Date.now();
+        await game.save();
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", { roll, from, sixCount: game.sixCount, currentPlayerIdx: game.currentPlayerIdx });
+        res.json({ success: true, roll, sixCount: game.sixCount });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ludo/move", isAuth, async (req, res) => {
+    try {
+        const { to, tokenId } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = getLudoGameId(from, to);
+
+        let game = await GameState.findOne({ gameId });
+        if (!game || !game.waitingForMove) return res.status(400).json({ error: "Invalid move" });
+
+        const pIdx = game.currentPlayerIdx;
+        const roll = game.currentRoll;
+        const player = game.players[pIdx];
+        const token = player.tokens.find(t => t.id === tokenId);
+
+        if (!token) return res.status(400).json({ error: "Token not found" });
+
+        // Move Logic
+        let captured = false;
+        if (token.status === 'home') {
+            if (roll !== 6) return res.status(400).json({ error: "Need 6 to move out" });
+            token.status = 'track';
+            token.pathIndex = LUDO_START_INDICES[pIdx];
+        } else if (token.status === 'track') {
+            for (let i=0; i<roll; i++) {
+                token.pathIndex = (token.pathIndex + 1) % 52;
+                if (token.pathIndex === (LUDO_START_INDICES[pIdx] + 51) % 52) {
+                    token.status = 'homerun';
+                    token.pathIndex = 0;
+                    break;
+                }
+            }
+        } else if (token.status === 'homerun') {
+            if (token.pathIndex + roll > 5) return res.status(400).json({ error: "Roll too high" });
+            token.pathIndex += roll;
+            if (token.pathIndex === 5) {
+                token.status = 'finished';
+                player.score++;
+            }
+        }
+
+        // Collision Check (Kills)
+        if (token.status === 'track') {
+            const coord = LUDO_TRACK[token.pathIndex];
+            const isSafe = LUDO_SAFE_ZONES.some(z => z[0] === coord[0] && z[1] === coord[1]);
+            if (!isSafe) {
+                game.players.forEach((opp, oi) => {
+                    if (oi !== pIdx) {
+                        opp.tokens.forEach(ot => {
+                            if (ot.status === 'track' && ot.pathIndex === token.pathIndex) {
+                                ot.status = 'home';
+                                ot.pathIndex = 0;
+                                captured = true;
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        // Extra turn?
+        let nextTurnIdx = (roll === 6 || captured) ? pIdx : (pIdx + 1) % game.players.length;
+        
+        // Handle 2-player mode where each user owns 2 colors
+        // If it's a 2nd turn for the same user but different color, we might need to handle that.
+        // But the game logic in EJS treats all 4 as sequential.
+
+        game.currentPlayerIdx = nextTurnIdx;
+        game.waitingForMove = false;
+        game.lastUpdated = Date.now();
+        await game.save();
+
+        const payload = {
+            from, tokenId, roll,
+            players: game.players,
+            nextTurnIdx,
+            captured
+        };
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-moved", payload);
+        res.json({ success: true, ...payload });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/api/games/ludo/state", isAuth, async (req, res) => {
     try {
         const { otherUser } = req.query;
         const from = req.session.username || "Bhondu";
-        const gameId = getGameId(from, otherUser);
+        const gameId = getLudoGameId(from, otherUser);
         const game = await GameState.findOne({ gameId });
         res.json({ success: true, game });
     } catch (err) { res.status(500).json({ success: false }); }
