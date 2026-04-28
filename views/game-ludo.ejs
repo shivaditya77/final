@@ -275,10 +275,8 @@
             </div>
 
             <div class="settings-bar">
-                <button class="btn-setting" onclick="initGame(2)">2 Players</button>
-                <button class="btn-setting" onclick="initGame(3)">3 Players</button>
-                <button class="btn-setting" onclick="initGame(4)">4 Players</button>
-                <button class="btn-setting" onclick="initGame(playerCount)">🔄 Restart</button>
+                <button class="btn-setting" onclick="window.requestReset()">🔄 Restart Game</button>
+                <button class="btn-setting" onclick="location.reload()">🔄 Force Refresh</button>
             </div>
         </div>
     </div>
