@@ -706,6 +706,25 @@ app.post("/api/games/heart-seeker/reset", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+app.post("/api/games/heart-seeker/sync-request", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        // Send to the other user's notification channel
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-sync-request", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/heart-seeker/sync-response", isAuth, async (req, res) => {
+    try {
+        const { to, phase, isReady } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger("private-notifications-" + to.toLowerCase(), "heart-seeker-sync-response", { from, phase, isReady });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // API for Stone Paper Scissors sync
 app.post("/api/games/sps/move", isAuth, async (req, res) => {
     try {

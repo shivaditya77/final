@@ -68,17 +68,20 @@
             position: relative;
             width: 100%;
             padding-bottom: 100%; /* Force perfect square */
-            background: rgba(255, 255, 255, 0.05); /* Visible even when empty */
+            min-height: 50px; /* HEAVY DUTY: Prevent collapse */
+            background: rgba(255, 255, 255, 0.06); 
             border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             overflow: hidden;
-            display: block; /* Ensure it takes space */
+            display: block;
         }
         .cell:hover:not(.taken) {
-            background: rgba(139, 92, 246, 0.1);
-            border-color: rgba(139, 92, 246, 0.4);
+            background: rgba(139, 92, 246, 0.15);
+            border-color: #a78bfa;
+            transform: scale(1.05);
+            z-index: 2;
         }
         .cell-content {
             position: absolute;
@@ -89,9 +92,9 @@
             font-size: 1.5rem;
             line-height: 1;
         }
-        .cell.hidden-heart { background: rgba(139, 92, 246, 0.2); border-color: #a78bfa; }
-        .cell.hit { background: rgba(255, 77, 109, 0.3); border-color: #ff4d6d; color: #ff4d6d; }
-        .cell.miss { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.4); }
+        .cell.hidden-heart { background: rgba(139, 92, 246, 0.3); border-color: #a78bfa; }
+        .cell.hit { background: rgba(255, 77, 109, 0.3); border-color: #ff4d6d; color: #ff4d6d; box-shadow: inset 0 0 15px rgba(255, 77, 109, 0.2); }
+        .cell.miss { background: rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.4); }
         .cell.taken { cursor: default; }
         
         .controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
@@ -146,7 +149,7 @@
                 </div>
 
                 <!-- OPPONENT GRID -->
-                <div class="grid-wrapper" id="opponent-grid-wrapper" style="opacity: 0.3; pointer-events: none;">
+                <div class="grid-wrapper" id="opponent-grid-wrapper" style="opacity: 0.2; pointer-events: none; transition: all 0.5s;">
                     <div class="grid-title"><%= otherUser %>'s Grid (Attack!)</div>
                     <div class="grid" id="opponent-grid">
                         <% for(let i=0; i<25; i++) { %>
@@ -160,7 +163,10 @@
 
             <div class="controls">
                 <button class="btn-ready" id="ready-btn" onclick="window.sendReady()" disabled>I'm Ready! 🚀</button>
-                <button class="btn-emergency" onclick="window.emergencyReset()">🔄 Stuck? Emergency Game Reset</button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-emergency" onclick="window.syncPhase()" style="border-color: #a78bfa; color: #a78bfa;">🔄 Sync Game</button>
+                    <button class="btn-emergency" onclick="window.emergencyReset()">🛑 Emergency Reset</button>
+                </div>
             </div>
         </div>
     </div>
@@ -199,15 +205,34 @@
                     console.log("🎮 Heart Seeker Ready:", data);
                     otherReady = true;
                     if (phase === 2) {
-                        startGame(true); // If I'm already waiting, start and tell them
+                        startGame(true); 
                     } else {
                         showToast(otherUser + " is ready! 🚀");
                     }
                 });
 
+                channel.bind('heart-seeker-sync-request', async (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    try {
+                        await fetch('/api/games/heart-seeker/sync-response', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: otherUser, phase, isReady: (phase >= 2) })
+                        });
+                    } catch (e) {}
+                });
+
+                channel.bind('heart-seeker-sync-response', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    console.log("🔄 Sync Response:", data);
+                    if (data.isReady) otherReady = true;
+                    if (phase === 2 && otherReady) startGame(true);
+                    if (data.phase === 3 && phase < 3) startGame(false);
+                });
+
                 channel.bind('heart-seeker-start', (data) => {
                     console.log("🎮 Heart Seeker Force Start:", data);
-                    if (phase < 3) startGame(false); // Start without rebroadcasting
+                    if (phase < 3) startGame(false);
                 });
 
                 channel.bind('heart-seeker-attack', async (data) => {
@@ -377,6 +402,19 @@
                     updateTurnUI();
                 }
             }
+
+            window.syncPhase = async function() {
+                const btn = document.querySelector('button[onclick="window.syncPhase()"]');
+                btn.innerText = "⌛ Syncing...";
+                try {
+                    await fetch('/api/games/heart-seeker/sync-request', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser })
+                    });
+                    setTimeout(() => { btn.innerText = "🔄 Sync Game"; }, 2000);
+                } catch (e) { btn.innerText = "❌ Error"; }
+            };
 
             window.emergencyReset = async function() {
                 if (!confirm("This will reload the game for BOTH players. Continue?")) return;
