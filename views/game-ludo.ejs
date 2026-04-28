@@ -134,7 +134,7 @@
                     <div id="status-text" style="margin: 15px 0; font-weight: 600; color: #aaa;">Roll to start!</div>
                     <div class="player-list" id="player-list-ui"></div>
                 </div>
-                <button class="roll-btn" style="background: rgba(255,255,255,0.05);" onclick="location.reload()">🔄 New Game</button>
+                <button class="roll-btn" style="background: rgba(255,255,255,0.05);" onclick="requestReset()">🔄 New Game</button>
             </div>
         </div>
     </div>
@@ -193,7 +193,7 @@
                 gameMode = mode;
                 document.getElementById('mode-1').classList.toggle('selected', mode === '1-color');
                 document.getElementById('mode-2').classList.toggle('selected', mode === '2-colors');
-                if (isBhondu) syncMove({ type: 'select-mode', mode });
+                if (!window.isRemoteSync) syncMove({ type: 'select-mode', mode });
             };
 
             window.startGame = function(isRemote = false) {
@@ -209,7 +209,7 @@
                 initTokens();
                 createBoard();
                 updateUI();
-                if (isBhondu && !isRemote) syncMove({ type: 'start-game' });
+                if (!isRemote) syncMove({ type: 'start-game' });
             };
 
             function initTokens() {
@@ -502,16 +502,18 @@
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
                 channel.bind('ludo-move', async (data) => {
                     if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    
+                    window.isRemoteSync = true;
                     if (data.type === 'select-mode') selectMode(data.mode);
                     else if (data.type === 'start-game') startGame(true);
                     else if (data.type === 'roll') { performRoll(data.dice); sixCount = data.sixCount; }
                     else if (data.type === 'move') {
                         const token = players[currentPlayer].tokens.find(t => t.id === data.tokenId);
-                        window.isRemoteSync = true;
                         await handleTokenClick(token);
-                        window.isRemoteSync = false;
                     }
+                    window.isRemoteSync = false;
                 });
+                channel.bind('ludo-reset', () => location.reload());
             }
 
             async function syncMove(data) {
@@ -522,6 +524,17 @@
                         body: JSON.stringify({ ...data, to: otherUser })
                     });
                 } catch (e) {}
+            }
+
+            async function requestReset() {
+                try {
+                    await fetch('/api/games/ludo/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: otherUser })
+                    });
+                } catch (e) {}
+                location.reload();
             }
 
             selectMode('1-color');
