@@ -87,33 +87,41 @@
         .token-green { background: radial-gradient(circle at 30% 30%, #43e97b, #00a86b); }
 
         .game-controls { flex: 1; max-width: 400px; display: flex; flex-direction: column; gap: 20px; }
-        .status-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 32px; padding: 25px; text-align: center; backdrop-filter: blur(20px); }
+        .status-card { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 32px; padding: 25px; text-align: center; backdrop-filter: blur(20px); position: relative; }
         .dice-box { width: 80px; height: 80px; background: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #1a1a1a; cursor: pointer; box-shadow: 0 15px 35px rgba(0,0,0,0.4); margin: 20px auto; }
-        .roll-btn { background: linear-gradient(135deg, #6e45e2, #88d3ce); border: none; color: white; padding: 14px 35px; border-radius: 50px; font-weight: 800; width: 100%; cursor: pointer; }
-        .roll-btn:disabled { opacity: 0.4; }
+        .dice-box.rolling { animation: shake 0.3s infinite; }
+        @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(10deg); } 75% { transform: rotate(-10deg); } }
 
-        .player-item { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 12px 20px; border-radius: 18px; margin-bottom: 8px; }
-        .player-item.active { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); transform: scale(1.02); }
+        .roll-btn { background: linear-gradient(135deg, #6e45e2, #88d3ce); border: none; color: white; padding: 14px 35px; border-radius: 50px; font-weight: 800; width: 100%; cursor: pointer; transition: 0.3s; }
+        .roll-btn:disabled { opacity: 0.4; pointer-events: none; }
+        .roll-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(110,69,226,0.3); }
+
+        .player-item { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 12px 20px; border-radius: 18px; margin-bottom: 8px; border: 1px solid transparent; transition: 0.3s; }
+        .player-item.active { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); transform: scale(1.02); }
         .p-color { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+        
+        .presence-indicator { position: absolute; top: 15px; right: 20px; font-size: 0.7rem; display: flex; align-items: center; gap: 5px; opacity: 0.6; }
+        .presence-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d6d; }
+        .presence-dot.online { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
     </style>
 
     <div id="setup-modal">
         <div class="setup-content">
-            <h1 style="font-weight: 800; font-size: 2rem; margin-bottom: 10px;">Select Game Mode</h1>
-            <p style="opacity: 0.6;">Choose how many colors each player controls</p>
+            <h1 style="font-weight: 800; font-size: 2.2rem; margin-bottom: 10px; background: linear-gradient(135deg, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Ludo Elite</h1>
+            <p style="opacity: 0.6; margin-bottom: 30px;">Choose your strategy. Conquer the board.</p>
             
             <div class="mode-options">
-                <div class="mode-card" id="mode-1" onclick="selectMode('1-color')">
-                    <span class="mode-title">1 Color Each</span>
+                <div class="mode-card selected" id="mode-1" onclick="selectMode('1-color')">
+                    <span class="mode-title">Duel Mode</span>
                     <p class="mode-desc">Bhondu (Red) vs Vishu (Yellow)</p>
                 </div>
                 <div class="mode-card" id="mode-2" onclick="selectMode('2-colors')">
-                    <span class="mode-title">2 Colors Each</span>
-                    <p class="mode-desc">Bhondu (Red, Blue) vs Vishu (Yellow, Green)</p>
+                    <span class="mode-title">Strategic Duel</span>
+                    <p class="mode-desc">Bhondu (Red/Blue) vs Vishu (Yellow/Green)</p>
                 </div>
             </div>
 
-            <button class="roll-btn" style="margin-top: 30px; font-size: 1.1rem;" onclick="startGame()">START GAME</button>
+            <button class="roll-btn" style="margin-top: 40px; font-size: 1.2rem; padding: 18px;" onclick="startGame()">ENTER ARENA</button>
         </div>
     </div>
 
@@ -128,23 +136,29 @@
 
             <div class="game-controls">
                 <div class="status-card">
-                    <div id="turn-badge" class="current-turn-badge" style="padding: 10px 20px; border-radius: 50px; font-weight: 800; margin-bottom: 15px; display: inline-block;">Red's Turn</div>
+                    <div class="presence-indicator">
+                        <div class="presence-dot" id="presence-dot"></div>
+                        <span id="presence-text"><%= otherUser %> Offline</span>
+                    </div>
+                    <div id="turn-badge" style="padding: 10px 25px; border-radius: 50px; font-weight: 800; margin-bottom: 20px; display: inline-block; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; box-shadow: 0 10px 20px rgba(0,0,0,0.3);">Waiting...</div>
                     <div class="dice-box" id="dice" onclick="handleRollClick()">🎲</div>
                     <button class="roll-btn" id="roll-btn" onclick="handleRollClick()">ROLL DICE</button>
-                    <div id="status-text" style="margin: 15px 0; font-weight: 600; color: #aaa;">Roll to start!</div>
-                    <div class="player-list" id="player-list-ui"></div>
+                    <div id="status-text" style="margin: 20px 0; font-weight: 600; color: #fff; font-size: 1.1rem; min-height: 1.5em;">Ready to Play?</div>
+                    <div class="player-list" id="player-list-ui" style="margin-top: 10px;"></div>
                 </div>
-                <button class="roll-btn" style="background: rgba(255,255,255,0.05);" onclick="requestReset()">🔄 New Game</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="roll-btn" style="background: rgba(255,255,255,0.05); flex:1;" onclick="requestReset()">🔄 Reset</button>
+                    <button class="roll-btn" style="background: rgba(255,255,255,0.05); flex:1;" onclick="syncBoardState()">📡 Force Sync</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Win Modal -->
-    <div id="win-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:4000; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
-        <div class="modal-content" style="background:#1a1a1a; padding:40px; border-radius:32px; text-align:center; border:1px solid rgba(255,255,255,0.1);">
-            <h2 id="win-title" style="font-size:2.5rem; background:linear-gradient(to right, #ff4d6d, #ffd700); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Victory! 🏆</h2>
-            <p id="win-desc" style="margin:20px 0; font-size:1.2rem;">Player has won!</p>
-            <button class="roll-btn" onclick="location.reload()">Play Again</button>
+    <div id="win-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:4000; align-items:center; justify-content:center; backdrop-filter:blur(15px);">
+        <div class="modal-content" style="background:linear-gradient(145deg, #1a1a1a, #0a0a0a); padding:50px; border-radius:40px; text-align:center; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 50px 100px rgba(0,0,0,0.8);">
+            <h2 id="win-title" style="font-size:3.5rem; background:linear-gradient(to right, #ff4d6d, #ffd700); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight: 900;">Victory! 🏆</h2>
+            <p id="win-desc" style="margin:30px 0; font-size:1.4rem; color: #fff; opacity: 0.8;">The board has a new king.</p>
+            <button class="roll-btn" style="padding: 18px 50px; font-size: 1.2rem;" onclick="location.reload()">PLAY AGAIN</button>
         </div>
     </div>
 
@@ -158,22 +172,10 @@
         (function() {
             const username = "<%= username %>";
             const otherUser = "<%= otherUser %>";
-            const isBhondu = username.toLowerCase() === 'bhondu';
-            
-            let gameMode = '1-color';
-            let activePlayerIndices = [0, 2]; // 0:Red, 1:Blue, 2:Yellow, 3:Green
-
-            const TRACK = [
-                [6,1],[6,2],[6,3],[6,4],[6,5], [5,6],[4,6],[3,6],[2,6],[1,6],[0,6], [0,7],[0,8], [1,8],[2,8],[3,8],[4,8],[5,8], [6,9],[6,10],[6,11],[6,12],[6,13],[6,14], [7,14],[8,14], [8,13],[8,12],[8,11],[8,10],[8,9], [9,8],[10,8],[11,8],[12,8],[13,8],[14,8], [14,7],[14,6], [13,6],[12,6],[11,6],[10,6],[9,6], [8,5],[8,4],[8,3],[8,2],[8,1],[8,0], [7,0],[6,0]
-            ];
-            const SAFE_ZONES = [[6,1], [1,8], [8,13], [13,6], [6,12], [12,8], [8,2], [2,6]];
-            const HOME_RUNS = {
-                0: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
-                1: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
-                2: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
-                3: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
-            };
-            const START_INDICES = { 0: 0, 1: 13, 2: 26, 3: 39 };
+            const TRACK = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
+            const SAFE_ZONES = [[6,1],[1,8],[8,13],[13,6],[6,12],[12,8],[8,2],[2,6]];
+            const HOME_RUNS = { 0:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]], 1:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]], 2:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]], 3:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]] };
+            const START_INDICES = { 0:0, 1:13, 2:26, 3:39 };
 
             let players = [
                 { id: 0, owner: 'Bhondu', name: 'Bhondu (Red)', color: 'red', score: 0, tokens: [], active: true },
@@ -182,444 +184,228 @@
                 { id: 3, owner: 'Vishu', name: 'Vishu (Green)', color: 'green', score: 0, tokens: [], active: false }
             ];
 
-            let currentPlayer = 0;
-            let currentRoll = 0;
-            let sixCount = 0;
-            let isRolling = false;
-            let waitingForMove = false;
-            let gameActive = false;
-            let rollResolve = null;
-            let rollPromise = null;
-            let lastSeq = 0;
+            let state = {
+                gameActive: false, gameMode: '1-color', currentPlayer: 0, currentRoll: 0, sixCount: 0,
+                isRolling: false, waitingForMove: false, activeIndices: [0, 2], lastSeq: 0
+            };
 
-            window.selectMode = function(mode) {
-                gameMode = mode;
+            let rollPromise = null, rollResolve = null;
+            let messageQueue = [];
+            let isProcessingQueue = false;
+
+            // UI HELPERS
+            const setStatus = (txt) => { document.getElementById('status-text').innerText = txt; };
+            const playSound = (id) => { const s = document.getElementById(`sound-${id}`); if(s) { s.currentTime=0; s.play().catch(()=>{}); } };
+
+            window.selectMode = (mode) => {
+                state.gameMode = mode;
                 document.getElementById('mode-1').classList.toggle('selected', mode === '1-color');
                 document.getElementById('mode-2').classList.toggle('selected', mode === '2-colors');
-                if (!window.isRemoteSync) syncMove({ type: 'select-mode', mode });
+                syncMove({ type: 'select-mode', mode });
             };
 
-            window.startGame = function(isRemote = false) {
-                if (gameMode === '2-colors') {
-                    players[1].active = true; players[3].active = true;
-                    activePlayerIndices = [0, 1, 2, 3];
+            window.startGame = (isRemote = false) => {
+                if (state.gameMode === '2-colors') {
+                    players[1].active = players[3].active = true; state.activeIndices = [0, 1, 2, 3];
                 } else {
-                    players[1].active = false; players[3].active = false;
-                    activePlayerIndices = [0, 2];
+                    players[1].active = players[3].active = false; state.activeIndices = [0, 2];
                 }
                 document.getElementById('setup-modal').style.display = 'none';
-                gameActive = true;
-                initTokens();
-                createBoard();
-                updateUI();
-                if (!isRemote) {
-                    syncMove({ type: 'start-game', mode: gameMode });
-                    setTimeout(syncBoardState, 1000);
-                }
+                state.gameActive = true;
+                initBoard(); updateUI();
+                if (!isRemote) { syncMove({ type: 'start-game', mode: state.gameMode }); setTimeout(syncBoardState, 1000); }
             };
 
-            function initTokens() {
+            function initBoard() {
+                const boardEl = document.getElementById('ludo-board'); boardEl.innerHTML = '';
+                const cells = {};
+                for (let r=0; r<15; r++) for (let c=0; c<15; c++) {
+                    const cell = document.createElement('div'); cell.className='cell'; cell.id=`cell-${r}-${c}`; boardEl.appendChild(cell); cells[`${r}-${c}`]=cell;
+                }
                 players.forEach(p => {
                     p.tokens = [];
-                    for (let i = 0; i < 4; i++) {
-                        p.tokens.push({ id: i, playerIdx: p.id, status: 'home', pos: -1, el: null });
+                    for (let i=0; i<4; i++) p.tokens.push({ id:i, playerIdx:p.id, status:'home', pos:-1, el:null });
+                    const base = document.createElement('div'); base.className=`home-base ${p.color}-home`; if(!p.active) base.style.opacity='0.2';
+                    const inner = document.createElement('div'); inner.className='home-inner';
+                    for (let i=0; i<4; i++) {
+                        const slot = document.createElement('div'); slot.className='token-slot'; slot.id=`slot-${p.color}-${i}`;
+                        const t = p.tokens[i];
+                        const tEl = document.createElement('div'); tEl.className=`token token-${p.color}`; tEl.innerText=i+1;
+                        tEl.onclick = () => handleTokenClick(t); t.el = tEl; slot.appendChild(tEl); inner.appendChild(slot);
                     }
+                    boardEl.appendChild(base);
                 });
-            }
-
-            function createBoard() {
-                const boardEl = document.getElementById('ludo-board');
-                boardEl.innerHTML = '';
-                const cells = {};
-
-                for (let r = 0; r < 15; r++) {
-                    for (let c = 0; c < 15; c++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'cell'; cell.id = `cell-${r}-${c}`;
-                        boardEl.appendChild(cell);
-                        cells[`${r}-${c}`] = cell;
-                    }
-                }
-
-                const bases = [
-                    { id: 0, cls: 'red-home' }, { id: 1, cls: 'blue-home' },
-                    { id: 2, cls: 'yellow-home' }, { id: 3, cls: 'green-home' }
-                ];
-                bases.forEach(b => {
-                    const base = document.createElement('div');
-                    base.className = `home-base ${b.cls}`;
-                    if (!players[b.id].active) base.style.opacity = '0.2';
-                    const inner = document.createElement('div'); inner.className = 'home-inner';
-                    for (let i = 0; i < 4; i++) {
-                        const slot = document.createElement('div'); slot.className = 'token-slot';
-                        slot.id = `slot-${players[b.id].color}-${i}`;
-                        inner.appendChild(slot);
-                    }
-                    base.appendChild(inner); boardEl.appendChild(base);
-                });
-
-                const center = document.createElement('div');
-                center.className = 'center-home';
-                center.innerHTML = `<div class="center-triangle tri-red"></div><div class="center-triangle tri-blue"></div><div class="center-triangle tri-yellow"></div><div class="center-triangle tri-green"></div><div class="center-inner">🏠</div>`;
+                const center = document.createElement('div'); center.className='center-home';
+                center.innerHTML=`<div class="center-triangle tri-red"></div><div class="center-triangle tri-blue"></div><div class="center-triangle tri-yellow"></div><div class="center-triangle tri-green"></div><div class="center-inner">🏠</div>`;
                 boardEl.appendChild(center);
-
-                TRACK.forEach(coord => cells[`${coord[0]}-${coord[1]}`].classList.add('path-cell'));
-                players.forEach(p => {
-                    if (p.active) {
-                        HOME_RUNS[p.id].forEach(coord => cells[`${coord[0]}-${coord[1]}`].classList.add(`${p.color}-path`));
-                        p.tokens.forEach((t, i) => {
-                            const tokenEl = document.createElement('div');
-                            tokenEl.className = `token token-${p.color}`; tokenEl.innerText = t.id + 1;
-                            tokenEl.onclick = () => handleTokenClick(t); t.el = tokenEl;
-                            document.getElementById(`slot-${p.color}-${i}`).appendChild(tokenEl);
-                        });
-                    }
-                });
-                SAFE_ZONES.forEach(coord => cells[`${coord[0]}-${coord[1]}`].classList.add('star-cell'));
+                TRACK.forEach(c => cells[`${c[0]}-${c[1]}`].classList.add('path-cell'));
+                SAFE_ZONES.forEach(c => cells[`${c[0]}-${c[1]}`].classList.add('star-cell'));
+                players.forEach(p => { if(p.active) HOME_RUNS[p.id].forEach(c => cells[`${c[0]}-${c[1]}`].classList.add(`${p.color}-path`)); });
                 renderPlayerList();
             }
 
             function renderPlayerList() {
-                const listUi = document.getElementById('player-list-ui');
-                listUi.innerHTML = players.filter(p => p.active).map(p => `
+                document.getElementById('player-list-ui').innerHTML = players.filter(p => p.active).map(p => `
                     <div class="player-item" id="p-item-${p.id}">
                         <div style="display:flex; align-items:center; gap:10px;">
                             <div class="p-color" style="background:var(--${p.color});"></div>
-                            <span style="font-weight:600; font-size:0.9rem;">${p.name}</span>
+                            <span style="font-weight:700;">${p.name}</span>
                         </div>
-                        <span id="p-score-${p.id}" style="font-weight:800;">${p.score}/4</span>
+                        <span id="p-score-${p.id}" style="font-weight:900; font-size:1.1rem;">${p.score}/4</span>
                     </div>
                 `).join('');
             }
 
             function updateUI() {
-                const turnBadge = document.getElementById('turn-badge');
-                const p = players[currentPlayer];
+                const p = players[state.currentPlayer];
                 const isMyTurn = p.owner.toLowerCase() === username.toLowerCase();
-
-                turnBadge.innerText = `${p.name}'s Turn`;
-                turnBadge.style.background = `var(--${p.color})`;
-                document.getElementById('roll-btn').disabled = !isMyTurn || isRolling || waitingForMove;
-                document.querySelectorAll('.player-item').forEach((el, idx) => {
-                    const pid = parseInt(el.id.split('-')[2]);
-                    el.classList.toggle('active', pid === currentPlayer);
+                const badge = document.getElementById('turn-badge');
+                badge.innerText = isMyTurn ? "Your Turn" : `${p.name}'s Turn`;
+                badge.style.background = `var(--${p.color})`;
+                document.getElementById('roll-btn').disabled = !isMyTurn || state.isRolling || state.waitingForMove;
+                document.querySelectorAll('.player-item').forEach(el => {
+                    const pid = parseInt(el.id.split('-')[2]); el.classList.toggle('active', pid === state.currentPlayer);
                 });
-
                 document.querySelectorAll('.token').forEach(el => el.classList.remove('active-turn'));
-                if (isMyTurn && waitingForMove) {
-                    const movable = getMovableTokens(currentPlayer, currentRoll);
+                if (isMyTurn && state.waitingForMove) {
+                    const movable = getMovableTokens(state.currentPlayer, state.currentRoll);
                     movable.forEach(t => t.el.classList.add('active-turn'));
-                    if (movable.length === 0) { setStatus("No moves! 😅"); setTimeout(nextTurn, 1000); }
+                    if (movable.length === 0) { setStatus("No moves! 😅"); setTimeout(() => nextTurn(), 1000); }
                 }
             }
 
-            function setStatus(txt) { document.getElementById('status-text').innerText = txt; }
-
-            window.handleRollClick = async function() {
-                const p = players[currentPlayer];
-                if (!gameActive || isRolling || waitingForMove || p.owner.toLowerCase() !== username.toLowerCase()) return;
+            window.handleRollClick = () => {
+                if (!state.gameActive || state.isRolling || state.waitingForMove || players[state.currentPlayer].owner.toLowerCase() !== username.toLowerCase()) return;
                 performRoll();
             };
 
-            function performRoll(remoteValue = null) {
-                isRolling = true;
+            function performRoll(remoteVal = null) {
+                state.isRolling = true;
                 rollPromise = new Promise(resolve => rollResolve = resolve);
                 const diceEl = document.getElementById('dice'); diceEl.classList.add('rolling'); playSound('roll');
                 let rollVal;
-                let rollInterval = setInterval(() => { diceEl.innerText = getDiceEmoji(Math.floor(Math.random() * 6) + 1); }, 80);
-
+                let interval = setInterval(() => diceEl.innerText = ['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)], 80);
                 setTimeout(() => {
-                    clearInterval(rollInterval);
-                    rollVal = remoteValue || Math.floor(Math.random() * 6) + 1;
-                    diceEl.innerText = getDiceEmoji(rollVal); diceEl.classList.remove('rolling');
-                    isRolling = false; currentRoll = rollVal;
-
+                    clearInterval(interval);
+                    rollVal = remoteVal || Math.floor(Math.random()*6)+1;
+                    diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][rollVal]; diceEl.classList.remove('rolling');
+                    state.isRolling = false; state.currentRoll = rollVal;
                     if (rollVal === 6) {
-                        sixCount++;
-                        if (sixCount === 3) {
-                            setStatus("3 Sixes! Turn Cancelled! 🚫"); sixCount = 0;
-                            if (!remoteValue) syncMove({ type: 'roll', dice: rollVal, sixCount: 3 });
-                            setTimeout(nextTurn, 1500); 
-                            rollResolve();
-                            return;
+                        state.sixCount++;
+                        if (state.sixCount === 3) {
+                            setStatus("Triple Six! Lost Turn! 🚫"); state.sixCount = 0;
+                            if (!remoteVal) syncMove({ type:'roll', dice:rollVal, sixCount:3 });
+                            setTimeout(() => nextTurn(), 1500); rollResolve(); return;
                         }
-                    } else { sixCount = 0; }
-
-                    waitingForMove = true;
-                    if (!remoteValue) syncMove({ type: 'roll', dice: rollVal, sixCount });
-                    updateUI();
-                    rollResolve();
+                    } else state.sixCount = 0;
+                    state.waitingForMove = true;
+                    if (!remoteVal) syncMove({ type:'roll', dice:rollVal, sixCount:state.sixCount });
+                    updateUI(); rollResolve();
                 }, 800);
-            }
-
-            function getDiceEmoji(v) { return ['','⚀','⚁','⚂','⚃','⚄','⚅'][v]; }
-
-            function getMovableTokens(pIdx, roll) {
-                const p = players[pIdx];
-                return p.tokens.filter(t => {
-                    if (t.status === 'finished') return false;
-                    if (t.status === 'home') return roll === 6;
-                    if (t.status === 'homerun') return (t.pos + roll) <= 5;
-                    let currentPos = t.pos;
-                    for (let step = 1; step <= roll; step++) {
-                        let nextPos = (currentPos + step) % 52;
-                        if (checkIsBlocked(pIdx, nextPos)) return false;
-                    }
-                    return true;
-                });
-            }
-
-            function checkIsBlocked(myIdx, trackIdx) {
-                for (let oppIdx = 0; oppIdx < 4; oppIdx++) {
-                    if (oppIdx === myIdx) continue;
-                    const tokensOnCell = players[oppIdx].tokens.filter(t => t.status === 'track' && t.pos === trackIdx);
-                    if (tokensOnCell.length >= 2) return true;
-                }
-                return false;
             }
 
             async function handleTokenClick(token) {
                 if (rollPromise) await rollPromise;
-                if (!waitingForMove || token.playerIdx !== currentPlayer) return;
-                const p = players[currentPlayer];
-                if (p.owner.toLowerCase() !== username.toLowerCase() && !window.isRemoteSync) return;
-
-                const movable = getMovableTokens(currentPlayer, currentRoll);
+                if (!state.waitingForMove || token.playerIdx !== state.currentPlayer) return;
+                if (!window.isRemoteProcessing && players[state.currentPlayer].owner.toLowerCase() !== username.toLowerCase()) return;
+                
+                const movable = getMovableTokens(state.currentPlayer, state.currentRoll);
                 if (!movable.includes(token)) return;
 
-                waitingForMove = false;
-                const captured = await moveToken(token, currentRoll);
-                
-                if (gameActive) {
-                    if (!window.isRemoteSync) {
-                        if (currentRoll === 6 || captured) { 
-                            setStatus(captured ? "Captured! Extra turn! ⚔️" : "Roll again! 🔥"); 
-                            syncMove({ type: 'move', tokenId: token.id, nextTurnIdx: currentPlayer });
-                            updateUI(); 
-                        } else { 
-                            const nextIdx = getNextTurnIdx();
-                            syncMove({ type: 'move', tokenId: token.id, nextTurnIdx: nextIdx });
-                            nextTurn(nextIdx); 
-                        }
+                state.waitingForMove = false;
+                const captured = await moveToken(token, state.currentRoll);
+                if (state.gameActive) {
+                    if (!window.isRemoteProcessing) {
+                        const nextIdx = (state.currentRoll === 6 || captured) ? state.currentPlayer : getNextTurnIdx();
+                        if (captured) setStatus("Captured! Extra Turn! ⚔️");
+                        syncMove({ type:'move', tokenId:token.id, nextTurnIdx:nextIdx });
+                        nextTurn(nextIdx);
                     } else {
-                        // Remote sync: update UI but don't advance turn here; initSync will force it
-                        if (currentRoll === 6 || captured) setStatus(captured ? "Captured! Extra turn! ⚔️" : "Roll again! 🔥");
+                        if (captured) setStatus("Captured! Extra Turn! ⚔️");
                         updateUI();
                     }
                 }
             }
 
             async function moveToken(token, roll) {
-                const player = players[token.playerIdx];
+                const p = players[token.playerIdx];
                 let captured = false;
-
                 if (token.status === 'home') {
                     token.status = 'track'; token.pos = START_INDICES[token.playerIdx];
                     await animateToCell(token, TRACK[token.pos]); playSound('move');
                 } else {
-                    for (let i = 0; i < roll; i++) {
+                    for (let i=0; i<roll; i++) {
                         if (token.status === 'track') {
                             token.pos = (token.pos + 1) % 52;
-                            const exitIdx = (START_INDICES[token.playerIdx] + 50) % 52;
-                            if (token.pos === (exitIdx + 1) % 52) { token.status = 'homerun'; token.pos = 0; }
-                        } else if (token.status === 'homerun') { token.pos++; }
+                            if (token.pos === (START_INDICES[token.playerIdx] + 50) % 52 + 1) { token.status='homerun'; token.pos=0; }
+                        } else if (token.status === 'homerun') token.pos++;
                         const coord = token.status === 'track' ? TRACK[token.pos] : HOME_RUNS[token.playerIdx][token.pos];
                         await animateToCell(token, coord); playSound('move');
                         if (token.status === 'homerun' && token.pos === 5) {
-                            token.status = 'finished'; player.score++;
-                            document.getElementById(`p-score-${player.id}`).innerText = `${player.score}/4`;
-                            gsap.to(token.el, { scale: 0, opacity: 0, duration: 0.5 });
-                            if (player.score === 4) showWinner(player.id);
+                            token.status = 'finished'; p.score++;
+                            document.getElementById(`p-score-${p.id}`).innerText = `${p.score}/4`;
+                            gsap.to(token.el, { scale:0, opacity:0, duration:0.5 });
+                            if (p.score === 4) showWinner(p.id);
                             break;
                         }
                     }
                 }
-
-                if (token.status === 'track') {
-                    const coord = TRACK[token.pos];
-                    const isSafe = SAFE_ZONES.some(z => z[0] === coord[0] && z[1] === coord[1]);
-                    if (!isSafe) {
-                        players.forEach(opp => {
-                            if (opp.id !== token.playerIdx) {
-                                opp.tokens.forEach(t => {
-                                    if (t.status === 'track' && t.pos === token.pos) {
-                                        sendHome(t); captured = true;
-                                    }
-                                });
-                            }
-                        });
-                    }
+                if (token.status === 'track' && !SAFE_ZONES.some(z => z[0]===TRACK[token.pos][0] && z[1]===TRACK[token.pos][1])) {
+                    players.forEach(opp => { if(opp.id !== token.playerIdx) opp.tokens.forEach(t => {
+                        if (t.status === 'track' && t.pos === token.pos) { sendHome(t); captured = true; }
+                    }); });
                 }
-                updateStackedTokens();
-                return captured;
+                updateStackedTokens(); return captured;
             }
 
             function sendHome(token) {
                 token.status = 'home'; token.pos = -1; playSound('kick');
-                const p = players[token.playerIdx];
-                const slot = document.getElementById(`slot-${p.color}-${token.id}`);
-                gsap.to(token.el, { x: 0, y: 0, scale: 1.5, duration: 0.3, onComplete: () => { slot.appendChild(token.el); gsap.to(token.el, { scale: 1, duration: 0.2 }); updateStackedTokens(); } });
+                const slot = document.getElementById(`slot-${players[token.playerIdx].color}-${token.id}`);
+                gsap.to(token.el, { x:0, y:0, scale:1.5, duration:0.4, onComplete: () => { slot.appendChild(token.el); gsap.to(token.el, { scale:1, duration:0.2 }); updateStackedTokens(); } });
             }
 
             function animateToCell(token, coord) {
-                return new Promise(resolve => {
+                return new Promise(r => {
                     const cell = document.getElementById(`cell-${coord[0]}-${coord[1]}`);
-                    const oldRect = token.el.getBoundingClientRect();
-                    cell.appendChild(token.el);
-                    const newRect = token.el.getBoundingClientRect();
-                    gsap.fromTo(token.el, { x: oldRect.left - newRect.left, y: oldRect.top - newRect.top }, { x: 0, y: 0, duration: 0.2, ease: "power1.out", onComplete: resolve });
+                    const old = token.el.getBoundingClientRect(); cell.appendChild(token.el);
+                    const cur = token.el.getBoundingClientRect();
+                    gsap.fromTo(token.el, { x:old.left-cur.left, y:old.top-cur.top }, { x:0, y:0, duration:0.2, onComplete:r });
                 });
             }
 
             function updateStackedTokens() {
-                const cellMap = new Map();
-                players.forEach(p => {
-                    if (p.active) {
-                        p.tokens.forEach(t => {
-                            if (t.status === 'track' || t.status === 'homerun') {
-                                const coord = t.status === 'track' ? TRACK[t.pos] : HOME_RUNS[t.playerIdx][t.pos];
-                                const key = `${coord[0]}-${coord[1]}`;
-                                if (!cellMap.has(key)) cellMap.set(key, []);
-                                cellMap.get(key).push(t);
-                            }
-                        });
+                const map = new Map();
+                players.forEach(p => p.active && p.tokens.forEach(t => {
+                    if (t.status === 'track' || t.status === 'homerun') {
+                        const c = t.status === 'track' ? TRACK[t.pos] : HOME_RUNS[t.playerIdx][t.pos];
+                        const k = `${c[0]}-${c[1]}`; if(!map.has(k)) map.set(k, []); map.get(k).push(t);
                     }
-                });
-
-                cellMap.forEach((tokens, key) => {
-                    const cell = document.getElementById(`cell-${key}`);
-                    const blockInd = cell.querySelector('.block-indicator'); if (blockInd) blockInd.remove();
+                }));
+                map.forEach((tokens, k) => {
+                    const cell = document.getElementById(`cell-${k}`);
                     if (tokens.length > 1) {
-                        const firstP = tokens[0].playerIdx;
-                        const isBlock = tokens.every(t => t.playerIdx === firstP);
-                        if (isBlock && tokens.length >= 2) {
-                            const ind = document.createElement('div'); ind.className = 'block-indicator'; ind.innerText = '🧱'; cell.appendChild(ind);
-                        }
                         tokens.forEach((t, i) => {
-                            const offset = (i - (tokens.length - 1) / 2) * 8;
-                            t.el.style.transform = `translate(${offset}px, ${offset}px) scale(0.9)`;
+                            const off = (i - (tokens.length-1)/2) * 8;
+                            t.el.style.transform = `translate(${off}px, ${off}px) scale(0.9)`;
                         });
-                    } else { tokens[0].el.style.transform = `none`; }
+                    } else tokens[0].el.style.transform = `none`;
                 });
             }
 
-            function getNextTurnIdx() {
-                let nextIdx = (activePlayerIndices.indexOf(currentPlayer) + 1) % activePlayerIndices.length;
-                return activePlayerIndices[nextIdx];
-            }
-
+            const getNextTurnIdx = () => state.activeIndices[(state.activeIndices.indexOf(state.currentPlayer)+1) % state.activeIndices.length];
+            
             function nextTurn(forcedIdx = null) {
-                if (forcedIdx !== null) {
-                    currentPlayer = forcedIdx;
-                    sixCount = 0;
-                } else if (currentRoll !== 6) {
-                    currentPlayer = getNextTurnIdx();
-                    sixCount = 0;
-                }
-                waitingForMove = false; updateUI();
+                state.currentPlayer = (forcedIdx !== null) ? forcedIdx : getNextTurnIdx();
+                state.sixCount = 0; state.waitingForMove = false; updateUI();
             }
 
             function showWinner(id) {
-                gameActive = false; playSound('win');
-                document.getElementById('win-desc').innerText = `${players[id].name} has conquered the board! 👑`;
-                document.getElementById('win-modal').style.display = 'flex';
+                state.gameActive = false; playSound('win');
+                document.getElementById('win-desc').innerText = `${players[id].name} conquered the board! 👑`;
+                document.getElementById('win-modal').style.display='flex';
             }
 
-            function playSound(id) { const s = document.getElementById(`sound-${id}`); if (s) { s.currentTime = 0; s.play().catch(e => {}); } }
-
-            function initSync() {
-                if (!window.globalPusher) return setTimeout(initSync, 500);
-                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                channel.bind('ludo-move', async (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    
-                    window.isRemoteSync = true;
-                    if (data.type === 'select-mode') selectMode(data.mode);
-                    else if (data.type === 'start-game') startGame(true);
-                    else if (data.type === 'roll') { performRoll(data.dice); sixCount = data.sixCount; }
-                    else if (data.type === 'move') {
-                        if (rollPromise) await rollPromise;
-                        const token = players[currentPlayer].tokens.find(t => t.id === data.tokenId);
-                        if (token) await handleTokenClick(token);
-                        if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
-                    }
-                });
-
-                channel.bind('ludo-state-sync', (data) => {
-                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    if (data.seq <= lastSeq) return;
-                    lastSeq = data.seq;
-
-                    // Apply full state
-                    gameMode = data.gameMode;
-                    currentPlayer = data.currentPlayer;
-                    sixCount = data.sixCount;
-                    waitingForMove = data.waitingForMove;
-                    
-                    data.players.forEach((remoteP, pIdx) => {
-                        const localP = players[pIdx];
-                        localP.score = remoteP.score;
-                        localP.active = remoteP.active;
-                        remoteP.tokens.forEach((remoteT, tIdx) => {
-                            const localT = localP.tokens[tIdx];
-                            localT.status = remoteT.status;
-                            localT.pos = remoteT.pos;
-                            
-                            // Visually place tokens
-                            if (localT.status === 'home') {
-                                const slot = document.getElementById(`slot-${localP.color}-${localT.id}`);
-                                if (slot && localT.el.parentElement !== slot) slot.appendChild(localT.el);
-                            } else if (localT.status === 'finished') {
-                                localT.el.style.display = 'none';
-                            } else {
-                                const coord = localT.status === 'track' ? TRACK[localT.pos] : HOME_RUNS[localT.playerIdx][localT.pos];
-                                const cell = document.getElementById(`cell-${coord[0]}-${coord[1]}`);
-                                if (cell && localT.el.parentElement !== cell) cell.appendChild(localT.el);
-                            }
-                        });
-                    });
-                    updateStackedTokens();
-                    renderPlayerList();
-                    updateUI();
-                });
-            }
-
-            async function syncBoardState() {
-                if (!gameActive) return;
-                const state = {
-                    type: 'state-sync',
-                    seq: ++lastSeq,
-                    gameMode,
-                    currentPlayer,
-                    sixCount,
-                    waitingForMove,
-                    players: players.map(p => ({
-                        id: p.id,
-                        score: p.score,
-                        active: p.active,
-                        tokens: p.tokens.map(t => ({ status: t.status, pos: t.pos }))
-                    }))
-                };
-                try {
-                    await fetch('/api/games/ludo/move', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...state, to: otherUser })
-                    });
-                } catch (e) {}
-            }
-
-            // Sync Heartbeat & Initial Handshake
-            setInterval(() => {
-                if (gameActive && players[currentPlayer].owner.toLowerCase() === username.toLowerCase()) {
-                    syncBoardState();
-                }
-            }, 20000);
-
-            setTimeout(() => {
-                if (gameActive) syncBoardState();
-            }, 1500);
-
+            // PUSHER SYNC LOGIC
             async function syncMove(data) {
                 try {
                     await fetch('/api/games/ludo/move', {
@@ -627,22 +413,98 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...data, to: otherUser })
                     });
-                } catch (e) {}
+                } catch(e) {}
             }
 
-            async function requestReset() {
-                try {
-                    await fetch('/api/games/ludo/reset', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ to: otherUser })
+            async function syncBoardState() {
+                if (!state.gameActive) return;
+                const payload = {
+                    type: 'state-sync', seq: ++state.lastSeq, gameMode: state.gameMode, currentPlayer: state.currentPlayer,
+                    waitingForMove: state.waitingForMove, sixCount: state.sixCount,
+                    players: players.map(p => ({ score:p.score, active:p.active, tokens:p.tokens.map(t => ({ status:t.status, pos:t.pos })) }))
+                };
+                syncMove(payload);
+            }
+
+            function initSync() {
+                if (!window.globalPusher) return setTimeout(initSync, 500);
+                const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
+                
+                channel.bind('ludo-move', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
+                    messageQueue.push({ event:'move', data });
+                    processQueue();
+                });
+
+                channel.bind('ludo-state-sync', (data) => {
+                    if (data.from.toLowerCase() !== otherUser.toLowerCase() || data.seq <= state.lastSeq) return;
+                    messageQueue.push({ event:'state', data });
+                    processQueue();
+                });
+
+                channel.bind('ludo-reset', () => location.reload());
+                
+                // Presence
+                channel.bind('ludo-ping', (data) => {
+                    if (data.from.toLowerCase() === otherUser.toLowerCase()) {
+                        document.getElementById('presence-dot').classList.add('online');
+                        document.getElementById('presence-text').innerText = `${otherUser} Online`;
+                        if (data.request) syncMove({ type: 'ping', from: username, request: false });
+                    }
+                });
+                
+                syncMove({ type: 'ping', from: username, request: true });
+            }
+
+            async function processQueue() {
+                if (isProcessingQueue || messageQueue.length === 0) return;
+                isProcessingQueue = true;
+                const { event, data } = messageQueue.shift();
+                
+                if (event === 'move') {
+                    window.isRemoteProcessing = true;
+                    if (data.type === 'select-mode') selectMode(data.mode);
+                    else if (data.type === 'start-game') startGame(true);
+                    else if (data.type === 'roll') { await performRoll(data.dice); state.sixCount = data.sixCount; }
+                    else if (data.type === 'move') {
+                        if (rollPromise) await rollPromise;
+                        const t = players[state.currentPlayer].tokens.find(t => t.id === data.tokenId);
+                        if (t) await handleTokenClick(t);
+                        if (data.nextTurnIdx !== undefined) nextTurn(data.nextTurnIdx);
+                    } else if (data.type === 'ping') {
+                        document.getElementById('presence-dot').classList.add('online');
+                        document.getElementById('presence-text').innerText = `${otherUser} Online`;
+                    }
+                    window.isRemoteProcessing = false;
+                } else if (event === 'state') {
+                    state.lastSeq = data.seq; state.gameMode = data.gameMode;
+                    state.currentPlayer = data.currentPlayer; state.sixCount = data.sixCount; state.waitingForMove = data.waitingForMove;
+                    data.players.forEach((rp, i) => {
+                        players[i].score = rp.score; players[i].active = rp.active;
+                        rp.tokens.forEach((rt, ti) => {
+                            const lt = players[i].tokens[ti]; lt.status = rt.status; lt.pos = rt.pos;
+                            const slot = document.getElementById(`slot-${players[i].color}-${ti}`);
+                            if (lt.status === 'home') { if(lt.el.parentElement!==slot) slot.appendChild(lt.el); }
+                            else if (lt.status === 'finished') lt.el.style.display='none';
+                            else {
+                                const c = lt.status === 'track' ? TRACK[lt.pos] : HOME_RUNS[i][lt.pos];
+                                const cell = document.getElementById(`cell-${c[0]}-${c[1]}`);
+                                if (lt.el.parentElement !== cell) cell.appendChild(lt.el);
+                            }
+                        });
                     });
-                } catch (e) {}
-                location.reload();
+                    updateStackedTokens(); renderPlayerList(); updateUI();
+                }
+                
+                isProcessingQueue = false;
+                processQueue();
             }
 
-            selectMode('1-color');
-            initSync();
+            window.requestReset = () => { if(confirm("Restart for both?")) { syncMove({ type:'reset' }); location.reload(); } };
+            setInterval(() => { if(state.gameActive && players[state.currentPlayer].owner.toLowerCase() === username.toLowerCase()) syncBoardState(); }, 20000);
+            setTimeout(() => { if(state.gameActive) syncBoardState(); }, 1500);
+
+            initBoard(); initSync();
         })();
     </script>
 </div>
