@@ -670,6 +670,15 @@ app.get("/games/ludo", isAuth, (req, res) => {
     });
 });
 
+app.get("/games/mini-ludo", isAuth, (req, res) => {
+    res.render("game-mini-ludo", {
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
+});
+
 // API for Tic Tac Toe sync
 app.post("/api/games/ttt/move", isAuth, async (req, res) => {
     try {
