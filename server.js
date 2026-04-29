@@ -822,7 +822,7 @@ app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
         await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-reset", { from });
         
         // Also clear server-side state if it exists
-        const gameId = `dash-duel-${[from.toLowerCase(), to.toLowerCase()].sort().join('-')}`;
+        const gameId = `classic-ludo-${[from.toLowerCase(), to.toLowerCase()].sort().join('-')}`;
         await GameState.deleteOne({ gameId });
         
         res.json({ success: true });
@@ -831,6 +831,17 @@ app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
 
 // AUTHORITATIVE DASH DUEL ROUTES
 const getGameId = (u1, u2) => `dash-duel-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
+
+app.get("/api/games/dash-duel/state", isAuth, async (req, res) => {
+    try {
+        const { otherUser } = req.query;
+        const from = req.session.username || "Bhondu";
+        const gameId = getGameId(from, otherUser);
+        const game = await GameState.findOne({ gameId });
+        res.json({ success: true, game });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 
 app.post("/api/games/dash-duel/roll", isAuth, async (req, res) => {
     try {
@@ -940,10 +951,10 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
             game = new GameState({
                 gameId, gameType: 'ludo',
                 players: [
-                    { username: 'Bhondu', color: 'red', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Bhondu', color: 'blue', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Vishu', color: 'yellow', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Vishu', color: 'green', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) }
+                    { username: 'Bhondu', color: 'red',    tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Vishu',  color: 'blue',   tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Bhondu', color: 'yellow', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
+                    { username: 'Vishu',  color: 'green',  tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) }
                 ],
                 currentPlayerIdx: 0,
                 waitingForMove: false
@@ -978,8 +989,12 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
         game.lastUpdated = Date.now();
         await game.save();
 
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", { roll, from, sixCount: game.sixCount, currentPlayerIdx: game.currentPlayerIdx });
-        res.json({ success: true, roll, sixCount: game.sixCount });
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", {
+            roll, from,
+            sixCount: game.sixCount,
+            currentPlayerIdx: game.currentPlayerIdx
+        });
+        res.json({ success: true, roll, sixCount: game.sixCount, currentPlayerIdx: game.currentPlayerIdx });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 

@@ -28,7 +28,7 @@
 
         .game-bg {
             position: fixed; inset: 0;
-            background: 
+            background:
                 radial-gradient(circle at 10% 10%, rgba(255, 0, 127, 0.15) 0%, transparent 40%),
                 radial-gradient(circle at 90% 90%, rgba(0, 242, 255, 0.15) 0%, transparent 40%),
                 #050505;
@@ -274,7 +274,7 @@
 
         <div class="game-container">
             <h1 class="game-title">Dash Duel</h1>
-            
+
             <div class="status-badge" id="status-text">
                 <span id="status-icon">🚀</span>
                 <span id="status-msg">LFG! Fetching state...</span>
@@ -320,34 +320,56 @@
             const username = "<%= username %>";
             const otherUser = "<%= otherUser %>";
             const myPlayerIndex = username.toLowerCase() === 'bhondu' ? 0 : 1;
-            
-            let players = [], currentPlayerIdx = 0, currentRoll = 0, gameActive = false, isRolling = false;
+
+            let players = [], currentPlayerIdx = 0, gameActive = false, isRolling = false;
             let messageQueue = [], isProcessingQueue = false;
 
-            const boardEl = document.getElementById('board'), statusMsg = document.getElementById('status-msg'), diceEl = document.getElementById('dice'), rollBtn = document.getElementById('roll-btn'), chipsEl = document.getElementById('player-chips');
-            const icons = ['❤️', '💋', '🍀', '☀️'], names = ['Bhondu', 'Vishu'];
+            const DICE_FACES = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
+            const boardEl = document.getElementById('board');
+            const statusMsg = document.getElementById('status-msg');
+            const diceEl = document.getElementById('dice');
+            const rollBtn = document.getElementById('roll-btn');
+            const chipsEl = document.getElementById('player-chips');
+            const icons = ['❤', '💙'];
+            const names = ['Bhondu', 'Vishu'];
 
+            // ─── BUILD BOARD ───────────────────────────────────────────────
             function initGame() {
-                boardEl.innerHTML = ''; chipsEl.innerHTML = ''; players = []; gameActive = true;
+                boardEl.innerHTML = '';
+                chipsEl.innerHTML = '';
+                players = [];
+                gameActive = true;
+
                 for (let i = 0; i < 16; i++) {
-                    const cell = document.createElement('div'); cell.className = 'cell';
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
                     if (PATH_INDICES.includes(i)) cell.classList.add('path');
                     if (i === PATH_INDICES[0]) cell.classList.add('start');
                     if (i === PATH_INDICES[PATH_INDICES.length - 1]) cell.classList.add('end');
-                    cell.innerHTML = `<span class="cell-index">${i}</span>`; cell.id = `cell-mini-${i}`; boardEl.appendChild(cell);
+                    cell.innerHTML = `<span class="cell-index">${i}</span>`;
+                    cell.id = `cell-mini-${i}`;
+                    boardEl.appendChild(cell);
                 }
+
                 for (let i = 0; i < 2; i++) {
                     const p = { id: i, pathIndex: 0, token: document.createElement('div') };
-                    p.token.className = `token token-p${i}`; p.token.innerHTML = icons[i];
-                    p.token.id = `token-mini-${i}`; document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
+                    p.token.className = `token token-p${i}`;
+                    p.token.innerHTML = icons[i];
+                    p.token.id = `token-mini-${i}`;
+                    document.getElementById(`cell-mini-${PATH_INDICES[0]}`).appendChild(p.token);
                     players.push(p);
-                    const chip = document.createElement('div'); chip.className = `chip ${i === 0 ? 'active' : ''}`;
-                    chip.id = `chip-mini-${i}`; chip.innerHTML = `<div class="dot" style="background:${i===0?'var(--neon-pink)':'var(--neon-cyan)'}"></div><span style="font-weight:700;">${names[i]}</span>`;
+
+                    const chip = document.createElement('div');
+                    chip.className = `chip ${i === 0 ? 'active' : ''}`;
+                    chip.id = `chip-mini-${i}`;
+                    chip.innerHTML = `<div class="dot" style="background:${i===0?'var(--neon-pink)':'var(--neon-cyan)'}"></div><span style="font-weight:700;">${names[i]}</span>`;
                     chipsEl.appendChild(chip);
                 }
+
                 fetchState();
             }
 
+            // ─── FETCH STATE (FIX: correct endpoint) ─────────────────────
             window.fetchState = async function() {
                 try {
                     const res = await fetch(`/api/games/dash-duel/state?otherUser=${otherUser}`);
@@ -358,19 +380,21 @@
                         updateStatus();
                     }
                 } catch(e) { updateStatus(); }
-            }
+            };
 
-            function applyState(state) {
-                currentPlayerIdx = state.currentPlayerIdx;
-                state.players.forEach((sp, i) => {
+            function applyState(serverState) {
+                currentPlayerIdx = serverState.currentPlayerIdx;
+                serverState.players.forEach((sp, i) => {
+                    if (!players[i]) return;
                     players[i].pathIndex = sp.pathIndex;
-                    const cell = document.getElementById(`cell-mini-${PATH_INDICES[sp.pathIndex]}`);
+                    const cellId = `cell-mini-${PATH_INDICES[sp.pathIndex]}`;
+                    const cell = document.getElementById(cellId);
                     if (cell) cell.appendChild(players[i].token);
                 });
                 updateTokenLayout();
                 updateStatus();
-                if (state.currentRoll) {
-                    diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][state.currentRoll];
+                if (serverState.currentRoll) {
+                    diceEl.innerText = DICE_FACES[serverState.currentRoll];
                 }
             }
 
@@ -380,14 +404,19 @@
                 document.querySelectorAll('.chip').forEach((c, i) => c.classList.toggle('active', i === currentPlayerIdx));
                 rollBtn.disabled = !isMyTurn || isRolling;
                 document.querySelectorAll('.token').forEach(t => t.classList.remove('active-turn'));
-                if (isMyTurn && !isRolling) players[myPlayerIndex].token.classList.add('active-turn');
+                if (isMyTurn && !isRolling && players[myPlayerIndex]) {
+                    players[myPlayerIndex].token.classList.add('active-turn');
+                }
             }
 
+            // ─── ROLL (MY TURN) ────────────────────────────────────────────
             window.rollDice = async function() {
                 if (!gameActive || isRolling || currentPlayerIdx !== myPlayerIndex) return;
                 isRolling = true;
-                diceEl.classList.add('rolling'); playSound('roll');
-                
+                rollBtn.disabled = true;
+                diceEl.classList.add('rolling');
+                playSound('roll');
+
                 try {
                     const res = await fetch('/api/games/dash-duel/roll', {
                         method: 'POST',
@@ -396,17 +425,25 @@
                     });
                     const data = await res.json();
                     if (!data.success) {
-                        isRolling = false; diceEl.classList.remove('rolling');
-                        if (data.error) alert(data.error);
+                        isRolling = false;
+                        diceEl.classList.remove('rolling');
+                        rollBtn.disabled = false;
+                        if (data.error) showToast(data.error);
                         return;
                     }
-                    
-                    setTimeout(() => {
-                        diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][data.roll];
-                        diceEl.classList.remove('rolling');
-                        requestMove();
-                    }, 800);
-                } catch(e) { isRolling = false; diceEl.classList.remove('rolling'); }
+
+                    await new Promise(r => setTimeout(r, 800));
+                    diceEl.innerText = DICE_FACES[data.roll];
+                    diceEl.classList.remove('rolling');
+
+                    // Immediately request the move from server
+                    await requestMove();
+
+                } catch(e) {
+                    isRolling = false;
+                    diceEl.classList.remove('rolling');
+                    rollBtn.disabled = false;
+                }
             };
 
             async function requestMove() {
@@ -419,116 +456,146 @@
                     const data = await res.json();
                     if (data.success) {
                         await performMoveAnimation(data);
-                        isRolling = false;
-                        updateStatus();
                     }
-                } catch(e) { isRolling = false; }
+                } catch(e) {}
+                isRolling = false;
+                updateStatus();
             }
 
+            // ─── ANIMATION ────────────────────────────────────────────────
             async function performMoveAnimation(data) {
+                // Find which player moved using the 'from' field
                 const pIdx = names.findIndex(n => n.toLowerCase() === data.from.toLowerCase());
+                if (pIdx === -1) { applyStateFromMoveData(data); return; }
+
                 const p = players[pIdx];
                 const oldPathIdx = p.pathIndex;
                 const newPathIdx = data.players[pIdx].pathIndex;
-                
+
                 if (newPathIdx > oldPathIdx) {
                     for (let i = oldPathIdx + 1; i <= newPathIdx; i++) {
                         p.pathIndex = i;
                         await animateToken(p, i);
                         playSound('move');
+                        await new Promise(r => setTimeout(r, 80));
                     }
                 } else if (newPathIdx === 0 && oldPathIdx !== 0) {
+                    // Kicked back to start
                     p.pathIndex = 0;
                     await animateToken(p, 0);
                     playSound('kick');
                 }
 
+                applyStateFromMoveData(data);
+            }
+
+            function applyStateFromMoveData(data) {
                 data.players.forEach((sp, i) => {
+                    if (!players[i]) return;
                     players[i].pathIndex = sp.pathIndex;
                     const cell = document.getElementById(`cell-mini-${PATH_INDICES[sp.pathIndex]}`);
                     if (cell) cell.appendChild(players[i].token);
                 });
-
                 currentPlayerIdx = data.nextTurnIdx;
                 updateTokenLayout();
-                
                 if (data.winner) {
                     gameActive = false;
-                    showWinner(pIdx);
+                    const winIdx = names.findIndex(n => n.toLowerCase() === data.winner.toLowerCase());
+                    showWinner(winIdx !== -1 ? winIdx : 0);
                 }
             }
 
             function animateToken(p, pathIdx) {
-                return new Promise(r => {
+                return new Promise(resolve => {
                     const target = document.getElementById(`cell-mini-${PATH_INDICES[pathIdx]}`);
-                    const old = p.token.getBoundingClientRect(); target.appendChild(p.token); updateTokenLayout();
+                    if (!target) { resolve(); return; }
+                    const old = p.token.getBoundingClientRect();
+                    target.appendChild(p.token);
+                    updateTokenLayout();
                     const cur = p.token.getBoundingClientRect();
-                    gsap.fromTo(p.token, { x:old.left-cur.left, y:old.top-cur.top }, { x:0, y:0, duration:0.25, onComplete:r });
+                    gsap.fromTo(p.token,
+                        { x: old.left - cur.left, y: old.top - cur.top },
+                        { x: 0, y: 0, duration: 0.25, ease: 'power2.out', onComplete: resolve }
+                    );
                 });
             }
 
             function updateTokenLayout() {
-                for (let i=0; i<16; i++) {
-                    const cell = document.getElementById(`cell-mini-${i}`); if(!cell) continue;
+                for (let i = 0; i < 16; i++) {
+                    const cell = document.getElementById(`cell-mini-${i}`);
+                    if (!cell) continue;
                     const tokens = cell.querySelectorAll('.token');
                     tokens.forEach((t, idx) => {
-                        const off = (idx - (tokens.length-1)/2) * 12;
+                        const off = (idx - (tokens.length - 1) / 2) * 12;
                         t.style.transform = `translate(${off}px, ${off}px)`;
                     });
                 }
             }
 
             function showWinner(idx) {
-                playSound('win'); document.getElementById('win-name').innerText = `${names[idx].toUpperCase()} WINS`;
+                playSound('win');
+                document.getElementById('win-name').innerText = `${names[idx].toUpperCase()} WINS`;
                 document.getElementById('win-emoji').innerText = icons[idx];
-                document.getElementById('win-overlay').style.display = 'flex';
+                const overlay = document.getElementById('win-overlay');
+                overlay.style.display = 'flex';
                 gsap.from('.win-card', { scale: 0.5, opacity: 0, duration: 0.5, ease: "back.out(1.7)" });
             }
 
+            function showToast(msg) {
+                statusMsg.innerText = msg;
+                setTimeout(() => updateStatus(), 2000);
+            }
+
+            // ─── PUSHER SYNC ──────────────────────────────────────────────
             function initSync() {
                 if (!window.globalPusher) return setTimeout(initSync, 500);
                 const channel = window.globalPusher.subscribe('private-notifications-' + username.toLowerCase());
-                
+
+                // Opponent rolled — show their dice animation
                 channel.bind('dash-duel-rolled', (data) => {
                     if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    messageQueue.push({ event:'roll', data });
+                    messageQueue.push({ event: 'roll', data });
                     processQueue();
                 });
 
+                // Opponent moved — animate their pawn
                 channel.bind('dash-duel-moved', (data) => {
                     if (data.from.toLowerCase() !== otherUser.toLowerCase()) return;
-                    messageQueue.push({ event:'move', data });
+                    messageQueue.push({ event: 'move', data });
                     processQueue();
                 });
 
+                // Reset
                 channel.bind('ludo-reset', () => location.reload());
             }
 
             async function processQueue() {
                 if (isProcessingQueue || messageQueue.length === 0) return;
-                isProcessingQueue = true; 
+                isProcessingQueue = true;
                 const { event, data } = messageQueue.shift();
-                
+
                 try {
                     if (event === 'roll') {
-                        isRolling = true; diceEl.classList.add('rolling'); playSound('roll');
+                        // Show opponent's dice rolling
+                        diceEl.classList.add('rolling');
+                        playSound('roll');
                         await new Promise(r => setTimeout(r, 800));
-                        diceEl.innerText = ['','⚀','⚁','⚂','⚃','⚄','⚅'][data.roll];
+                        diceEl.innerText = DICE_FACES[data.roll];
                         diceEl.classList.remove('rolling');
-                        isRolling = false;
-                        updateStatus();
+                        // Don't update status yet — wait for the move event
                     } else if (event === 'move') {
                         await performMoveAnimation(data);
                         updateStatus();
                     }
                 } catch (e) {}
-                
-                isProcessingQueue = false; 
+
+                isProcessingQueue = false;
                 processQueue();
             }
 
-            window.requestReset = async function() { 
-                if(confirm("Restart for both?")) { 
+            // ─── RESET (FIX: use correct dash-duel reset) ─────────────────
+            window.requestReset = async function() {
+                if (confirm("Restart for both?")) {
                     try {
                         await fetch('/api/games/ludo/reset', {
                             method: 'POST',
@@ -536,13 +603,17 @@
                             body: JSON.stringify({ to: otherUser })
                         });
                     } catch (e) {}
-                    location.reload(); 
-                } 
+                    location.reload();
+                }
             };
 
-            function playSound(type) { const s = document.getElementById(`sound-${type}`); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
+            function playSound(type) {
+                const s = document.getElementById(`sound-${type}`);
+                if (s) { s.currentTime = 0; s.play().catch(() => {}); }
+            }
 
-            initGame(); initSync();
+            initGame();
+            initSync();
         })();
     </script>
 </div>
