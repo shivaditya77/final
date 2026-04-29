@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhondu Cricket | Cricket Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
+    <style>
+        :root {
+            --pitch: #1a4d2e;
+            --neon-green: #4ade80;
+            --neon-gold: #fbbf24;
+            --dark-bg: #0a0f1e;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--dark-bg);
+            color: white;
+            overflow: hidden;
+            height: 100dvh;
+        }
+
+        /* Stadium Background */
+        .stadium {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 100%, var(--pitch) 0%, var(--dark-bg) 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 70px 20px 40px;
+            gap: 20px;
+            transition: transform 0.1s;
+        }
+
+        .floodlight {
+            position: absolute;
+            top: 20px;
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.3;
+        }
+        .light-left { left: 10%; }
+        .light-right { right: 10%; }
+
+        .scoreboard {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 12px 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .score-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 5px; }
+        .run-display { font-family: 'JetBrains Mono', monospace; font-size: 2.2rem; color: var(--neon-green); text-shadow: 0 0 15px var(--neon-green); }
+        .wicket-label { font-size: 0.7rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .target-label { color: var(--neon-gold); font-weight: 800; font-size: 0.7rem; letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase; }
+
+        .pitch-view {
+            width: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+            gap: 30px;
+            flex: 1; 
+            min-height: 180px;
+        }
+
+        .avatar {
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            background: var(--glass);
+            border: 3px solid var(--neon-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            position: relative;
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.1);
+        }
+
+        .avatar.bowler { border-color: rgba(255,255,255,0.3); }
+        .role-tag { position: absolute; bottom: -28px; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-green); font-weight: 800; white-space: nowrap; }
+
+        .hand-reveal {
+            position: absolute;
+            top: -65px;
+            font-size: 3rem;
+            opacity: 0;
+            transform: scale(0.5);
+            filter: drop-shadow(0 0 15px white);
+        }
+
+        .reaction-emoji {
+            position: fixed;
+            font-size: 2.5rem;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+        }
+
+        .reaction-bar {
+            display: flex;
+            gap: 12px;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 15px;
+            border-radius: 30px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 50;
+        }
+
+        .react-btn {
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .react-btn:active { transform: scale(1.5); }
+
+        .action-text {
+            font-size: 4rem;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 0 30px rgba(255,255,255,0.5);
+            opacity: 0;
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .controls {
+            width: 100%;
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 450px;
+            z-index: 10;
+        }
+
+        .pick-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px;
+            border-radius: 16px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pick-btn span { font-size: 1.8rem; margin-bottom: 2px; }
+        .pick-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+        .pick-btn.selected { background: var(--neon-green); color: black; border-color: var(--neon-green); box-shadow: 0 0 20px rgba(74, 222, 128, 0.4); }
+        .pick-btn.disabled { opacity: 0.2; pointer-events: none; }
+
+        .toss-container {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            z-index: 20;
+            padding: 20px;
+        }
+
+        .coin {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #fcd34d, #b45309);
+            border-radius: 50%;
+            margin: 0 auto 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.4);
+            border: 8px solid rgba(255,255,255,0.3);
+            font-weight: 900;
+            color: #78350f;
+        }
+
+        .toss-title { 
+            font-size: 2rem; 
+            font-weight: 800; 
+            margin-bottom: 25px; 
+            letter-spacing: -1.5px;
+            color: white;
+            line-height: 1.2;
+        }
+
+        .choice-btns { display: flex; gap: 20px; justify-content: center; width: 100%; max-width: 500px; }
+        .choice-btn {
+            flex: 1; padding: 20px; border-radius: 20px; border: 2px solid var(--neon-gold);
+            background: rgba(251, 191, 36, 0.05); color: var(--neon-gold); font-size: 1.2rem;
+            font-weight: 800; letter-spacing: 2px; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px);
+        }
+        .choice-btn:hover { background: var(--neon-gold); color: black; box-shadow: 0 0 40px rgba(251, 191, 36, 0.6); transform: translateY(-5px) scale(1.05); }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.96);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .result-text { font-size: 5rem; font-weight: 900; letter-spacing: -3px; margin-bottom: 10px; }
+        .back-btn { position: absolute; top: 20px; left: 20px; color: white; text-decoration: none; font-size: 0.8rem; opacity: 0.6; padding: 10px 15px; border-radius: 30px; background: var(--glass); }
+        .reset-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px 15px; border-radius: 30px; font-size: 0.7rem; cursor: pointer; z-index: 1000; }
+        .bottom-section { width: 100%; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; z-index: 50; }
+        .user-debug { font-size: 0.6rem; opacity: 0.3; letter-spacing: 2px; white-space: nowrap; }
+
+        .high-five-hand { position: fixed; font-size: 12rem; z-index: 500; opacity: 0; pointer-events: none; }
+        #handLeft { left: -100px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+        #handRight { right: -100px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+
+        @media (max-width: 400px) {
+            .avatar { width: 70px; height: 70px; font-size: 1.8rem; }
+            .scoreboard { padding: 10px 15px; }
+            .run-display { font-size: 1.8rem; }
+            .pick-btn span { font-size: 1.5rem; }
+            .pick-btn { padding: 8px; }
+        }
+
+        @media (max-height: 750px) {
+            .stadium { padding: 40px 15px 20px; gap: 10px; }
+            .pitch-view { min-height: 140px; }
+            .scoreboard { padding: 8px 15px; }
+            .run-display { font-size: 1.7rem; }
+            .avatar { width: 75px; height: 75px; }
+            .toss-container { padding-bottom: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="stadium" id="stadium">
+        <div class="floodlight light-left"></div>
+        <div class="floodlight light-right"></div>
+
+        <a href="/games" class="back-btn">← EXIT</a>
+        <button class="reset-btn" onclick="resetMatch()">RESET</button>
+
+        <div class="scoreboard" id="scoreboard" style="display: none;">
+            <div class="target-label" id="inningLabel">INNINGS 1</div>
+            <div class="score-row">
+                <div>
+                    <div class="wicket-label">RUNS</div>
+                    <div class="run-display" id="score">0</div>
+                </div>
+                <div>
+                    <div class="wicket-label">WICKETS</div>
+                    <div class="run-display" id="wickets" style="color: #ff4d4d; text-shadow: 0 0 15px #ff4d4d;">0/3</div>
+                </div>
+                <div id="targetContainer" style="display: none;">
+                    <div class="wicket-label">TARGET</div>
+                    <div class="run-display" id="target" style="color: var(--neon-gold); text-shadow: 0 0 15px var(--neon-gold);">0</div>
+                </div>
+            </div>
+            <div id="statusMessage" style="font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--neon-green); font-weight: 800;">...</div>
+            <div id="commentaryBox" style="margin-top: 10px; font-size: 0.75rem; font-style: italic; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">Welcome!</div>
+        </div>
+
+        <div class="pitch-view" id="pitchView">
+            <div class="avatar" id="batsmanAvatar">
+                <span id="batsmanEmoji">🏏</span>
+                <div class="hand-reveal" id="batsmanHand">☝️</div>
+                <div class="role-tag">BATSMAN</div>
+            </div>
+            <div class="stumps" id="stumps"><div class="stump s1"></div><div class="stump s2"></div><div class="stump s3"></div></div>
+            <div class="avatar bowler" id="bowlerAvatar">
+                <span id="bowlerEmoji">🏐</span>
+                <div class="hand-reveal" id="bowlerHand">✌️</div>
+                <div class="role-tag">BOWLER</div>
+            </div>
+        </div>
+
+        <div class="toss-container" id="tossPhase">
+            <div class="coin" id="coin">?</div>
+            <div class="toss-title" id="tossTitle">Who calls?</div>
+            <div class="choice-btns" id="tossBtns" style="display: none;"><button class="choice-btn" onclick="startToss(1)">HEADS</button><button class="choice-btn" onclick="startToss(2)">TAILS</button></div>
+            <div class="waiting-status" id="tossWait" style="display: none;">Waiting for call...</div>
+        </div>
+
+        <div class="toss-container" id="choicePhase" style="display: none;">
+            <div class="toss-title" id="choiceTitle">You won!</div>
+            <div class="choice-btns" style="display: none;"><button class="choice-btn" onclick="chooseRole('bat')">BAT</button><button class="choice-btn" onclick="chooseRole('bowl')">BOWL</button></div>
+        </div>
+
+        <div class="action-text" id="actionText">SIXER!</div>
+
+        <div class="bottom-section">
+            <div class="reaction-bar" id="reactionBar" style="display: none;">
+                <div class="react-btn" onclick="sendReaction('😂')">😂</div>
+                <div class="react-btn" onclick="sendReaction('🔥')">🔥</div>
+                <div class="react-btn" onclick="sendReaction('👏')">👏</div>
+                <div class="react-btn" onclick="sendReaction('💔')">💔</div>
+                <div class="react-btn" onclick="sendReaction('🤫')">🤫</div>
+            </div>
+            <div class="controls" id="controls">
+                <button class="pick-btn" onclick="makePick(1)"><span>☝️</span><small>1</small></button>
+                <button class="pick-btn" onclick="makePick(2)"><span>✌️</span><small>2</small></button>
+                <button class="pick-btn" onclick="makePick(3)"><span>🤟</span><small>3</small></button>
+                <button class="pick-btn" onclick="makePick(4)"><span>🖖</span><small>4</small></button>
+                <button class="pick-btn" onclick="makePick(5)"><span>✋</span><small>5</small></button>
+                <button class="pick-btn" onclick="makePick(6)"><span>✊</span><small>6</small></button>
+            </div>
+            <div class="waiting-status" id="waitingText" style="display: none;">Waiting for other player...</div>
+            <div class="user-debug" style="position: static; transform: none; margin-top: 15px;">LOGGED IN AS: <span id="debugUser"><%= username %></span></div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="result-text" id="overlayText">OUT!</div>
+        <div id="overlaySubtext" style="font-size: 1rem; opacity: 0.8; margin-bottom: 30px;">Switching sides...</div>
+        <button id="overlayActionBtn" onclick="closeOverlay()" style="padding: 15px 40px; border-radius: 40px; border: none; background: white; color: black; font-weight: 900; cursor: pointer;">CONTINUE</button>
+    </div>
+
+    <div class="high-five-hand" id="handLeft">🖐️</div>
+    <div class="high-five-hand" id="handRight">🖐️</div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function speak(text, type = 'normal') {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance(text);
+                msg.rate = 1.1; msg.pitch = 1.0; msg.volume = 1.0;
+                
+                if (type === 'high') { msg.rate = 1.3; msg.pitch = 1.2; }
+                if (type === 'tense') { msg.rate = 0.9; msg.pitch = 0.8; }
+                if (type === 'victory') { msg.rate = 1.1; msg.pitch = 1.3; }
+                
+                window.speechSynthesis.speak(msg);
+            }
+        }
+
+        function playSound(type) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            if (type === 'hit') { oscillator.type = 'square'; oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); oscillator.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1); gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1); }
+            else if (type === 'out') { oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(100, audioCtx.currentTime); oscillator.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.5); gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5); }
+            else if (type === 'boundary') { oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(400, audioCtx.currentTime); oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2); gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.3); }
+            else if (type === 'clap') { oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2); oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.2); }
+        }
+
+        function vibrate(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
+
+        const username = "<%= username %>";
+        const otherUser = "<%= otherUser %>";
+        let isProcessing = false;
+        const handMap = { 1: '☝️', 2: '✌️', 3: '🤟', 4: '🖖', 5: '✋', 6: '✊' };
+
+        const pusher = new Pusher('<%= pusherKey %>', { cluster: '<%= pusherCluster %>', authEndpoint: '/pusher/auth' });
+        const channel = pusher.subscribe('private-notifications-' + username.toLowerCase());
+
+        channel.bind('cricket-ball', (data) => {
+            if (data.game.status === 'playing' && data.game.lastMove) showBallResult(data.game);
+            else updateUI(data.game);
+        });
+        channel.bind('cricket-reaction', (data) => animateReaction(data.from, data.emoji));
+        channel.bind('cricket-toss-started', (data) => performCoinSpin(data.game, data.choice));
+        channel.bind('cricket-reset', () => window.location.reload());
+        channel.bind('cricket-highfive-tap', (data) => {
+            document.getElementById('overlaySubtext').innerText = `${data.from} is waiting for a High-Five! 🖐️`;
+        });
+        channel.bind('cricket-highfive-complete', () => performHighFiveAnimation());
+
+        async function fetchState() {
+            const res = await fetch(`/api/games/cricket/state?otherUser=${otherUser}`);
+            const data = await res.json();
+            if (data.success) updateUI(data.game);
+        }
+
+        function updateUI(game) {
+            if (isProcessing || !game || !game.players || game.players.length < 2) return;
+            document.getElementById('tossPhase').style.display = game.status === 'toss' ? 'block' : 'none';
+            document.getElementById('choicePhase').style.display = game.status === 'choosing' ? 'block' : 'none';
+            document.getElementById('scoreboard').style.display = game.status === 'playing' ? 'block' : 'none';
+            document.getElementById('pitchView').style.display = game.status === 'playing' ? 'flex' : 'none';
+            document.getElementById('controls').style.display = game.status === 'playing' ? 'grid' : 'none';
+            document.getElementById('reactionBar').style.display = game.status === 'playing' ? 'flex' : 'none';
+            if (game.status === 'toss') {
+                const amIPrimary = username.toLowerCase() === game.players[0].username.toLowerCase();
+                document.getElementById('tossBtns').style.display = amIPrimary ? 'flex' : 'none';
+                document.getElementById('tossWait').style.display = amIPrimary ? 'none' : 'block';
+                document.getElementById('tossTitle').innerText = amIPrimary ? "Call the Toss!" : `${game.players[0].username} is calling...`;
+            }
+            if (game.status === 'choosing') {
+                const winnerName = game.tossWinner || "";
+                const amIWinner = winnerName.toLowerCase() === username.toLowerCase();
+                document.getElementById('choiceTitle').innerText = amIWinner ? "You won!" : `${winnerName} won toss...`;
+                document.querySelector('#choicePhase .choice-btns').style.display = amIWinner ? 'flex' : 'none';
+                
+                if (amIWinner) speak(`Incredible! ${username} has won the toss! Will you bat or bowl?`, 'victory');
+                else speak(`The coin has landed! ${winnerName} wins the toss and is now deciding the fate of the match!`, 'normal');
+            }
+            if (game.status === 'playing') {
+                const batsman = game.players.find(p => p.isBatting);
+                const bowler = game.players.find(p => !p.isBatting);
+                document.getElementById('score').innerText = batsman.score;
+                document.getElementById('wickets').innerText = `${batsman.wickets}/3`;
+                document.getElementById('inningLabel').innerText = `INNINGS ${game.inning}`;
+                document.getElementById('statusMessage').innerText = `${batsman.username} is Batting`;
+                if (game.target) { document.getElementById('targetContainer').style.display = 'block'; document.getElementById('target').innerText = game.target; }
+                document.getElementById('batsmanEmoji').innerText = batsman.username.toLowerCase() === 'bhondu' ? '🐶' : '🐹';
+                document.getElementById('bowlerEmoji').innerText = bowler.username.toLowerCase() === 'bhondu' ? '🐶' : '🐹';
+                const mySlot = game.players[0].username.toLowerCase() === username.toLowerCase() ? 'player1' : 'player2';
+                if (game.currentPicks[mySlot]) { setControlsEnabled(false); document.getElementById('waitingText').style.display = 'block'; }
+                else { setControlsEnabled(true); document.getElementById('waitingText').style.display = 'none'; }
+            }
+        }
+
+        async function sendReaction(emoji) {
+            animateReaction(username, emoji);
+            await fetch('/api/games/cricket/react', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, emoji }) });
+        }
+
+        function animateReaction(from, emoji) {
+            const isBatsman = document.getElementById('statusMessage').innerText.toLowerCase().includes(from.toLowerCase());
+            const targetId = isBatsman ? 'batsmanAvatar' : 'bowlerAvatar';
+            const target = document.getElementById(targetId);
+            const e = document.createElement('div'); e.className = 'reaction-emoji'; e.innerText = emoji; document.body.appendChild(e);
+            const rect = target.getBoundingClientRect(); gsap.set(e, { x: rect.left + rect.width/2 - 20, y: rect.top });
+            gsap.to(e, { opacity: 1, y: rect.top - 150, x: rect.left + rect.width/2 - 20 + (Math.random() * 100 - 50), scale: 1.5, duration: 1, ease: "power2.out", onComplete: () => e.remove() });
+        }
+
+        async function startToss(choice) {
+            const res = await fetch('/api/games/cricket/toss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, choice }) });
+            const data = await res.json(); if (data.success) performCoinSpin(data.game, data.choice);
+        }
+
+        function performCoinSpin(game, choice) {
+            if (isProcessing) return; isProcessing = true;
+            const coin = document.getElementById('coin'); document.getElementById('tossBtns').style.display = 'none'; document.getElementById('tossWait').style.display = 'none'; document.getElementById('tossTitle').innerText = "Tossing...";
+            vibrate(50);
+            gsap.to(coin, { rotationY: 2160, y: -200, duration: 1.5, ease: "power2.inOut", onComplete: () => { gsap.to(coin, { y: 0, duration: 0.5, ease: "bounce.out" }); const result = game.lastMove.bowlerRun; coin.innerText = result === 1 ? 'H' : 'T'; vibrate([50, 50]); isProcessing = false; setTimeout(() => updateUI(game), 1200); } });
+        }
+
+        async function chooseRole(choice) {
+            const res = await fetch('/api/games/cricket/choose', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, choice }) });
+            const data = await res.json(); 
+            if (data.success) {
+                const role = choice === 'bat' ? 'batting' : 'bowling';
+                speak(`${username} is ${role} first.`);
+                updateUI(data.game);
+            }
+        }
+
+        async function makePick(num) {
+            const btn = event.currentTarget; const btns = document.querySelectorAll('.pick-btn'); btns.forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); setControlsEnabled(false); document.getElementById('waitingText').style.display = 'block';
+            const res = await fetch('/api/games/cricket/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, run: num }) });
+            const data = await res.json(); if (data.success && !data.waiting) showBallResult(data.game);
+        }
+
+        function getPronoun(name, type = 'subject') {
+            const isFemale = name.toLowerCase() === 'bhondu';
+            if (type === 'subject') return isFemale ? 'she' : 'he';
+            if (type === 'object') return isFemale ? 'her' : 'him';
+            if (type === 'possessive') return isFemale ? 'her' : 'his';
+            return 'they';
+        }
+
+        function updateCommentary(game) {
+            const move = game.lastMove; 
+            const batsman = game.players.find(p => p.isBatting).username; 
+            const bowler = game.players.find(p => !p.isBatting).username; 
+            const box = document.getElementById('commentaryBox');
+            let text = ""; let type = 'normal';
+
+            const b_sub = getPronoun(batsman, 'subject');
+            const b_pos = getPronoun(batsman, 'possessive');
+            const bowl_sub = getPronoun(bowler, 'subject');
+            const bowl_pos = getPronoun(bowler, 'possessive');
+
+            if (move.result === 'out') {
+                const phrases = [
+                    `OH MY GOD! ${batsman} is GONE! ${bowler} has delivered a stunner!`,
+                    `CLEAN BOWLED! ${bowler} has sent ${batsman}'s stumps flying!`,
+                    `WICKET! ${bowler} has absolutely bamboozled ${batsman}!`,
+                    `I don't believe it! ${batsman} walks back, completely outclassed by ${bowler}.`
+                ];
+                text = phrases[Math.floor(Math.random() * phrases.length)];
+                type = 'high';
+            } else {
+                if (move.batsmanRun === 6) {
+                    const phrases = [
+                        `ABSOLUTELY MONSTROUS! ${batsman} smashes ${bowler} for SIX!`,
+                        `THAT IS HUGE! ${batsman} sends ${bowler} into the second tier!`,
+                        `SIX RUNS! ${batsman} is showing ${bowler} who the boss is!`,
+                        `${batsman} connects perfectly! ${bowler} can only watch that sail away!`
+                    ];
+                    text = phrases[Math.floor(Math.random() * phrases.length)];
+                    type = 'high';
+                } else if (move.batsmanRun === 4) {
+                    const phrases = [
+                        `CRACKING SHOT! ${batsman} finds the gap against ${bowler} for FOUR!`,
+                        `Elegant from ${batsman}! ${bowler} gets punished by ${b_pos} bat!`,
+                        `FOUR RUNS! ${batsman} is playing ${bowler} like a fiddle!`
+                    ];
+                    text = phrases[Math.floor(Math.random() * phrases.length)];
+                    type = 'high';
+                } else if (move.batsmanRun === 0) {
+                    const phrases = [
+                        `A dot ball! ${bowler} is winning the mental battle against ${batsman}.`,
+                        `Beaten! ${bowler} leaves ${batsman} searching for answers!`,
+                        `${batsman} misses, and ${bowler} lets ${b_sub} hear about it! Dot ball.`
+                    ];
+                    text = phrases[Math.floor(Math.random() * phrases.length)];
+                    type = 'tense';
+                } else {
+                    text = `${batsman} nudges ${bowler} for ${move.batsmanRun} run(s). ${b_sub} is playing it smart.`;
+                }
+            }
+            box.style.opacity = 0; 
+            setTimeout(() => { 
+                box.innerText = text; 
+                gsap.to(box, { opacity: 0.7, duration: 0.5 }); 
+                speak(text, type); 
+            }, 300);
+        }
+
+        function showBallResult(game) {
+            if (isProcessing) return; isProcessing = true; updateCommentary(game);
+            const move = game.lastMove; const bHand = document.getElementById('batsmanHand'); const bowHand = document.getElementById('bowlerHand'); const actionText = document.getElementById('actionText'); const stadium = document.getElementById('stadium');
+            bHand.innerText = handMap[move.batsmanRun]; bowHand.innerText = handMap[move.bowlerRun];
+            
+            if (move.result === 'win') { createCelebration(); playSound('boundary'); vibrate([100, 50, 100]); }
+
+            const tl = gsap.timeline({ onComplete: () => {
+                isProcessing = false;
+                const finalDelay = (move.result === 'win' || move.result === 'gameover') ? 1.5 : 0;
+                setTimeout(() => { if (move.result === 'win' || move.result === 'gameover' || move.result === 'out') handleGameEndOverlay(game); else updateUI(game); }, finalDelay * 1000);
+            }});
+            tl.to([bHand, bowHand], { opacity: 1, scale: 1.2, y: -20, duration: 0.4, ease: "back.out" });
+            if (move.result === 'out') { playSound('out'); vibrate(300); tl.to(actionText, { opacity: 1, textContent: "OUT!", scale: 1.5, duration: 0.3 }, "<"); tl.to('.stump', { rotation: (i) => i * 30 - 30, x: (i) => i * 20 - 20, y: -50, duration: 0.4 }, "<"); tl.to(stadium, { x: 5, y: 5, repeat: 5, yoyo: true, duration: 0.05 }, "<"); }
+            else { 
+                if (move.batsmanRun >= 4) { playSound('boundary'); vibrate([50, 30, 50]); } else { playSound('hit'); vibrate(50); }
+                let txt = move.batsmanRun === 6 ? "SIXER!" : (move.batsmanRun === 4 ? "FOUR!" : `+${move.batsmanRun}`);
+                tl.to(actionText, { opacity: 1, textContent: txt, scale: 1.5, color: "#4ade80", duration: 0.3 }, "<");
+                tl.to('#batsmanAvatar', { y: -20, duration: 0.2, yoyo: true, repeat: 1 }, "<");
+                if (move.batsmanRun >= 4) tl.to(stadium, { x: 3, y: 3, repeat: 3, yoyo: true, duration: 0.05 }, "<");
+            }
+            tl.to([bHand, bowHand, actionText], { opacity: 0, scale: 0.5, duration: 0.3, delay: 0.8 });
+        }
+
+        function createCelebration() {
+            for (let i = 0; i < 50; i++) {
+                const p = document.createElement('div'); p.style.position = 'fixed'; p.style.width = '10px'; p.style.height = '10px'; p.style.background = ['#4ade80', '#fbbf24', '#ff4d4d', '#3b82f6'][Math.floor(Math.random() * 4)]; p.style.borderRadius = '50%'; p.style.zIndex = '300'; p.style.left = '50%'; p.style.top = '50%'; document.body.appendChild(p);
+                gsap.to(p, { x: (Math.random() - 0.5) * window.innerWidth, y: (Math.random() - 0.5) * window.innerHeight, opacity: 0, scale: 0, duration: 2 + Math.random() * 2, ease: "power2.out", onComplete: () => p.remove() });
+            }
+        }
+
+        function handleGameEndOverlay(game) {
+            const move = game.lastMove; const batsman = game.players.find(p => p.isBatting); const bowler = game.players.find(p => !p.isBatting);
+            const btn = document.getElementById('overlayActionBtn');
+            if (move.result === 'win' || move.result === 'gameover') {
+                btn.innerText = "GIVE HIGH-FIVE! 🖐️";
+                btn.onclick = sendHighFive;
+            } else {
+                btn.innerText = "CONTINUE";
+                btn.onclick = closeOverlay;
+            }
+
+            if (move.result === 'win') { 
+                document.getElementById('overlayText').innerText = "TARGET REACHED!"; 
+                document.getElementById('overlaySubtext').innerText = `${batsman.username} chased down the target!`; 
+                speak(`Target reached! ${batsman.username} wins the match!`);
+            }
+            else if (move.result === 'out') { 
+                document.getElementById('overlayText').innerText = "OUT!"; 
+                document.getElementById('overlaySubtext').innerText = `${bowler.username} bowled a ${move.bowlerRun}! lives left: ${3-batsman.wickets}`; 
+                if (batsman.wickets >= 3) speak(`All out! ${bowler.username} wins the match!`);
+            }
+            else { 
+                const winnerName = move.result === 'win' ? batsman.username : bowler.username; 
+                document.getElementById('overlayText').innerText = `${winnerName.toUpperCase()} WINS!`; 
+                document.getElementById('overlaySubtext').innerText = "What a match!"; 
+                speak(`Game over! ${winnerName} is the champion!`);
+            }
+            document.getElementById('overlay').style.display = 'flex';
+        }
+
+        async function sendHighFive() {
+            const btn = document.getElementById('overlayActionBtn');
+            btn.innerText = "WAITING... 🖐️";
+            btn.disabled = true;
+            await fetch('/api/games/cricket/highfive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser }) });
+        }
+
+        function performHighFiveAnimation() {
+            playSound('clap'); vibrate([100, 100]);
+            const hL = document.getElementById('handLeft'); const hR = document.getElementById('handRight');
+            gsap.timeline({ onComplete: closeOverlay })
+                .to([hL, hR], { opacity: 1, duration: 0.1 })
+                .to(hL, { left: '50%', x: '-100%', duration: 0.4, ease: "power2.in" })
+                .to(hR, { right: '50%', x: '100%', duration: 0.4, ease: "power2.in" }, "<")
+                .to([hL, hR], { scale: 1.5, duration: 0.1 })
+                .to([hL, hR], { scale: 1, duration: 0.2 })
+                .to([hL, hR], { opacity: 0, duration: 0.5, delay: 0.5 });
+        }
+
+        function setControlsEnabled(enabled) { const btns = document.querySelectorAll('.pick-btn'); btns.forEach(b => b.classList.toggle('disabled', !enabled)); if (enabled) btns.forEach(b => b.classList.remove('selected')); }
+        async function resetMatch() { if (!confirm("Reset match?")) return; await fetch('/api/games/cricket/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser }) }); window.location.reload(); }
+        function closeOverlay() { document.getElementById('overlay').style.display = 'none'; gsap.to('.stump', { rotation: 0, x: 0, y: 0, duration: 0.3 }); fetchState(); }
+        fetchState();
+    </script>
+</body>
+</html>

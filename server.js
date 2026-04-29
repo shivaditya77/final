@@ -40,7 +40,8 @@ const Message = require("./models/Message");
 const User = require("./models/User");
 const Notification = require("./models/Notification");
 const Subscription = require("./models/Subscription");
-const GameState = require("./models/GameState");
+const CricketGame = require("./models/CricketGame");
+
 
 // ========== CONFIGURATIONS ==========
 const pusher = new Pusher({
@@ -663,8 +664,8 @@ app.get("/games/snake", isAuth, (req, res) => {
     });
 });
 
-app.get("/games/ludo", isAuth, (req, res) => {
-    res.render("game-ludo", {
+app.get("/games/cricket", isAuth, (req, res) => {
+    res.render("game-cricket", {
         username: req.session.username,
         otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
         pusherKey: process.env.PUSHER_KEY,
@@ -672,14 +673,7 @@ app.get("/games/ludo", isAuth, (req, res) => {
     });
 });
 
-app.get("/games/dash-duel", isAuth, (req, res) => {
-    res.render("game-dash-duel", {
-        username: req.session.username,
-        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
-        pusherKey: process.env.PUSHER_KEY,
-        pusherCluster: process.env.PUSHER_CLUSTER
-    });
-});
+
 
 // API for Tic Tac Toe sync
 app.post("/api/games/ttt/move", isAuth, async (req, res) => {
@@ -804,292 +798,220 @@ app.post("/api/games/snake/reset", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// API for Ludo sync
-app.post("/api/games/ludo/move", isAuth, async (req, res) => {
-    try {
-        const { to, ...data } = req.body;
-        const from = req.session.username || "Bhondu";
-        const eventName = data.type === 'state-sync' ? "ludo-state-sync" : "ludo-move";
-        await pusher.trigger("private-notifications-" + to.toLowerCase(), eventName, { ...data, from });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
+// AUTHORITATIVE CRICKET ROUTES
+const getCricketId = (u1, u2) => `cricket-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
 
-app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
-    try {
-        const { to } = req.body;
-        const from = req.session.username || "Bhondu";
-        await pusher.trigger("private-notifications-" + to.toLowerCase(), "ludo-reset", { from });
-        
-        // Also clear server-side state if it exists
-        const gameId = `classic-ludo-${[from.toLowerCase(), to.toLowerCase()].sort().join('-')}`;
-        await GameState.deleteOne({ gameId });
-        
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
-// AUTHORITATIVE DASH DUEL ROUTES
-const getGameId = (u1, u2) => `dash-duel-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
-
-app.get("/api/games/dash-duel/state", isAuth, async (req, res) => {
+app.get("/api/games/cricket/state", isAuth, async (req, res) => {
     try {
         const { otherUser } = req.query;
         const from = req.session.username || "Bhondu";
-        const gameId = getGameId(from, otherUser);
-        const game = await GameState.findOne({ gameId });
+        const gameId = getCricketId(from, otherUser);
+        let game = await CricketGame.findOne({ gameId });
+        if (!game) {
+            const players = [
+                { username: from, score: 0, isBatting: false },
+                { username: otherUser, score: 0, isBatting: false }
+            ];
+            // Randomly shuffle so either player can be the toss caller
+            if (Math.random() > 0.5) players.reverse();
+
+            game = new CricketGame({
+                gameId,
+                status: 'toss',
+                players: players
+            });
+            await game.save();
+        }
         res.json({ success: true, game });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-
-app.post("/api/games/dash-duel/roll", isAuth, async (req, res) => {
+app.post("/api/games/cricket/toss", isAuth, async (req, res) => {
     try {
-        const { to } = req.body;
+        const { to, choice } = req.body; // choice: 1 for Heads, 2 for Tails
         const from = req.session.username || "Bhondu";
-        const gameId = getGameId(from, to);
+        const gameId = getCricketId(from, to);
+        let game = await CricketGame.findOne({ gameId });
 
-        let game = await GameState.findOne({ gameId });
-        if (!game) {
-            game = new GameState({
-                gameId, gameType: 'dash-duel',
-                players: [
-                    { username: 'Bhondu', color: 'red', pathIndex: 0 },
-                    { username: 'Vishu', color: 'blue', pathIndex: 0 }
-                ],
-                currentPlayerIdx: 0
-            });
-        }
+        if (!game || game.status !== 'toss') return res.status(400).json({ error: "Invalid state" });
 
-        // Validation: Is it this player's turn?
-        if (game.players[game.currentPlayerIdx].username.toLowerCase() !== from.toLowerCase()) {
-            return res.status(403).json({ error: "Not your turn" });
-        }
+        const result = Math.floor(Math.random() * 2) + 1; // 1: Heads, 2: Tails
+        const p1 = game.players[0];
+        const p2 = game.players[1];
+        
+        // P1 always calls in this version
+        const winner = (choice === result) ? p1.username : p2.username;
 
-        const roll = Math.floor(Math.random() * 6) + 1;
-        game.currentRoll = roll;
-        game.waitingForMove = true;
-        game.lastUpdated = Date.now();
+        game.status = 'choosing';
+        game.tossWinner = winner;
+        game.lastMove = { result: 'toss', bowlerRun: result }; 
         await game.save();
 
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "dash-duel-rolled", { roll, from });
-        res.json({ success: true, roll });
+        // Broadcast TO BOTH that the toss has started and give the result
+        // We trigger to the other user as usual, and return to the caller
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-toss-started", { game, choice });
+        res.json({ success: true, game, choice });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.post("/api/games/dash-duel/move", isAuth, async (req, res) => {
+app.post("/api/games/cricket/choose", isAuth, async (req, res) => {
     try {
-        const { to } = req.body;
+        const { to, choice } = req.body; // 'bat' or 'bowl'
         const from = req.session.username || "Bhondu";
-        const gameId = getGameId(from, to);
+        const gameId = getCricketId(from, to);
+        let game = await CricketGame.findOne({ gameId });
 
-        let game = await GameState.findOne({ gameId });
-        if (!game || !game.waitingForMove) return res.status(400).json({ error: "Invalid move request" });
+        if (!game || game.status !== 'choosing' || game.tossWinner.toLowerCase() !== from.toLowerCase()) {
+            return res.status(400).json({ error: "Not your choice" });
+        }
 
-        const pIdx = game.currentPlayerIdx;
-        const roll = game.currentRoll;
-        const PATH_LENGTH = 16; // Dash Duel path length
+        const p1 = game.players[0];
+        const p2 = game.players[1];
 
-        let newPathIndex = game.players[pIdx].pathIndex + roll;
-        
-        // Cap at end
-        if (newPathIndex >= PATH_LENGTH) {
-            newPathIndex = game.players[pIdx].pathIndex; // Stay put if overshot? Or just end?
-            // In Dash Duel we usually cap or stay. Let's stay put if roll is too high.
+        if (choice === 'bat') {
+            const winner = p1.username.toLowerCase() === from.toLowerCase() ? p1 : p2;
+            const loser = p1.username.toLowerCase() === from.toLowerCase() ? p2 : p1;
+            winner.isBatting = true;
+            loser.isBatting = false;
         } else {
-            game.players[pIdx].pathIndex = newPathIndex;
+            const winner = p1.username.toLowerCase() === from.toLowerCase() ? p1 : p2;
+            const loser = p1.username.toLowerCase() === from.toLowerCase() ? p2 : p1;
+            winner.isBatting = false;
+            loser.isBatting = true;
         }
 
-        // Collision Check
-        const otherIdx = (pIdx + 1) % 2;
-        if (game.players[pIdx].pathIndex !== 0 && game.players[pIdx].pathIndex === game.players[otherIdx].pathIndex) {
-            game.players[otherIdx].pathIndex = 0; // Kicked back to start
-        }
-
-        // Win Check
-        let winner = null;
-        if (game.players[pIdx].pathIndex === PATH_LENGTH - 1) {
-            winner = from;
-        }
-
-        // Next Turn
-        if (roll !== 6) {
-            game.currentPlayerIdx = (pIdx + 1) % 2;
-        }
-        
-        game.waitingForMove = false;
-        game.lastUpdated = Date.now();
+        game.status = 'playing';
+        game.tossChoice = choice;
         await game.save();
 
-        const payload = {
-            from, roll,
-            players: game.players,
-            nextTurnIdx: game.currentPlayerIdx,
-            winner
-        };
-
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "dash-duel-moved", payload);
-        res.json({ success: true, ...payload });
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-ball", { game });
+        res.json({ success: true, game });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// AUTHORITATIVE CLASSIC LUDO ROUTES
-const getLudoGameId = (u1, u2) => `classic-ludo-${[u1.toLowerCase(), u2.toLowerCase()].sort().join('-')}`;
-const LUDO_TRACK_LENGTH = 52;
-const LUDO_SAFE_ZONES = [[6,1],[1,8],[8,13],[13,6],[6,12],[12,8],[8,2],[2,6]];
-const LUDO_START_INDICES = { 0:0, 1:13, 2:26, 3:39 };
-const LUDO_TRACK = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
-
-app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
+app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
     try {
-        const { to } = req.body;
+        const { to, run } = req.body;
         const from = req.session.username || "Bhondu";
-        const gameId = getLudoGameId(from, to);
+        const gameId = getCricketId(from, to);
+        let game = await CricketGame.findOne({ gameId });
 
-        let game = await GameState.findOne({ gameId });
-        if (!game) {
-            game = new GameState({
-                gameId, gameType: 'ludo',
-                players: [
-                    { username: 'Bhondu', color: 'red',    tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Vishu',  color: 'blue',   tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Bhondu', color: 'yellow', tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) },
-                    { username: 'Vishu',  color: 'green',  tokens: Array(4).fill(0).map((_,i)=>({id:i, status:'home', pathIndex:0})) }
-                ],
-                currentPlayerIdx: 0,
-                waitingForMove: false
-            });
+        if (!game || game.status !== 'playing') return res.status(400).json({ error: "Game not in progress" });
+
+        // Assign run to the correct player slot
+        if (game.players[0].username.toLowerCase() === from.toLowerCase()) {
+            game.currentPicks.player1 = run;
+        } else {
+            game.currentPicks.player2 = run;
         }
 
-        // Check if it's the player's turn (simplified for 2 users, but 4 colors)
-        const activePlayer = game.players[game.currentPlayerIdx];
-        if (activePlayer.username.toLowerCase() !== from.toLowerCase()) {
-            return res.status(403).json({ error: "Not your turn" });
-        }
+        // Both ready? Process the ball
+        if (game.currentPicks.player1 && game.currentPicks.player2) {
+            const p1 = game.players[0];
+            const p2 = game.players[1];
+            const p1Run = game.currentPicks.player1;
+            const p2Run = game.currentPicks.player2;
 
-        const roll = Math.floor(Math.random() * 6) + 1;
-        game.currentRoll = roll;
-        game.isRolling = false;
-        
-        if (roll === 6) {
-            game.sixCount++;
-            if (game.sixCount === 3) {
-                game.sixCount = 0;
-                game.waitingForMove = false;
-                game.currentPlayerIdx = (game.currentPlayerIdx + 1) % game.players.length;
-                // Keep cycling until we find an active player if needed (but here all 4 are active)
+            const batsman = p1.isBatting ? p1 : p2;
+            const bowler = p1.isBatting ? p2 : p1;
+            const batsmanRun = p1.isBatting ? p1Run : p2Run;
+            const bowlerRun = p1.isBatting ? p2Run : p1Run;
+
+            const MAX_WICKETS = 3;
+
+            if (batsmanRun === bowlerRun) {
+                // OUT!
+                batsman.wickets += 1;
+                game.lastMove = { batsmanRun, bowlerRun, result: 'out' };
+
+                if (batsman.wickets >= MAX_WICKETS) {
+                    // All out!
+                    if (game.inning === 1) {
+                        game.target = batsman.score + 1;
+                        game.inning = 2;
+                        p1.isBatting = !p1.isBatting;
+                        p2.isBatting = !p2.isBatting;
+                        // Reset current batsman's score for the new inning
+                        const newBatsman = p1.isBatting ? p1 : p2;
+                        newBatsman.score = 0;
+                        newBatsman.wickets = 0;
+                    } else {
+                        // Game Over - Bowler Wins
+                        game.lastMove.result = 'gameover';
+                    }
+                }
             } else {
-                game.waitingForMove = true;
-            }
-        } else {
-            game.sixCount = 0;
-            game.waitingForMove = true;
-        }
+                // Runs scored
+                batsman.score += batsmanRun;
+                game.lastMove = { batsmanRun, bowlerRun, result: 'runs' };
 
-        game.lastUpdated = Date.now();
-        await game.save();
-
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", {
-            roll, from,
-            sixCount: game.sixCount,
-            currentPlayerIdx: game.currentPlayerIdx
-        });
-        res.json({ success: true, roll, sixCount: game.sixCount, currentPlayerIdx: game.currentPlayerIdx });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
-app.post("/api/games/ludo/move", isAuth, async (req, res) => {
-    try {
-        const { to, tokenId } = req.body;
-        const from = req.session.username || "Bhondu";
-        const gameId = getLudoGameId(from, to);
-
-        let game = await GameState.findOne({ gameId });
-        if (!game || !game.waitingForMove) return res.status(400).json({ error: "Invalid move" });
-
-        const pIdx = game.currentPlayerIdx;
-        const roll = game.currentRoll;
-        const player = game.players[pIdx];
-        const token = player.tokens.find(t => t.id === tokenId);
-
-        if (!token) return res.status(400).json({ error: "Token not found" });
-
-        // Move Logic
-        let captured = false;
-        if (token.status === 'home') {
-            if (roll !== 6) return res.status(400).json({ error: "Need 6 to move out" });
-            token.status = 'track';
-            token.pathIndex = LUDO_START_INDICES[pIdx];
-        } else if (token.status === 'track') {
-            for (let i=0; i<roll; i++) {
-                token.pathIndex = (token.pathIndex + 1) % 52;
-                if (token.pathIndex === (LUDO_START_INDICES[pIdx] + 51) % 52) {
-                    token.status = 'homerun';
-                    token.pathIndex = 0;
-                    break;
+                // Inning 2 Target check
+                if (game.inning === 2 && batsman.score >= game.target) {
+                    game.lastMove.result = 'win';
                 }
             }
-        } else if (token.status === 'homerun') {
-            if (token.pathIndex + roll > 5) return res.status(400).json({ error: "Roll too high" });
-            token.pathIndex += roll;
-            if (token.pathIndex === 5) {
-                token.status = 'finished';
-                player.score++;
-            }
+
+            // Clear picks for next ball
+            game.currentPicks = { player1: null, player2: null };
+            game.lastUpdated = Date.now();
+            await game.save();
+
+            // Notify both
+            await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-ball", { game });
+            return res.json({ success: true, game });
         }
 
-        // Collision Check (Kills)
-        if (token.status === 'track') {
-            const coord = LUDO_TRACK[token.pathIndex];
-            const isSafe = LUDO_SAFE_ZONES.some(z => z[0] === coord[0] && z[1] === coord[1]);
-            if (!isSafe) {
-                game.players.forEach((opp, oi) => {
-                    if (oi !== pIdx) {
-                        opp.tokens.forEach(ot => {
-                            if (ot.status === 'track' && ot.pathIndex === token.pathIndex) {
-                                ot.status = 'home';
-                                ot.pathIndex = 0;
-                                captured = true;
-                            }
-                        });
-                    }
-                });
-            }
-        }
+        await game.save();
+        res.json({ success: true, waiting: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
 
-        // Extra turn?
-        let nextTurnIdx = (roll === 6 || captured) ? pIdx : (pIdx + 1) % game.players.length;
-        
-        // Handle 2-player mode where each user owns 2 colors
-        // If it's a 2nd turn for the same user but different color, we might need to handle that.
-        // But the game logic in EJS treats all 4 as sequential.
+app.post("/api/games/cricket/highfive", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username;
+        const gameId = getCricketId(from, to);
+        let game = await CricketGame.findOne({ gameId });
+        if (!game) return res.status(404).json({ error: "Game not found" });
 
-        game.currentPlayerIdx = nextTurnIdx;
-        game.waitingForMove = false;
-        game.lastUpdated = Date.now();
+        const player = game.players.find(p => p.username.toLowerCase() === from.toLowerCase());
+        player.highFive = true;
         await game.save();
 
-        const payload = {
-            from, tokenId, roll,
-            players: game.players,
-            nextTurnIdx,
-            captured
-        };
+        // Notify other player that I high-fived
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-highfive-tap", { from });
 
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-moved", payload);
-        res.json({ success: true, ...payload });
+        // If both high-fived, trigger the big animation
+        if (game.players.every(p => p.highFive)) {
+            await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-highfive-complete", {});
+            await pusher.trigger(`private-notifications-${from.toLowerCase()}`, "cricket-highfive-complete", {});
+        }
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.get("/api/games/ludo/state", isAuth, async (req, res) => {
+app.post("/api/games/cricket/reset", isAuth, async (req, res) => {
     try {
-        const { otherUser } = req.query;
+        const { to } = req.body;
         const from = req.session.username || "Bhondu";
-        const gameId = getLudoGameId(from, otherUser);
-        const game = await GameState.findOne({ gameId });
-        res.json({ success: true, game });
+        const gameId = getCricketId(from, to);
+        await CricketGame.deleteOne({ gameId });
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-reset", { from });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
 });
+
+app.post("/api/games/cricket/react", isAuth, async (req, res) => {
+    try {
+        const { to, emoji } = req.body;
+        const from = req.session.username;
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-reaction", { from, emoji });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+
+
 
 app.post("/api/games/snake/sync", isAuth, async (req, res) => {
     try {
