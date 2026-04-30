@@ -437,7 +437,11 @@
                 document.getElementById('batsmanEmoji').innerText = batsman.username.toLowerCase() === 'bhondu' ? '🐶' : '🐹';
                 document.getElementById('bowlerEmoji').innerText = bowler.username.toLowerCase() === 'bhondu' ? '🐶' : '🐹';
                 const mySlot = game.players[0].username.toLowerCase() === username.toLowerCase() ? 'player1' : 'player2';
-                if (game.currentPicks[mySlot]) { setControlsEnabled(false); document.getElementById('waitingText').style.display = 'block'; }
+                if (game.currentPicks[mySlot]) { 
+                    setControlsEnabled(false); 
+                    document.getElementById('waitingText').style.display = 'block'; 
+                    document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.5rem; opacity: 0.5;">Stuck?</span>';
+                }
                 else { setControlsEnabled(true); document.getElementById('waitingText').style.display = 'none'; }
             }
         }
@@ -479,9 +483,28 @@
         }
 
         async function makePick(num) {
-            const btn = event.currentTarget; const btns = document.querySelectorAll('.pick-btn'); btns.forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); setControlsEnabled(false); document.getElementById('waitingText').style.display = 'block';
-            const res = await fetch('/api/games/cricket/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, run: num }) });
-            const data = await res.json(); if (data.success && !data.waiting) showBallResult(data.game);
+            try {
+                const btn = event.currentTarget; 
+                const btns = document.querySelectorAll('.pick-btn'); 
+                btns.forEach(b => b.classList.remove('selected')); 
+                if (btn) btn.classList.add('selected'); 
+                
+                setControlsEnabled(false); 
+                document.getElementById('waitingText').style.display = 'block';
+                document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.5rem; opacity: 0.5;">Stuck?</span>';
+                
+                const res = await fetch('/api/games/cricket/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, run: num }) });
+                const data = await res.json(); 
+                if (data.success && !data.waiting) showBallResult(data.game);
+                else if (!data.success) {
+                    setControlsEnabled(true);
+                    document.getElementById('waitingText').style.display = 'none';
+                }
+            } catch (err) {
+                console.error(err);
+                setControlsEnabled(true);
+                document.getElementById('waitingText').style.display = 'none';
+            }
         }
 
         function getPronoun(name, type = 'subject') {

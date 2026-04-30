@@ -894,76 +894,111 @@ app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
         const { to, run } = req.body;
         const from = req.session.username || "Bhondu";
         const gameId = getCricketId(from, to);
-        let game = await CricketGame.findOne({ gameId });
 
+        // 1. Find game and determine which player is moving
+        let game = await CricketGame.findOne({ gameId });
         if (!game || game.status !== 'playing') return res.status(400).json({ error: "Game not in progress" });
 
-        // Assign run to the correct player slot
-        if (game.players[0].username.toLowerCase() === from.toLowerCase()) {
-            game.currentPicks.player1 = run;
-        } else {
-            game.currentPicks.player2 = run;
-        }
+        const isPlayer1 = game.players[0].username.toLowerCase() === from.toLowerCase();
+        const updateField = isPlayer1 ? 'currentPicks.player1' : 'currentPicks.player2';
 
-        // Both ready? Process the ball
-        if (game.currentPicks.player1 && game.currentPicks.player2) {
-            const p1 = game.players[0];
-            const p2 = game.players[1];
-            const p1Run = game.currentPicks.player1;
-            const p2Run = game.currentPicks.player2;
+        // 2. Atomic update of the pick
+        game = await CricketGame.findOneAndUpdate(
+            { gameId },
+            { $set: { [updateField]: run } },
+            { new: true }
+        );
 
-            const batsman = p1.isBatting ? p1 : p2;
-            const bowler = p1.isBatting ? p2 : p1;
-            const batsmanRun = p1.isBatting ? p1Run : p2Run;
-            const bowlerRun = p1.isBatting ? p2Run : p1Run;
+        // 3. Both ready? Process the ball
+        if (game.currentPicks.player1 !== null && game.currentPicks.player2 !== null) {
+            // 4. Atomic "claim" to process the ball - only one request will succeed here
+            const processingGame = await CricketGame.findOneAndUpdate(
+                { 
+                    gameId, 
+                    'currentPicks.player1': { $ne: null }, 
+                    'currentPicks.player2': { $ne: null } 
+                },
+                { $set: { 'currentPicks.player1': null, 'currentPicks.player2': null } },
+                { new: false } // return state BEFORE clearing picks
+            );
 
-            const MAX_WICKETS = 3;
+            if (processingGame) {
+                // We are the processor!
+                const p1 = processingGame.players[0];
+                const p2 = processingGame.players[1];
+                const p1Run = processingGame.currentPicks.player1;
+                const p2Run = processingGame.currentPicks.player2;
 
-            if (batsmanRun === bowlerRun) {
-                // OUT!
-                batsman.wickets += 1;
-                game.lastMove = { batsmanRun, bowlerRun, result: 'out' };
+                const batsman = p1.isBatting ? p1 : p2;
+                const bowler = p1.isBatting ? p2 : p1;
+                const batsmanRun = p1.isBatting ? p1Run : p2Run;
+                const bowlerRun = p1.isBatting ? p2Run : p1Run;
 
-                if (batsman.wickets >= MAX_WICKETS) {
-                    // All out!
-                    if (game.inning === 1) {
-                        game.target = batsman.score + 1;
-                        game.inning = 2;
-                        p1.isBatting = !p1.isBatting;
-                        p2.isBatting = !p2.isBatting;
-                        // Reset current batsman's score for the new inning
-                        const newBatsman = p1.isBatting ? p1 : p2;
-                        newBatsman.score = 0;
-                        newBatsman.wickets = 0;
-                    } else {
-                        // Game Over - Bowler Wins
-                        game.lastMove.result = 'gameover';
+                const MAX_WICKETS = 3;
+                let moveResult = 'runs';
+                let inning = processingGame.inning;
+                let target = processingGame.target;
+                let status = processingGame.status;
+
+                if (batsmanRun === bowlerRun) {
+                    batsman.wickets += 1;
+                    moveResult = 'out';
+
+                    if (batsman.wickets >= MAX_WICKETS) {
+                        if (inning === 1) {
+                            target = batsman.score + 1;
+                            inning = 2;
+                            p1.isBatting = !p1.isBatting;
+                            p2.isBatting = !p2.isBatting;
+                            const newBatsman = p1.isBatting ? p1 : p2;
+                            newBatsman.score = 0;
+                            newBatsman.wickets = 0;
+                        } else {
+                            moveResult = 'gameover';
+                            status = 'finished';
+                        }
+                    }
+                } else {
+                    batsman.score += batsmanRun;
+                    moveResult = 'runs';
+                    if (inning === 2 && batsman.score >= target) {
+                        moveResult = 'win';
+                        status = 'finished';
                     }
                 }
+
+                const finalGame = await CricketGame.findOneAndUpdate(
+                    { gameId },
+                    { 
+                        $set: { 
+                            players: [p1, p2],
+                            lastMove: { batsmanRun, bowlerRun, result: moveResult },
+                            inning, target, status,
+                            lastUpdated: Date.now()
+                        } 
+                    },
+                    { new: true }
+                );
+
+                // Notify BOTH players to ensure all tabs are synced
+                await Promise.all([
+                    pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-ball", { game: finalGame }),
+                    pusher.trigger(`private-notifications-${from.toLowerCase()}`, "cricket-ball", { game: finalGame })
+                ]).catch(e => console.error("Pusher trigger error:", e));
+
+                return res.json({ success: true, game: finalGame });
             } else {
-                // Runs scored
-                batsman.score += batsmanRun;
-                game.lastMove = { batsmanRun, bowlerRun, result: 'runs' };
-
-                // Inning 2 Target check
-                if (game.inning === 2 && batsman.score >= game.target) {
-                    game.lastMove.result = 'win';
-                }
+                // Someone else already processed it, fetch latest state
+                game = await CricketGame.findOne({ gameId });
+                return res.json({ success: true, game });
             }
-
-            // Clear picks for next ball
-            game.currentPicks = { player1: null, player2: null };
-            game.lastUpdated = Date.now();
-            await game.save();
-
-            // Notify both
-            await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "cricket-ball", { game });
-            return res.json({ success: true, game });
         }
 
-        await game.save();
         res.json({ success: true, waiting: true });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) { 
+        console.error("Cricket Pick Error:", err);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 app.post("/api/games/cricket/highfive", isAuth, async (req, res) => {
