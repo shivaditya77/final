@@ -9,7 +9,7 @@
         .game-body {
             min-height: 100vh; background: var(--bg-dark); color: white;
             font-family: 'Outfit', sans-serif; display: flex; flex-direction: column;
-            align-items: center; padding-top: 80px; position: relative; overflow-x: hidden;
+            align-items: center; padding-top: 60px; position: relative; overflow-x: hidden;
         }
 
         /* Lobby UI */
@@ -46,21 +46,24 @@
 
         /* The Professional Board */
         .ludo-container {
-            width: 100%; display: flex; flex-direction: column; align-items: center; gap: 25px;
+            width: 95vw; max-width: 500px; display: flex; flex-direction: column; align-items: center; gap: 20px;
             opacity: 0; pointer-events: none; transition: opacity 0.8s;
         }
         .ludo-container.active { opacity: 1; pointer-events: auto; }
 
         .hud {
-            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);
-            padding: 20px; border-radius: 24px; display: flex; justify-content: space-between; align-items: center;
+            width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass);
+            padding: 12px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center;
             backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 5px;
         }
 
+        #turn-badge { font-size: 0.8rem; padding: 10px 20px !important; white-space: nowrap; }
+
         .ludo-board {
-            position: relative; width: 90vw; height: 90vw; max-width: 500px; max-height: 500px;
-            background: #111; border: 8px solid #222;
-            box-shadow: 0 30px 80px rgba(0,0,0,0.9); border-radius: 15px; overflow: hidden;
+            position: relative; width: 100%; aspect-ratio: 1 / 1;
+            background: #111; border: 4px solid #222;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden;
             display: block;
         }
 
@@ -112,11 +115,11 @@
 
         /* Tokens */
         .token {
-            width: 75%; height: 75%; border-radius: 50%; border: 2.5px solid white; 
-            box-shadow: 0 6px 15px rgba(0,0,0,0.6);
+            width: 82%; height: 82%; border-radius: 50%; border: 1.5px solid white; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             cursor: pointer; z-index: 100; position: absolute; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex; align-items: center; justify-content: center; font-weight: 900; color: white;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
         }
         .t-red { background: radial-gradient(circle at 30% 30%, #ff758c, #c9184a); }
         .t-blue { background: radial-gradient(circle at 30% 30%, #4facfe, #00d2ff); }
@@ -127,13 +130,13 @@
         @keyframes pulse { 0%, 100% { transform: scale(1.15); } 50% { transform: scale(1.3); } }
 
         /* HUD */
-        .dice-box { width: 65px; height: 65px; background: white; color: black; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        .dice-box { width: 55px; height: 55px; background: white; color: black; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         .dice-box.rolling { animation: shake 0.2s infinite; }
         @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
 
         .btn-action { 
             background: linear-gradient(135deg, #6e45e2, #88d3ce); color: white; border: none; 
-            padding: 16px 45px; border-radius: 50px; font-weight: 900; cursor: pointer; font-size: 1.1rem; 
+            padding: 12px 30px; border-radius: 50px; font-weight: 900; cursor: pointer; font-size: 1rem; 
             box-shadow: 0 10px 30px rgba(110,69,226,0.3);
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
@@ -479,6 +482,15 @@
             setTimeout(async () => {
                 document.getElementById('dice').classList.remove('rolling');
                 const icons = ['⚀','⚁','⚂','⚃','⚄','⚅']; document.getElementById('dice').innerText = icons[data.roll - 1];
+                
+                if (data.cancelled) {
+                    speak("Three sixes! Turn cancelled!");
+                    document.getElementById('status').innerText = "3 Sixes! Turn Cancelled.";
+                    state.turn = data.nextTurn; state.roll = 0; state.waitingForMove = false;
+                    setTimeout(() => { document.getElementById('dice').innerText = '🎲'; updateUI(); }, 1000);
+                    return;
+                }
+
                 state.roll = data.roll; state.waitingForMove = true;
                 
                 if(data.roll === 6) speakEvent('roll_6', { player: username });
@@ -498,17 +510,91 @@
             }, 600);
         }
 
-        function getMovableTokens(color, roll) { return state.tokens[color].map((t, i) => { if(!t || t.status === 'finished') return -1; if(t.status === 'home' && roll !== 6) return -1; if(t.status === 'homerun' && t.pos + roll > 5) return -1; return i; }).filter(i => i !== -1); }
+        function getBlocks() {
+            const blocks = {};
+            const positions = {};
+            Object.keys(state.tokens).forEach(color => {
+                state.tokens[color].forEach(t => {
+                    if (t && t.status === 'track') {
+                        const globalPos = (CONFIGS[color].start + t.pos) % 52;
+                        const key = `track-${globalPos}`;
+                        positions[key] = positions[key] || {};
+                        positions[key][color] = (positions[key][color] || 0) + 1;
+                    }
+                });
+            });
+            Object.keys(positions).forEach(key => {
+                Object.keys(positions[key]).forEach(color => {
+                    if (positions[key][color] >= 2) blocks[key] = color;
+                });
+            });
+            return blocks;
+        }
+
+        function getMovableTokens(color, roll) { 
+            const blocks = getBlocks();
+            return state.tokens[color].map((t, i) => { 
+                if(!t || t.status === 'finished') return -1; 
+                if(t.status === 'home') {
+                    if (roll !== 6) return -1;
+                    // Check if starting square is blocked by opponent
+                    const globalPos = CONFIGS[color].start;
+                    const blockOwner = blocks[`track-${globalPos}`];
+                    if (blockOwner && blockOwner !== color) return -1;
+                    return i;
+                }
+                if(t.status === 'homerun') {
+                    if (t.pos + roll > 5) return -1;
+                    return i;
+                }
+                
+                // Track movement block check
+                for (let s = 1; s <= roll; s++) {
+                    let checkPos = t.pos + s;
+                    if (checkPos > 51) break; // Entering home run
+                    const globalPos = (CONFIGS[color].start + checkPos) % 52;
+                    const blockOwner = blocks[`track-${globalPos}`];
+                    if (blockOwner && blockOwner !== color) return -1;
+                }
+                
+                return i; 
+            }).filter(i => i !== -1); 
+        }
 
         async function handleTokenClick(color, idx) {
             if(!state.waitingForMove || color !== state.turn) return;
             if(!getMovableTokens(color, state.roll).includes(idx)) return;
             const t = state.tokens[color][idx]; let newPos = t.pos, newStatus = t.status;
+            let bonusTurn = false;
+
             if(t.status === 'home') { newStatus = 'track'; newPos = 0; }
-            else if(t.status === 'track') { newPos += state.roll; if(newPos > 51) { newStatus = 'homerun'; newPos -= 52; } }
-            else if(t.status === 'homerun') { newPos += state.roll; if(newPos === 5) newStatus = 'finished'; }
+            else if(t.status === 'track') { 
+                newPos += state.roll; 
+                if(newPos > 51) { newStatus = 'homerun'; newPos -= 52; } 
+                else {
+                    // Check capture for bonus turn
+                    const realPos = (CONFIGS[color].start + newPos) % 52;
+                    const isSafe = STAMPS.some(s => s[0] === TRACK[realPos][0] && s[1] === TRACK[realPos][1]);
+                    if (!isSafe) {
+                        Object.keys(state.tokens).forEach(oc => {
+                            if (oc === color) return;
+                            state.tokens[oc].forEach(ot => {
+                                if (ot && ot.status === 'track' && ((CONFIGS[oc].start + ot.pos) % 52) === realPos) bonusTurn = true;
+                            });
+                        });
+                    }
+                }
+            }
+            else if(t.status === 'homerun') { 
+                newPos += state.roll; 
+                if(newPos === 5) {
+                    newStatus = 'finished';
+                    bonusTurn = true; // Rule 13.B: Bonus on Reaching Home
+                }
+            }
+
             await moveToken(color, idx, newStatus, newPos);
-            const res = await fetch('/api/games/ludo/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, tokenId: idx, color, status: newStatus, pos: newPos }) });
+            const res = await fetch('/api/games/ludo/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, tokenId: idx, color, status: newStatus, pos: newPos, bonusTurn }) });
             const data = await res.json(); 
             if(data.winner) {
                 showWin(data.winner);
@@ -623,8 +709,8 @@
             Object.values(map).forEach(tokens => {
                 if(tokens.length > 1) {
                     tokens.forEach((t, i) => {
-                        const offset = (i - (tokens.length - 1) / 2) * 10;
-                        t.el.style.transform = `translate(${offset}px, ${offset}px) scale(0.9)`;
+                        const offset = (i - (tokens.length - 1) / 2) * 25; // 25% offset
+                        t.el.style.transform = `translate(${offset}%, ${offset}%) scale(0.85)`;
                     });
                 } else {
                     tokens[0].el.style.transform = 'none';
@@ -637,7 +723,7 @@
             Object.keys(state.assignments).forEach(otherColor => {
                 if(otherColor === color) return;
                 state.tokens[otherColor].forEach((t, i) => { 
-                    if(t.status === 'track' && ((CONFIGS[otherColor].start + t.pos) % 52) === realPos) {
+                    if(t && t.status === 'track' && ((CONFIGS[otherColor].start + t.pos) % 52) === realPos) {
                         document.getElementById('snd-kick').play();
                         speakEvent('kick', { killer: username, target: state.assignments[otherColor] });
                         if(window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
@@ -669,7 +755,24 @@
                 renderSetup();
             }
         });
-        channel.bind('ludo-rolled', (data) => { if(data.from.toLowerCase() === otherUser.toLowerCase()) { state.roll = data.roll; state.waitingForMove = true; document.getElementById('dice').classList.add('rolling'); setTimeout(() => { document.getElementById('dice').classList.remove('rolling'); const icons = ['⚀','⚁','⚂','⚃','⚄','⚅']; document.getElementById('dice').innerText = icons[data.roll - 1]; updateUI(); }, 600); } });
+        channel.bind('ludo-rolled', (data) => { 
+            if(data.from.toLowerCase() === otherUser.toLowerCase()) { 
+                if (data.cancelled) {
+                    speak("Opponent rolled three sixes! Turn cancelled!");
+                    document.getElementById('status').innerText = "Opponent: 3 Sixes! Turn Cancelled.";
+                    state.turn = data.nextTurn; state.roll = 0; state.waitingForMove = false;
+                    setTimeout(() => { document.getElementById('dice').innerText = '🎲'; updateUI(); }, 1000);
+                    return;
+                }
+                state.roll = data.roll; state.waitingForMove = true; 
+                document.getElementById('dice').classList.add('rolling'); 
+                setTimeout(() => { 
+                    document.getElementById('dice').classList.remove('rolling'); 
+                    const icons = ['⚀','⚁','⚂','⚃','⚄','⚅']; document.getElementById('dice').innerText = icons[data.roll - 1]; 
+                    updateUI(); 
+                }, 600); 
+            } 
+        });
         channel.bind('ludo-moved', (data) => { if(data.from.toLowerCase() === otherUser.toLowerCase()) { if(!data.isSkip) moveToken(data.color, data.tokenId, data.status, data.pos); state.turn = data.nextTurn; state.roll = 0; state.waitingForMove = false; document.getElementById('dice').innerText = '🎲'; updateUI(); } });
         channel.bind('ludo-win', (data) => showWin(data.winner));
         async function requestReset() { if(confirm("Reset Game?")) { await fetch('/api/games/ludo/reset', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({to:otherUser}) }); location.reload(); } }

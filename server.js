@@ -1217,6 +1217,7 @@ app.get("/api/games/ludo/state", isAuth, (req, res) => {
             assignments: {}, // { red: 'Bhondu', ... }
             turn: 'red',
             roll: 0,
+            consecutiveSixes: 0,
             waitingForMove: false,
             tokens: {
                 red: [null, null, null, null],
@@ -1262,6 +1263,34 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
         
         // Update server state
         if (ludoStates[gameId]) {
+            if (roll === 6) {
+                ludoStates[gameId].consecutiveSixes++;
+            } else {
+                ludoStates[gameId].consecutiveSixes = 0;
+            }
+
+            if (ludoStates[gameId].consecutiveSixes === 3) {
+                // 3 Sixes in a row -> Turn Cancelled
+                ludoStates[gameId].roll = 0;
+                ludoStates[gameId].consecutiveSixes = 0;
+                ludoStates[gameId].waitingForMove = false;
+                
+                // Switch Turn
+                const order = ['red', 'blue', 'yellow', 'green'];
+                const assignedColors = Object.keys(ludoStates[gameId].assignments);
+                let currentIdx = order.indexOf(ludoStates[gameId].turn);
+                for (let i = 1; i <= 4; i++) {
+                    let nextColor = order[(currentIdx + i) % 4];
+                    if (assignedColors.includes(nextColor)) {
+                        ludoStates[gameId].turn = nextColor;
+                        break;
+                    }
+                }
+                
+                await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", { from, roll: 6, cancelled: true, nextTurn: ludoStates[gameId].turn });
+                return res.json({ success: true, roll: 6, cancelled: true, nextTurn: ludoStates[gameId].turn });
+            }
+
             ludoStates[gameId].roll = roll;
             ludoStates[gameId].waitingForMove = true;
         }
@@ -1273,7 +1302,7 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
 
 app.post("/api/games/ludo/move", isAuth, async (req, res) => {
     try {
-        const { to, tokenId, color, status, pos, isSkip } = req.body;
+        const { to, tokenId, color, status, pos, isSkip, bonusTurn } = req.body;
         const from = req.session.username || "Bhondu";
         const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
 
@@ -1295,7 +1324,9 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
             ludoStates[gameId].waitingForMove = false;
             
             // Turn switching logic: Skip unassigned colors
-            if (ludoStates[gameId].roll !== 6 || isSkip) {
+            // If it's a 6, or a bonus turn (capture/home), stay on current turn
+            if ((ludoStates[gameId].roll !== 6 && !bonusTurn) || isSkip) {
+                ludoStates[gameId].consecutiveSixes = 0; // Reset on turn switch
                 const order = ['red', 'blue', 'yellow', 'green'];
                 const assignedColors = Object.keys(ludoStates[gameId].assignments);
                 let currentIdx = order.indexOf(ludoStates[gameId].turn);
@@ -1314,8 +1345,8 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
             ludoStates[gameId].roll = 0;
         }
 
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-moved", { from, tokenId, color, status, pos, nextTurn: ludoStates[gameId].turn, isSkip });
-        res.json({ success: true, nextTurn: ludoStates[gameId].turn });
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-moved", { from, tokenId, color, status, pos, nextTurn: ludoStates[gameId].turn, isSkip, bonusTurn });
+        res.json({ success: true, nextTurn: ludoStates[gameId].turn, bonusTurn });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 

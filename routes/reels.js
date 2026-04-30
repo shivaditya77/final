@@ -14,11 +14,8 @@ router.get('/reels', isAuth, (req, res) => {
         console.error("Error loading reels_list.json:", err);
     }
 
-    // Shuffle for variety
-    const shuffledReels = [...reels].sort(() => Math.random() - 0.5);
-
     res.render('reels', { 
-        reels: shuffledReels,
+        reels: reels,
         username,
         pusherKey: process.env.PUSHER_KEY, 
         pusherCluster: process.env.PUSHER_CLUSTER 
