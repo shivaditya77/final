@@ -441,9 +441,17 @@
                 if (game.currentPicks[mySlot]) { 
                     setControlsEnabled(false); 
                     document.getElementById('waitingText').style.display = 'block'; 
-                    document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.5rem; opacity: 0.5;">Stuck?</span>';
+                    document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.6rem; opacity: 0.8; color: #4ade80;">Force Sync?</span>';
                 }
                 else { setControlsEnabled(true); document.getElementById('waitingText').style.display = 'none'; }
+            } else {
+                // If not playing, definitely hide the waiting text
+                document.getElementById('waitingText').style.display = 'none';
+                
+                // If finished, show the result overlay
+                if (game.status === 'finished' || (game.lastMove && (game.lastMove.result === 'win' || game.lastMove.result === 'gameover'))) {
+                    handleGameEndOverlay(game);
+                }
             }
         }
 
