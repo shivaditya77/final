@@ -398,6 +398,7 @@
         channel.bind('cricket-highfive-complete', () => performHighFiveAnimation());
 
         async function fetchState() {
+            isProcessing = false; // Force reset if stuck
             const res = await fetch(`/api/games/cricket/state?otherUser=${otherUser}`);
             const data = await res.json();
             if (data.success) updateUI(data.game);
@@ -484,14 +485,17 @@
 
         async function makePick(num) {
             try {
-                const btn = event.currentTarget; 
+                // Use window.event as fallback for older browsers or specific event triggers
+                const evt = window.event;
+                const btn = (evt && evt.currentTarget) ? evt.currentTarget : null;
+                
                 const btns = document.querySelectorAll('.pick-btn'); 
                 btns.forEach(b => b.classList.remove('selected')); 
-                if (btn) btn.classList.add('selected'); 
+                if (btn && btn.classList) btn.classList.add('selected'); 
                 
                 setControlsEnabled(false); 
                 document.getElementById('waitingText').style.display = 'block';
-                document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.5rem; opacity: 0.5;">Stuck?</span>';
+                document.getElementById('waitingText').innerHTML = 'Waiting for other player... <span onclick="fetchState()" style="text-decoration: underline; cursor: pointer; font-size: 0.6rem; opacity: 0.8; color: #4ade80;">Force Sync?</span>';
                 
                 const res = await fetch('/api/games/cricket/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, run: num }) });
                 const data = await res.json(); 
@@ -501,7 +505,7 @@
                     document.getElementById('waitingText').style.display = 'none';
                 }
             } catch (err) {
-                console.error(err);
+                console.error("Pick Error:", err);
                 setControlsEnabled(true);
                 document.getElementById('waitingText').style.display = 'none';
             }

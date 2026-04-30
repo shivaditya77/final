@@ -910,13 +910,13 @@ app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
         );
 
         // 3. Both ready? Process the ball
-        if (game.currentPicks.player1 !== null && game.currentPicks.player2 !== null) {
+        if (game.currentPicks.player1 && game.currentPicks.player2) {
             // 4. Atomic "claim" to process the ball - only one request will succeed here
             const processingGame = await CricketGame.findOneAndUpdate(
                 { 
                     gameId, 
-                    'currentPicks.player1': { $ne: null }, 
-                    'currentPicks.player2': { $ne: null } 
+                    'currentPicks.player1': { $gt: 0 }, 
+                    'currentPicks.player2': { $gt: 0 } 
                 },
                 { $set: { 'currentPicks.player1': null, 'currentPicks.player2': null } },
                 { new: false } // return state BEFORE clearing picks
