@@ -46,64 +46,69 @@
 
         /* The Professional Board */
         .ludo-container {
-            position: relative; z-index: 10; width: 100%; max-width: 600px;
-            padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 20px;
+            width: 100%; display: flex; flex-direction: column; align-items: center; gap: 25px;
             opacity: 0; pointer-events: none; transition: opacity 0.8s;
         }
         .ludo-container.active { opacity: 1; pointer-events: auto; }
 
+        .hud {
+            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);
+            padding: 20px; border-radius: 24px; display: flex; justify-content: space-between; align-items: center;
+            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
         .ludo-board {
-            display: grid; grid-template-columns: repeat(15, 1fr);
-            width: 92vw; max-width: 500px; aspect-ratio: 1/1;
-            background: #0f0f0f; border: 4px solid #222;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.8); position: relative;
-            border-radius: 8px; overflow: hidden; touch-action: manipulation;
+            position: relative; width: 90vw; height: 90vw; max-width: 500px; max-height: 500px;
+            background: #111; border: 8px solid #222;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.9); border-radius: 15px; overflow: hidden;
+            display: block;
         }
 
-        .cell { border: 0.2px solid rgba(255,255,255,0.02); display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+        #cells-grid {
+            position: absolute; inset: 0; z-index: 1;
+            display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+            width: 100%; height: 100%;
+        }
+
+        .cell { 
+            border: 0.5px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; 
+            background: rgba(255,255,255,0.02); box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .cell.track-path { background: rgba(255,255,255,0.04); }
         
-        .base { position: absolute; width: 40%; height: 40%; padding: 2%; z-index: 5; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .base { position: absolute; width: 40%; height: 40%; z-index: 10; pointer-events: none; }
         .base-inner { 
-            width: 100%; height: 100%; background: rgba(0,0,0,0.5); border-radius: 12px; 
+            width: 100%; height: 100%; background: rgba(0,0,0,0.4); border-radius: 20px; 
             display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; 
-            padding: 10%; gap: 10%; border: 1px solid rgba(255,255,255,0.05);
+            padding: 10%; gap: 10%; border: 2px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.3);
+            pointer-events: auto;
         }
-        .slot { border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; position: relative; }
+        .slot { border-radius: 50%; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.05); position: relative; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5); }
 
-        @media (max-width: 600px) {
-            .game-body { padding-top: 60px; }
-            .hud { padding: 15px; border-radius: 20px; margin-bottom: 0; }
-            .setup-content { padding: 25px; border-radius: 30px; }
-            .btn-action { padding: 12px 30px; font-size: 1rem; }
-            .dice-box { width: 55px; height: 55px; font-size: 1.8rem; }
-            .turn-indicator { font-size: 0.8rem; padding: 10px 20px !important; }
+        .red-base { top: 0; left: 0; background: linear-gradient(135deg, rgba(255, 77, 109, 0.2), rgba(255, 77, 109, 0.05)); }
+        .blue-base { top: 0; right: 0; background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(0, 210, 255, 0.05)); }
+        .green-base { bottom: 0; left: 0; background: linear-gradient(135deg, rgba(46, 213, 115, 0.2), rgba(46, 213, 115, 0.05)); }
+        .yellow-base { bottom: 0; right: 0; background: linear-gradient(135deg, rgba(255, 165, 2, 0.2), rgba(255, 165, 2, 0.05)); }
+
+        .red-path { background: rgba(255, 77, 109, 0.2) !important; border: 1px solid rgba(255, 77, 109, 0.4) !important; }
+        .blue-path { background: rgba(0, 210, 255, 0.2) !important; border: 1px solid rgba(0, 210, 255, 0.4) !important; }
+        .green-path { background: rgba(46, 213, 115, 0.2) !important; border: 1px solid rgba(46, 213, 115, 0.4) !important; }
+        .yellow-path { background: rgba(255, 165, 2, 0.2) !important; border: 1px solid rgba(255, 165, 2, 0.4) !important; }
+
+        .stamp::after { content: '★'; color: #ffd700; font-size: 1.2rem; filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); font-weight: 900; }
+
+        .home-center {
+            position: absolute; width: 20%; height: 20%; top: 40%; left: 40%; z-index: 15;
+            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+            background: #111; border: 2px solid #333; box-shadow: 0 0 40px rgba(0,0,0,0.6);
         }
-
-        .red-base { top: 0; left: 0; background: linear-gradient(135deg, rgba(255, 77, 109, 0.4), rgba(255, 77, 109, 0.1)); }
-        .blue-base { top: 0; right: 0; background: linear-gradient(135deg, rgba(0, 210, 255, 0.4), rgba(0, 210, 255, 0.1)); }
-        .green-base { bottom: 0; left: 0; background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 255, 136, 0.1)); }
-        .yellow-base { bottom: 0; right: 0; background: linear-gradient(135deg, rgba(255, 215, 0, 0.4), rgba(255, 215, 0, 0.1)); }
-
-        /* Paths & Stamps */
-        .path-red { background: rgba(255, 77, 109, 0.25) !important; }
-        .path-blue { background: rgba(0, 210, 255, 0.25) !important; }
-        .path-green { background: rgba(0, 255, 136, 0.25) !important; }
-        .path-yellow { background: rgba(255, 215, 0, 0.25) !important; }
-
-        .stamp { background: rgba(255,255,255,0.05) !important; }
-        .stamp::after { content: '★'; color: #ffd700; font-size: 1.4rem; filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); font-weight: 900; }
-
-        /* Center Professional Triangles */
-        .center-home {
-            position: absolute; inset: 40%; z-index: 10; background: #1a1a1a;
-            display: flex; align-items: center; justify-content: center;
-            border: 2px solid #333; overflow: hidden;
-        }
-        .tri { position: absolute; width: 0; height: 0; border-style: solid; }
-        .tri-red { border-width: 60px 60px 0 60px; border-color: rgba(255, 77, 109, 0.6) transparent transparent transparent; top: 0; left: 0; }
-        .tri-blue { border-width: 60px 0 60px 60px; border-color: transparent transparent transparent rgba(0, 210, 255, 0.6); top: 0; right: 0; }
-        .tri-yellow { border-width: 0 60px 60px 60px; border-color: transparent transparent rgba(255, 215, 0, 0.6) transparent; bottom: 0; left: 0; }
-        .tri-green { border-width: 60px 60px 60px 0; border-color: transparent rgba(0, 255, 136, 0.6) transparent transparent; top: 0; left: 0; }
+        .home-tri { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+        .tri-red { background: linear-gradient(45deg, var(--red), transparent); clip-path: polygon(0 0, 100% 100%, 0 100%); }
+        .tri-blue { background: linear-gradient(-45deg, var(--blue), transparent); clip-path: polygon(100% 0, 100% 100%, 0 0); }
+        .tri-green { background: linear-gradient(-45deg, var(--green), transparent); clip-path: polygon(0 100%, 100% 0, 0 0); }
+        .tri-yellow { background: linear-gradient(45deg, var(--yellow), transparent); clip-path: polygon(100% 100%, 100% 0, 0 100%); }
 
         /* Tokens */
         .token {
@@ -115,14 +120,13 @@
         }
         .t-red { background: radial-gradient(circle at 30% 30%, #ff758c, #c9184a); }
         .t-blue { background: radial-gradient(circle at 30% 30%, #4facfe, #00d2ff); }
-        .t-green { background: radial-gradient(circle at 30% 30%, #43e97b, #00a86b); }
-        .t-yellow { background: radial-gradient(circle at 30% 30%, #f6d365, #fda085); }
+        .t-green { background: radial-gradient(circle at 30% 30%, #43e97b, #2ed373); }
+        .t-yellow { background: radial-gradient(circle at 30% 30%, #f6d365, #ffa502); }
         
         .token.active-turn { animation: pulse 1.2s infinite; transform: scale(1.15); border-color: #fff; box-shadow: 0 0 25px rgba(255,255,255,0.6); z-index: 110; }
         @keyframes pulse { 0%, 100% { transform: scale(1.15); } 50% { transform: scale(1.3); } }
 
         /* HUD */
-        .hud { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 30px; border: 1px solid var(--border-glass); }
         .dice-box { width: 65px; height: 65px; background: white; color: black; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         .dice-box.rolling { animation: shake 0.2s infinite; }
         @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
@@ -191,8 +195,9 @@
     <div class="game-body">
         <%- include('partials/navbar') %>
 
-        <div class="ludo-container" id="ludo-container">
-            <div class="hud">
+        <div class="main-content">
+            <div id="ludo-container" class="ludo-container">
+                <div class="hud">
                 <div id="turn-badge" class="turn-indicator red" style="padding: 12px 30px; border-radius: 50px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">Bhondu's Turn</div>
                 <div style="display:flex; align-items:center; gap:20px;">
                     <div id="comm-toggle" onclick="toggleComm()" style="cursor:pointer; opacity:0.5; font-size:1.2rem;">🔊</div>
@@ -201,20 +206,22 @@
                 </div>
             </div>
 
-            <div class="ludo-board" id="board">
-                <!-- Pro Bases -->
+            <div class="ludo-board" id="ludo-board">
+                <!-- The Grid Layer -->
+                <div id="cells-grid" style="display:grid; grid-template-columns:repeat(15, 1fr); width:100%; height:100%;"></div>
+
+                <!-- Persistent Bases -->
                 <div class="base red-base" id="b-red" style="top:0;left:0;"><div class="base-inner"><div class="slot" id="s-red-0"></div><div class="slot" id="s-red-1"></div><div class="slot" id="s-red-2"></div><div class="slot" id="s-red-3"></div></div></div>
                 <div class="base blue-base" id="b-blue" style="top:0;right:0;"><div class="base-inner"><div class="slot" id="s-blue-0"></div><div class="slot" id="s-blue-1"></div><div class="slot" id="s-blue-2"></div><div class="slot" id="s-blue-3"></div></div></div>
                 <div class="base green-base" id="b-green" style="bottom:0;left:0;"><div class="base-inner"><div class="slot" id="s-green-0"></div><div class="slot" id="s-green-1"></div><div class="slot" id="s-green-2"></div><div class="slot" id="s-green-3"></div></div></div>
                 <div class="base yellow-base" id="b-yellow" style="bottom:0;right:0;"><div class="base-inner"><div class="slot" id="s-yellow-0"></div><div class="slot" id="s-yellow-1"></div><div class="slot" id="s-yellow-2"></div><div class="slot" id="s-yellow-3"></div></div></div>
                 
-                <!-- Professional Center -->
-                <div class="center-home">
-                    <div class="tri tri-red"></div>
-                    <div class="tri tri-blue"></div>
-                    <div class="tri tri-yellow"></div>
-                    <div class="tri tri-green"></div>
-                    <div style="position:absolute; z-index:20; font-size:1.5rem;">🏠</div>
+                <!-- Center Home -->
+                <div class="home-center">
+                    <div class="home-tri tri-red"></div>
+                    <div class="home-tri tri-blue"></div>
+                    <div class="home-tri tri-yellow"></div>
+                    <div class="home-tri tri-green"></div>
                 </div>
             </div>
 
@@ -413,12 +420,31 @@
 
         // --- GAME ---
         function initBoard() {
-            const board = document.getElementById('board');
-            for(let r=0; r<15; r++) { for(let c=0; c<15; c++) {
-                const cell = document.createElement('div'); cell.className = 'cell'; cell.id = `c-${r}-${c}`; board.appendChild(cell);
-            }}
-            STAMPS.forEach(pos => document.getElementById(`c-${pos[0]}-${pos[1]}`).classList.add('stamp'));
-            Object.keys(HOME_RUNS).forEach(color => { HOME_RUNS[color].forEach(pos => document.getElementById(`c-${pos[0]}-${pos[1]}`).classList.add('path-' + color)); });
+            const grid = document.getElementById('cells-grid'); grid.innerHTML = '';
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    const cell = document.createElement('div'); cell.className = 'cell'; cell.id = `c-${r}-${c}`;
+                    const isTrack = (r >= 6 && r <= 8) || (c >= 6 && c <= 8);
+                    const isCenter = (r >= 6 && r <= 8) && (c >= 6 && c <= 8);
+                    if(isTrack && !isCenter) {
+                        // Entry points
+                        if(r === 6 && c === 1) cell.classList.add('red-path');
+                        if(r === 1 && c === 8) cell.classList.add('blue-path');
+                        if(r === 8 && c === 13) cell.classList.add('yellow-path');
+                        if(r === 13 && c === 6) cell.classList.add('green-path');
+                        // Home runs
+                        if(r === 7 && c > 0 && c < 6) cell.classList.add('red-path');
+                        if(r === 7 && c > 8 && c < 14) cell.classList.add('yellow-path');
+                        if(c === 7 && r > 0 && r < 6) cell.classList.add('blue-path');
+                        if(c === 7 && r > 8 && r < 14) cell.classList.add('green-path');
+                    }
+                    grid.appendChild(cell);
+                }
+            }
+            // Stars moved "one step back" as per request
+            const ADJUSTED_STAMPS = [[6,1], [1,8], [8,13], [13,6], [8,2], [2,6], [6,12], [12,8]];
+            ADJUSTED_STAMPS.forEach(p => { const el = document.getElementById(`c-${p[0]}-${p[1]}`); if(el) el.classList.add('stamp'); });
+            
             Object.keys(state.assignments).forEach(color => { for(let i=0; i<4; i++) {
                 const t = document.createElement('div'); t.className = `token t-${color}`; t.id = `t-${color}-${i}`; t.innerText = i + 1;
                 t.onclick = () => handleTokenClick(color, i);
@@ -506,26 +532,80 @@
             }());
         }
 
-        async function moveToken(color, idx, status, pos) {
-            const t = state.tokens[color][idx]; t.status = status; t.pos = pos;
-            if(status === 'home') {
+        async function moveToken(color, idx, targetStatus, targetPos) {
+            const t = state.tokens[color][idx];
+            const currentStatus = t.status;
+            const currentPos = t.pos;
+            const roll = state.roll || 1; 
+
+            if(targetStatus === 'home') {
+                t.status = 'home'; t.pos = -1;
                 document.getElementById(`s-${color}-${idx}`).appendChild(t.el);
+                updateStackedTokens();
+                return;
             }
-            else if(status === 'finished') {
-                t.el.style.display = 'none';
-                document.getElementById('snd-home').play();
-                speakEvent('home', { player: state.assignments[color] });
-                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#ff4d6d', '#ffffff'] });
-            }
-            else {
-                document.getElementById('snd-move').play();
-                const coords = (status === 'track') ? TRACK[(CONFIGS[color].start + pos) % 52] : HOME_RUNS[color][pos];
+
+            // Step-by-Step Jumping Animation
+            const tl = gsap.timeline({ onComplete: () => {
+                t.status = targetStatus; t.pos = targetPos;
+                if(targetStatus === 'finished') {
+                    t.el.style.display = 'none';
+                    document.getElementById('snd-home').play();
+                    speakEvent('home', { player: state.assignments[color] });
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#ff4d6d', '#ffffff'] });
+                }
+                if(targetStatus === 'track') checkCapture(color, targetPos);
+                updateStackedTokens();
+            }});
+
+            if(currentStatus === 'home') {
+                // Exit Base
+                const coords = TRACK[CONFIGS[color].start];
                 const cell = document.getElementById(`c-${coords[0]}-${coords[1]}`);
-                const rect = t.el.getBoundingClientRect(); cell.appendChild(t.el); const nRect = t.el.getBoundingClientRect();
-                gsap.fromTo(t.el, { x: rect.left - nRect.left, y: rect.top - nRect.top }, { x: 0, y: 0, duration: 0.3, ease: "power2.out" });
-                if(status === 'track') checkCapture(color, pos);
+                tl.to(t.el, { scale: 1.3, duration: 0.2 })
+                  .call(() => { document.getElementById('snd-move').play(); cell.appendChild(t.el); })
+                  .fromTo(t.el, { y: -20 }, { y: 0, scale: 1, duration: 0.3, ease: "bounce.out" });
+            } else {
+                // Hop through each square with momentum
+                for(let i = 1; i <= roll; i++) {
+                    const stepPos = currentPos + i;
+                    let coords;
+                    if(currentStatus === 'track') {
+                        if(stepPos > 51) coords = HOME_RUNS[color][stepPos - 52];
+                        else coords = TRACK[(CONFIGS[color].start + stepPos) % 52];
+                    } else if(currentStatus === 'homerun') {
+                        coords = HOME_RUNS[color][stepPos];
+                    }
+
+                    if(coords) {
+                        const cell = document.getElementById(`c-${coords[0]}-${coords[1]}`);
+                        const isLast = (i === roll);
+                        
+                        // BUTTERY FLUID ARC
+                        tl.to(t.el, { 
+                            y: -30, 
+                            scaleX: 0.85, scaleY: 1.25, // Stretch up
+                            filter: "drop-shadow(0 20px 15px rgba(0,0,0,0.4))",
+                            duration: 0.08, 
+                            ease: "sine.out",
+                            onStart: () => {
+                                document.getElementById('snd-move').currentTime = 0;
+                                document.getElementById('snd-move').play();
+                            }
+                        })
+                        .call(() => cell.appendChild(t.el))
+                        .to(t.el, { 
+                            y: 0, 
+                            scaleX: isLast ? 1.2 : 1, // Squash on land
+                            scaleY: isLast ? 0.8 : 1,
+                            filter: isLast ? "drop-shadow(0 5px 5px rgba(0,0,0,0.6))" : "drop-shadow(0 15px 10px rgba(0,0,0,0.3))",
+                            duration: 0.08, 
+                            ease: isLast ? "back.out(2)" : "sine.in"
+                        }, "-=0.01")
+                        .to(t.el, { scaleX: 1, scaleY: 1, duration: 0.05, ease: "power2.out" }); // Settle
+                    }
+                }
             }
-            updateStackedTokens();
         }
 
         function updateStackedTokens() {
