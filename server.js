@@ -1193,6 +1193,179 @@ app.get("/reasons", isAuth, (req, res) => res.render("reasons"));
 app.get("/voice-memory", isAuth, (req, res) => res.render("voice-memory"));
 app.get("/outfit", isAuth, (req, res) => res.render("outfit"));
 app.get("/future-plans", isAuth, (req, res) => res.render("future-plans"));
+// --- Ludo Authoritative State ---
+let ludoStates = {}; // Simple in-memory store: { "bhondu-vishu": { ...State } }
+
+app.get("/games/ludo", isAuth, (req, res) => {
+    res.render("game-ludo", {
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
+});
+
+app.get("/api/games/ludo/state", isAuth, (req, res) => {
+    const from = (req.session.username || "Bhondu").toLowerCase();
+    const to = req.query.otherUser.toLowerCase();
+    const gameId = [from, to].sort().join('-');
+    
+    if (!ludoStates[gameId]) {
+        ludoStates[gameId] = {
+            phase: 'setup', // 'setup' or 'playing'
+            mode: '2-house',
+            assignments: {}, // { red: 'Bhondu', ... }
+            turn: 'red',
+            roll: 0,
+            waitingForMove: false,
+            tokens: {
+                red: [null, null, null, null],
+                blue: [null, null, null, null],
+                yellow: [null, null, null, null],
+                green: [null, null, null, null]
+            }
+        };
+    }
+    res.json({ success: true, state: ludoStates[gameId] });
+});
+
+app.post("/api/games/ludo/setup", isAuth, async (req, res) => {
+    try {
+        const { to, mode, assignments, phase } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
+
+        if (ludoStates[gameId]) {
+            if (mode) ludoStates[gameId].mode = mode;
+            if (assignments) ludoStates[gameId].assignments = assignments;
+            if (phase) ludoStates[gameId].phase = phase;
+            
+            // If starting game, determine first turn color from assignments
+            if (phase === 'playing') {
+                const assignedColors = Object.keys(ludoStates[gameId].assignments);
+                ludoStates[gameId].turn = assignedColors[0];
+            }
+        }
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-setup-sync", { from, mode, assignments, phase });
+        res.json({ success: true, state: ludoStates[gameId] });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
+        
+        const roll = Math.floor(Math.random() * 6) + 1;
+        
+        // Update server state
+        if (ludoStates[gameId]) {
+            ludoStates[gameId].roll = roll;
+            ludoStates[gameId].waitingForMove = true;
+        }
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", { from, roll });
+        res.json({ success: true, roll });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ludo/move", isAuth, async (req, res) => {
+    try {
+        const { to, tokenId, color, status, pos, isSkip } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
+
+        if (ludoStates[gameId]) {
+            if (!isSkip) {
+                ludoStates[gameId].tokens[color][tokenId] = { status, pos };
+                
+                // Win detection
+                const tokens = ludoStates[gameId].tokens[color];
+                const finishedCount = tokens.filter(t => t && t.status === 'finished').length;
+                if (finishedCount === 4) {
+                    ludoStates[gameId].phase = 'finished';
+                    ludoStates[gameId].winner = from;
+                    await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-win", { winner: from });
+                    return res.json({ success: true, winner: from });
+                }
+            }
+            
+            ludoStates[gameId].waitingForMove = false;
+            
+            // Turn switching logic: Skip unassigned colors
+            if (ludoStates[gameId].roll !== 6 || isSkip) {
+                const order = ['red', 'blue', 'yellow', 'green'];
+                const assignedColors = Object.keys(ludoStates[gameId].assignments);
+                let currentIdx = order.indexOf(ludoStates[gameId].turn);
+                
+                // Find the next color that is actually assigned
+                let foundNext = false;
+                for (let i = 1; i <= 4; i++) {
+                    let nextColor = order[(currentIdx + i) % 4];
+                    if (assignedColors.includes(nextColor)) {
+                        ludoStates[gameId].turn = nextColor;
+                        foundNext = true;
+                        break;
+                    }
+                }
+            }
+            ludoStates[gameId].roll = 0;
+        }
+
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-moved", { from, tokenId, color, status, pos, nextTurn: ludoStates[gameId].turn, isSkip });
+        res.json({ success: true, nextTurn: ludoStates[gameId].turn });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
+        delete ludoStates[gameId];
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-reset", {});
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/games/road-dash", isAuth, (req, res) => {
+    res.render("game-road-dash", {
+        username: req.session.username,
+        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
+});
+
+app.post("/api/games/road-dash/start", isAuth, async (req, res) => {
+    try {
+        const { to } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-start", { from });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/road-dash/sync", isAuth, async (req, res) => {
+    try {
+        const { to, x, y, speed, state } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-sync", { from, x, y, speed, state });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/games/road-dash/action", isAuth, async (req, res) => {
+    try {
+        const { to, action, data } = req.body;
+        const from = req.session.username || "Bhondu";
+        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-action", { from, action, data });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
 // Error & Health

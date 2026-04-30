@@ -341,7 +341,10 @@
     <div class="overlay" id="overlay">
         <div class="result-text" id="overlayText">OUT!</div>
         <div id="overlaySubtext" style="font-size: 1rem; opacity: 0.8; margin-bottom: 30px;">Switching sides...</div>
-        <button id="overlayActionBtn" onclick="closeOverlay()" style="padding: 15px 40px; border-radius: 40px; border: none; background: white; color: black; font-weight: 900; cursor: pointer;">CONTINUE</button>
+        <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
+            <button id="overlayActionBtn" onclick="closeOverlay()" style="padding: 15px 40px; border-radius: 40px; border: none; background: white; color: black; font-weight: 900; cursor: pointer;">CONTINUE</button>
+            <button onclick="resetMatch()" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.6); padding: 10px 25px; border-radius: 30px; font-size: 0.8rem; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;">Rematch</button>
+        </div>
     </div>
 
     <div class="high-five-hand" id="handLeft">🖐️</div>
