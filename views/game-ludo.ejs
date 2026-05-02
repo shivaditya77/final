@@ -4,12 +4,13 @@
         :root {
             --red: #ff4d6d; --blue: #00d2ff; --green: #00ff88; --yellow: #ffd700;
             --bg-dark: #050505; --border-glass: rgba(255, 255, 255, 0.1);
+            --gold: #ffd700;
         }
 
         .game-body {
             min-height: 100vh; background: var(--bg-dark); color: white;
             font-family: 'Outfit', sans-serif; display: flex; flex-direction: column;
-            align-items: center; padding-top: 60px; position: relative; overflow-x: hidden;
+            align-items: center; padding-top: 80px; position: relative; overflow-x: hidden;
         }
 
         /* Lobby UI */
@@ -46,24 +47,58 @@
 
         /* The Professional Board */
         .ludo-container {
-            width: 95vw; max-width: 500px; display: flex; flex-direction: column; align-items: center; gap: 20px;
+            width: 95vw; max-width: 500px; display: flex; flex-direction: column; align-items: center; gap: 15px;
             opacity: 0; pointer-events: none; transition: opacity 0.8s;
         }
         .ludo-container.active { opacity: 1; pointer-events: auto; }
 
         .hud {
             width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass);
-            padding: 12px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center;
-            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            margin-bottom: 5px;
+            padding: 20px; border-radius: 32px; display: flex; justify-content: space-between; align-items: center;
+            backdrop-filter: blur(25px); box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+            margin-bottom: 20px;
+            position: relative;
         }
 
-        #turn-badge { font-size: 0.8rem; padding: 10px 20px !important; white-space: nowrap; }
+        .hud-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 15px;
+        }
+
+        .hud-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .hud-icon {
+            width: 42px; height: 42px; border-radius: 14px; background: rgba(255,255,255,0.05);
+            display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+            cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s;
+            opacity: 0.7;
+        }
+
+        .hud-icon:hover { opacity: 1; background: rgba(255,255,255,0.1); transform: translateY(-3px); }
+
+        .dice-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #turn-badge { 
+            font-size: 0.95rem; padding: 12px 25px !important; white-space: nowrap; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.2);
+            font-weight: 900; border-radius: 18px; text-transform: uppercase; letter-spacing: 1.5px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: #000;
+        }
 
         .ludo-board {
             position: relative; width: 100%; aspect-ratio: 1 / 1;
             background: #111; border: 4px solid #222;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.9); border-radius: 12px; overflow: hidden;
             display: block;
         }
 
@@ -74,38 +109,38 @@
         }
 
         .cell { 
-            border: 0.5px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; 
-            background: rgba(255,255,255,0.02); box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+            border: 0.5px solid rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; 
+            background: rgba(255,255,255,0.01); box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
             position: relative;
         }
         .cell.track-path { background: rgba(255,255,255,0.04); }
         
         .base { position: absolute; width: 40%; height: 40%; z-index: 10; pointer-events: none; }
         .base-inner { 
-            width: 100%; height: 100%; background: rgba(0,0,0,0.4); border-radius: 20px; 
+            width: 100%; height: 100%; background: rgba(0,0,0,0.5); border-radius: 25px; 
             display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; 
             padding: 10%; gap: 10%; border: 2px solid rgba(255,255,255,0.1);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.3);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 50px rgba(0,0,0,0.4);
             pointer-events: auto;
         }
-        .slot { border-radius: 50%; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.05); position: relative; box-shadow: inset 0 5px 10px rgba(0,0,0,0.5); }
+        .slot { border-radius: 50%; background: rgba(0,0,0,0.7); border: 2px solid rgba(255,255,255,0.05); position: relative; box-shadow: inset 0 8px 15px rgba(0,0,0,0.7); }
 
-        .red-base { top: 0; left: 0; background: linear-gradient(135deg, rgba(255, 77, 109, 0.2), rgba(255, 77, 109, 0.05)); }
-        .blue-base { top: 0; right: 0; background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(0, 210, 255, 0.05)); }
-        .green-base { bottom: 0; left: 0; background: linear-gradient(135deg, rgba(46, 213, 115, 0.2), rgba(46, 213, 115, 0.05)); }
-        .yellow-base { bottom: 0; right: 0; background: linear-gradient(135deg, rgba(255, 165, 2, 0.2), rgba(255, 165, 2, 0.05)); }
+        .red-base { top: 0; left: 0; background: linear-gradient(135deg, rgba(255, 77, 109, 0.25), rgba(255, 77, 109, 0.05)); }
+        .blue-base { top: 0; right: 0; background: linear-gradient(135deg, rgba(0, 210, 255, 0.25), rgba(0, 210, 255, 0.05)); }
+        .green-base { bottom: 0; left: 0; background: linear-gradient(135deg, rgba(46, 213, 115, 0.25), rgba(46, 213, 115, 0.05)); }
+        .yellow-base { bottom: 0; right: 0; background: linear-gradient(135deg, rgba(255, 165, 2, 0.25), rgba(255, 165, 2, 0.05)); }
 
-        .red-path { background: rgba(255, 77, 109, 0.2) !important; border: 1px solid rgba(255, 77, 109, 0.4) !important; }
-        .blue-path { background: rgba(0, 210, 255, 0.2) !important; border: 1px solid rgba(0, 210, 255, 0.4) !important; }
-        .green-path { background: rgba(46, 213, 115, 0.2) !important; border: 1px solid rgba(46, 213, 115, 0.4) !important; }
-        .yellow-path { background: rgba(255, 165, 2, 0.2) !important; border: 1px solid rgba(255, 165, 2, 0.4) !important; }
+        .red-path { background: rgba(255, 77, 109, 0.25) !important; border: 1px solid rgba(255, 77, 109, 0.4) !important; }
+        .blue-path { background: rgba(0, 210, 255, 0.25) !important; border: 1px solid rgba(0, 210, 255, 0.4) !important; }
+        .green-path { background: rgba(46, 213, 115, 0.25) !important; border: 1px solid rgba(46, 213, 115, 0.4) !important; }
+        .yellow-path { background: rgba(255, 165, 2, 0.25) !important; border: 1px solid rgba(255, 165, 2, 0.4) !important; }
 
-        .stamp::after { content: '★'; color: #ffd700; font-size: 1.2rem; filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); font-weight: 900; }
+        .stamp::after { content: '★'; color: #ffd700; font-size: 1.3rem; filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8)); font-weight: 900; }
 
         .home-center {
             position: absolute; width: 20%; height: 20%; top: 40%; left: 40%; z-index: 15;
             display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-            background: #111; border: 2px solid #333; box-shadow: 0 0 40px rgba(0,0,0,0.6);
+            background: #111; border: 2px solid #333; box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
         .home-tri { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
         .tri-red { background: linear-gradient(45deg, var(--red), transparent); clip-path: polygon(0 0, 100% 100%, 0 100%); }
@@ -115,34 +150,41 @@
 
         /* Tokens */
         .token {
-            width: 82%; height: 82%; border-radius: 50%; border: 1.5px solid white; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            width: 85%; height: 85%; border-radius: 50%; border: 2px solid rgba(255,255,255,0.8); 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.6), inset 0 -4px 8px rgba(0,0,0,0.4);
             cursor: pointer; z-index: 100; position: absolute; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex; align-items: center; justify-content: center; font-weight: 900; color: white;
-            font-size: 0.75rem;
+            font-size: 0.8rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         .t-red { background: radial-gradient(circle at 30% 30%, #ff758c, #c9184a); }
         .t-blue { background: radial-gradient(circle at 30% 30%, #4facfe, #00d2ff); }
         .t-green { background: radial-gradient(circle at 30% 30%, #43e97b, #2ed373); }
         .t-yellow { background: radial-gradient(circle at 30% 30%, #f6d365, #ffa502); }
         
-        .token.active-turn { animation: pulse 1.2s infinite; transform: scale(1.15); border-color: #fff; box-shadow: 0 0 25px rgba(255,255,255,0.6); z-index: 110; }
-        @keyframes pulse { 0%, 100% { transform: scale(1.15); } 50% { transform: scale(1.3); } }
+        .token.active-turn { animation: pulse 1.2s infinite; transform: scale(1.2); border-color: #fff; box-shadow: 0 0 30px rgba(255,255,255,0.7); z-index: 110; }
+        @keyframes pulse { 0%, 100% { transform: scale(1.2); } 50% { transform: scale(1.4); } }
 
         /* HUD */
-        .dice-box { width: 55px; height: 55px; background: white; color: black; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        .dice-box { 
+            width: 50px; height: 50px; background: white; color: black; border-radius: 14px; 
+            display: flex; align-items: center; justify-content: center; font-size: 2rem; 
+            cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.1); 
+            transition: all 0.2s; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .dice-box:hover:not(.rolling) { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(0,0,0,0.6); }
         .dice-box.rolling { animation: shake 0.2s infinite; }
         @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
 
         .btn-action { 
             background: linear-gradient(135deg, #6e45e2, #88d3ce); color: white; border: none; 
-            padding: 12px 30px; border-radius: 50px; font-weight: 900; cursor: pointer; font-size: 1rem; 
-            box-shadow: 0 10px 30px rgba(110,69,226,0.3);
+            padding: 10px 24px; border-radius: 50px; font-weight: 900; cursor: pointer; font-size: 0.9rem; 
+            box-shadow: 0 10px 25px rgba(110,69,226,0.4);
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-transform: uppercase; letter-spacing: 1px;
         }
-        .btn-action:hover:not(:disabled) { transform: scale(1.05) translateY(-3px); box-shadow: 0 15px 40px rgba(110,69,226,0.5); }
+        .btn-action:hover:not(:disabled) { transform: scale(1.05) translateY(-3px); box-shadow: 0 15px 40px rgba(110,69,226,0.6); }
         .btn-action:active { transform: scale(0.95); }
-        .btn-action:disabled { opacity: 0.3; filter: grayscale(1); }
+        .btn-action:disabled { opacity: 0.3; filter: grayscale(1); cursor: not-allowed; }
 
         #start-btn.ready-glow { animation: readyPulse 2s infinite; }
         @keyframes readyPulse { 0% { box-shadow: 0 0 0 0 rgba(110,69,226,0.7); } 70% { box-shadow: 0 0 0 20px rgba(110,69,226,0); } 100% { box-shadow: 0 0 0 0 rgba(110,69,226,0); } }
@@ -157,6 +199,18 @@
         }
         .trophy { font-size: 8rem; filter: drop-shadow(0 0 30px #ffd700); margin-bottom: 20px; }
         .winner-name { font-size: 3rem; font-weight: 900; background: linear-gradient(to bottom, #fff, #ffd700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        @media (max-width: 600px) {
+            .game-body { padding-top: 70px; }
+            .hud { padding: 15px; border-radius: 24px; flex-direction: column; gap: 20px; }
+            .hud-left { width: 100%; display: flex; justify-content: center; }
+            .hud-right { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+            .hud-actions { justify-content: center; width: 100%; }
+            .dice-area { justify-content: center; width: 100%; }
+            #turn-badge { font-size: 0.85rem; width: 100%; text-align: center; }
+            .btn-action { padding: 12px 25px; font-size: 0.85rem; }
+            .dice-box { width: 48px; height: 48px; font-size: 1.8rem; }
+        }
     </style>
 
     <div id="setup-modal">
@@ -201,13 +255,20 @@
         <div class="main-content">
             <div id="ludo-container" class="ludo-container">
                 <div class="hud">
-                <div id="turn-badge" class="turn-indicator red" style="padding: 12px 30px; border-radius: 50px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">Bhondu's Turn</div>
-                <div style="display:flex; align-items:center; gap:20px;">
-                    <div id="comm-toggle" onclick="toggleComm()" style="cursor:pointer; opacity:0.5; font-size:1.2rem;">🔊</div>
-                    <div id="dice" class="dice-box" onclick="handleRoll()">🎲</div>
-                    <button id="roll-btn" class="btn-action" style="padding: 12px 35px;" onclick="handleRoll()">ROLL</button>
+                    <div class="hud-left">
+                        <div id="turn-badge" class="turn-indicator red">Bhondu's Turn</div>
+                    </div>
+                    <div class="hud-right">
+                        <div class="hud-actions">
+                            <div id="sync-btn" onclick="syncState()" title="Sync Game" class="hud-icon">🔄</div>
+                            <div id="comm-toggle" onclick="toggleComm()" class="hud-icon">🔊</div>
+                        </div>
+                        <div class="dice-area">
+                            <div id="dice" class="dice-box" onclick="handleRoll()">🎲</div>
+                            <button id="roll-btn" class="btn-action" onclick="handleRoll()">ROLL</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
             <div class="ludo-board" id="ludo-board">
                 <!-- The Grid Layer -->
@@ -248,7 +309,7 @@
         function toggleComm() {
             commEnabled = !commEnabled;
             document.getElementById('comm-toggle').innerText = commEnabled ? "🔊" : "🔇";
-            document.getElementById('comm-toggle').style.opacity = commEnabled ? "1" : "0.3";
+            document.getElementById('comm-toggle').style.opacity = commEnabled ? "1" : "0.5";
         }
 
         const COMMENTARY = {
@@ -352,7 +413,9 @@
 
         const username = "<%= username %>";
         const otherUser = "<%= otherUser %>";
-        const pusher = new Pusher('<%= pusherKey %>', { cluster: '<%= pusherCluster %>', authEndpoint: '/pusher/auth' });
+        
+        // Use global pusher if available, fallback to local if needed
+        const pusher = window.globalPusher || new Pusher('<%= pusherKey %>', { cluster: '<%= pusherCluster %>', authEndpoint: '/pusher/auth' });
         const channel = pusher.subscribe('private-notifications-' + username.toLowerCase());
 
         const TRACK = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
@@ -499,12 +562,28 @@
 
                 if(getMovableTokens(state.turn, state.roll).length === 0) {
                     speakEvent('no_moves', { player: username });
-                    document.getElementById('status').innerText = "No moves! Auto-skipping...";
+                    document.getElementById('status').innerText = "No moves! Auto-skipping in 2s...";
+                    
+                    // Client-side guard for auto-skip
                     setTimeout(async () => {
-                        const skipRes = await fetch('/api/games/ludo/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: otherUser, isSkip: true }) });
-                        const skipData = await skipRes.json(); state.turn = skipData.nextTurn; state.roll = 0; state.waitingForMove = false;
-                        document.getElementById('dice').innerText = '🎲'; updateUI();
-                    }, 1000);
+                        if (state.roll === 0 || !state.waitingForMove) return; // Already moved/skipped
+                        try {
+                            const skipRes = await fetch('/api/games/ludo/move', { 
+                                method: 'POST', 
+                                headers: { 'Content-Type': 'application/json' }, 
+                                body: JSON.stringify({ to: otherUser, isSkip: true }) 
+                            });
+                            const skipData = await skipRes.json(); 
+                            state.turn = skipData.nextTurn; state.roll = 0; state.waitingForMove = false;
+                            document.getElementById('dice').innerText = '🎲'; 
+                            document.getElementById('status').innerText = "Skipped!";
+                            updateUI();
+                        } catch (err) {
+                            console.error("Skip error:", err);
+                            // Fallback if network fails: just reset locally so user can try something
+                            state.waitingForMove = false; updateUI();
+                        }
+                    }, 2000);
                 }
                 updateUI();
             }, 600);
@@ -777,17 +856,31 @@
         channel.bind('ludo-win', (data) => showWin(data.winner));
         async function requestReset() { if(confirm("Reset Game?")) { await fetch('/api/games/ludo/reset', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({to:otherUser}) }); location.reload(); } }
 
+        async function syncState() {
+            document.getElementById('sync-btn').style.animation = "shake 0.5s infinite";
+            const res = await fetch(`/api/games/ludo/state?otherUser=${otherUser}`); 
+            const data = await res.json();
+            document.getElementById('sync-btn').style.animation = "none";
+            if(data.success) { 
+                state = data.state; 
+                if(state.phase === 'setup') { 
+                    document.getElementById('setup-modal').style.display = 'flex'; 
+                    gsap.to('.setup-content', { opacity: 1, y: 0, duration: 1, ease: "expo.out" });
+                    renderSetup(); 
+                } else {
+                    document.getElementById('setup-modal').style.display = 'none'; 
+                    document.getElementById('ludo-container').classList.add('active'); 
+                    initBoard();
+                    Object.keys(state.tokens).forEach(color => state.tokens[color].forEach((st, i) => { 
+                        if(st && st.status !== 'home') moveToken(color, i, st.status, st.pos); 
+                    }));
+                    setTimeout(updateStackedTokens, 500);
+                }
+            }
+        }
+
         (async () => {
-            const res = await fetch(`/api/games/ludo/state?otherUser=${otherUser}`); const data = await res.json();
-            if(data.success) { state = data.state; if(state.phase === 'setup') { 
-                document.getElementById('setup-modal').style.display = 'flex'; 
-                gsap.to('.setup-content', { opacity: 1, y: 0, duration: 1, ease: "expo.out" });
-                renderSetup(); 
-            } else {
-                document.getElementById('setup-modal').style.display = 'none'; document.getElementById('ludo-container').classList.add('active'); initBoard();
-                Object.keys(state.tokens).forEach(color => state.tokens[color].forEach((st, i) => { if(st && st.status !== 'home') moveToken(color, i, st.status, st.pos); }));
-                setTimeout(updateStackedTokens, 500);
-            }}
+            await syncState();
         })();
     </script>
 </div>
