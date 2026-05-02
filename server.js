@@ -21,6 +21,9 @@ const helmet = require("helmet");
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const webpush = require("web-push");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+
 
 const app = express();
 
@@ -114,6 +117,33 @@ app.use(session({
     }
 }));
 
+// ========== PASSPORT CONFIG ==========
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback",
+    proxy: true
+}, (accessToken, refreshToken, profile, done) => {
+    const email = profile.emails[0].value.toLowerCase();
+    let username = null;
+
+    if (email === process.env.VISHU_EMAIL.toLowerCase()) username = "Vishu";
+    else if (email === process.env.BHONDU_EMAIL.toLowerCase()) username = "Bhondu";
+
+    if (username) {
+        return done(null, { username, email });
+    } else {
+        return done(null, false, { message: "Access Denied: Not an authorized user." });
+    }
+}));
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
+
+
 // Global locals for Pusher/Auth
 app.use(async (req, res, next) => {
     res.locals.pusherKey = process.env.PUSHER_KEY || "";
@@ -156,7 +186,10 @@ const chatUpload = multer({ storage: chatStorage });
 
 // ========== ROUTES ==========
 const authRoutes = require("./routes/auth");
+const passkeyRoutes = require("./routes/passkey");
 app.use("/", authRoutes);
+app.use("/api/passkey", passkeyRoutes);
+
 
 app.get("/", isAuth, (req, res) => {
     res.render("home", {

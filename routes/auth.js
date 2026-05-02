@@ -3,6 +3,8 @@ const router = express.Router();
 
 const bcrypt = require("bcryptjs");
 const rateLimit = require("express-rate-limit");
+const passport = require("passport");
+
 
 // Credentials loaded from .env
 const USERNAME = process.env.LOGIN_USERNAME || "Bhondu";
@@ -49,6 +51,19 @@ router.get("/login", (req, res) => {
     req.session.error = null;
     res.render("login", { error });
 });
+
+// ========== GOOGLE AUTH ROUTES ==========
+router.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+router.get("/auth/google/callback", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+    // Successfully authenticated
+    req.session.isAuth = true;
+    req.session.username = req.user.username;
+    req.session.loginTime = new Date().toISOString();
+    console.log(`❤️ ${req.user.username} logged in via Google at ${new Date().toLocaleString()}`);
+    res.redirect("/");
+});
+
 
 // ========== LEGACY LOGIN PAGE ==========
 router.get("/legacy/login", (req, res) => {

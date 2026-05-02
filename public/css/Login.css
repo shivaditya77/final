@@ -243,3 +243,35 @@
         font-size: 1.6rem;
     }
 }
+
+/* ========== GOOGLE LOGIN BUTTON ========== */
+.google-login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    background: white;
+    border: none;
+    border-radius: 50px;
+    color: #444;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.google-login-btn:hover {
+    transform: scale(1.02) translateZ(0);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.1);
+    background: #f8f8f8;
+}
+
+.google-icon-svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+}
+

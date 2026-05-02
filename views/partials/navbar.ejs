@@ -21,6 +21,11 @@
     </div>
     <% } %>
 
+    <div class="nav-btn biometric-btn" id="biometric-setup-btn" style="cursor: pointer; display: none; background: rgba(255, 77, 109, 0.2); border-color: #ff4d6d;">
+        <span>☝️</span><span class="nav-text">Enable FaceID</span>
+    </div>
+
+
     <a href="/logout" class="nav-btn premium-logout" style="text-decoration: none;" onclick="confirmLogout(event)" data-barba-prevent="true">
         <span>💋</span><span class="nav-text">Logout</span>
     </a>
@@ -449,5 +454,45 @@
         }
         return outputArray;
     }
+    
+    // ========== BIOMETRIC SETUP LOGIC ==========
+    const bioBtn = document.getElementById('biometric-setup-btn');
+    if (bioBtn && window.PublicKeyCredential && window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(available => {
+            if (available) bioBtn.style.display = 'flex';
+        });
+
+        bioBtn.addEventListener('click', async () => {
+            try {
+                const { startRegistration } = await import('https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.es5.umd.min.js');
+                
+                bioBtn.innerText = 'Setting up...';
+                const resp = await fetch('/api/passkey/register-options');
+                const options = await resp.json();
+
+                const regResp = await startRegistration(options);
+
+                const verifyResp = await fetch('/api/passkey/register-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(regResp),
+                });
+
+                const result = await verifyResp.json();
+                if (result.success) {
+                    alert('🎉 Biometric Login Enabled! You can now log in with FaceID/Fingerprint next time.');
+                    bioBtn.style.display = 'none';
+                } else {
+                    alert('❌ Setup failed: ' + result.error);
+                    bioBtn.innerHTML = '<span>☝️</span><span class="nav-text">Retry FaceID</span>';
+                }
+            } catch (err) {
+                console.error(err);
+                alert('❌ Error: ' + err.message);
+                bioBtn.innerHTML = '<span>☝️</span><span class="nav-text">Enable FaceID</span>';
+            }
+        });
+    }
 })();
 </script>
+
