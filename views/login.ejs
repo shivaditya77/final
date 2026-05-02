@@ -74,10 +74,6 @@
                     <span>Sign in with Google</span>
                 </a>
 
-                <button id="biometric-login-btn" class="google-login-btn" style="display: none; margin-top: 10px; background: rgba(255, 77, 109, 0.1); border: 1px solid #ff4d6d; color: #ff4d6d;">
-                    <span style="font-size: 1.2rem; margin-right: 10px;">☝️</span>
-                    <span>Unlock with Biometrics</span>
-                </button>
 
 
                 <div class="hint-wrapper">
@@ -260,59 +256,8 @@
             barba.hooks.before(() => {
                 clearInterval(counterInterval);
             });
-    
-        // ========== BIOMETRIC LOGIN LOGIC ==========
-        const bioLoginBtn = document.getElementById('biometric-login-btn');
-        const usernameInput = document.getElementById('usernameInput');
-
-        if (bioLoginBtn && window.PublicKeyCredential && window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-            PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(available => {
-                if (available) bioLoginBtn.style.display = 'flex';
-            });
-
-            bioLoginBtn.addEventListener('click', async () => {
-                const username = usernameInput.value.trim();
-                if (!username) {
-                    alert('🌸 Please type your name first (Bhondu or Vishu) so I know who is unlocking! ❤️');
-                    return;
-                }
-
-                try {
-                    const { startAuthentication } = await import('https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.es5.umd.min.js');
-                    
-                    bioLoginBtn.innerText = 'Verifying...';
-                    const resp = await fetch('/api/passkey/login-options', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username }),
-                    });
-
-                    if (!resp.ok) throw new Error('No biometrics found for this name.');
-
-                    const options = await resp.json();
-                    const authResp = await startAuthentication(options);
-
-                    const verifyResp = await fetch('/api/passkey/login-verify', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ body: authResp, username }),
-                    });
-
-                    const result = await verifyResp.json();
-                    if (result.success) {
-                        window.location.href = '/';
-                    } else {
-                        alert('❌ Verification failed: ' + result.error);
-                        bioLoginBtn.innerHTML = '<span style="font-size: 1.2rem; margin-right: 10px;">☝️</span><span>Try Again</span>';
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert('❌ Error: ' + err.message);
-                    bioLoginBtn.innerHTML = '<span style="font-size: 1.2rem; margin-right: 10px;">☝️</span><span>Unlock with Biometrics</span>';
-                }
-            });
-        }
     })();
+
     </script>
 
 </div>

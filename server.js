@@ -186,9 +186,7 @@ const chatUpload = multer({ storage: chatStorage });
 
 // ========== ROUTES ==========
 const authRoutes = require("./routes/auth");
-const passkeyRoutes = require("./routes/passkey");
 app.use("/", authRoutes);
-app.use("/api/passkey", passkeyRoutes);
 
 
 app.get("/", isAuth, (req, res) => {
