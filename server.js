@@ -1392,41 +1392,6 @@ app.post("/api/games/ludo/reset", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.get("/games/road-dash", isAuth, (req, res) => {
-    res.render("game-road-dash", {
-        username: req.session.username,
-        otherUser: (req.session.username || "Bhondu").toLowerCase() === 'bhondu' ? 'Vishu' : 'Bhondu',
-        pusherKey: process.env.PUSHER_KEY,
-        pusherCluster: process.env.PUSHER_CLUSTER
-    });
-});
-
-app.post("/api/games/road-dash/start", isAuth, async (req, res) => {
-    try {
-        const { to } = req.body;
-        const from = req.session.username || "Bhondu";
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-start", { from });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
-app.post("/api/games/road-dash/sync", isAuth, async (req, res) => {
-    try {
-        const { to, x, y, speed, state } = req.body;
-        const from = req.session.username || "Bhondu";
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-sync", { from, x, y, speed, state });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
-app.post("/api/games/road-dash/action", isAuth, async (req, res) => {
-    try {
-        const { to, action, data } = req.body;
-        const from = req.session.username || "Bhondu";
-        await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "road-dash-action", { from, action, data });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
 
 app.get("/final", isAuth, (req, res) => res.render("final"));
 
