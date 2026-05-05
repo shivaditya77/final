@@ -1203,17 +1203,33 @@ const memories = [
 app.get("/memories", isAuth, (req, res) => res.render("memories", { memories, name: req.session.username || "Bhondu" }));
 
 app.get("/api/questions", isAuth, async (req, res) => {
-    const username = (req.session.username || "Bhondu").toLowerCase();
-    const q = await Question.findOne({ username });
-    res.json(q ? q.answers : {});
+    try {
+        // Use case-insensitive search and sort by updatedAt to get the latest/best data
+        const vishu = await Question.findOne({ username: { $regex: /^vishu$/i } }).sort({ updatedAt: -1 });
+        const bhondu = await Question.findOne({ username: { $regex: /^bhondu$/i } }).sort({ updatedAt: -1 });
+        res.json({
+            vishu: vishu ? vishu.answers : {},
+            bhondu: bhondu ? bhondu.answers : {}
+        });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
 app.post("/api/questions/save", isAuth, async (req, res) => {
     try {
         const username = (req.session.username || "Bhondu").toLowerCase();
-        await Question.findOneAndUpdate({ username }, { answers: req.body }, { upsert: true });
+        const answers = req.body.answers || req.body; 
+        
+        // Find existing record case-insensitively to avoid duplicates like 'Bhondu' and 'bhondu'
+        await Question.findOneAndUpdate(
+            { username: { $regex: new RegExp(`^${username}$`, 'i') } }, 
+            { username, answers, updatedAt: new Date() }, 
+            { upsert: true, new: true }
+        );
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) { 
+        console.error("Save Error:", err);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 app.get("/questions", isAuth, (req, res) => res.render("questions"));

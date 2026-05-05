@@ -16,10 +16,9 @@
                 async leave(data) {
                     // Start blurring and fading the current page
                     return gsap.to(data.current.container, {
-                        duration: 0.4,
+                        duration: 0.3,
                         opacity: 0,
-                        filter: 'blur(15px)',
-                        scale: 0.96,
+                        scale: 0.98,
                         ease: 'power2.in'
                     });
                 },
@@ -45,8 +44,7 @@
                     // Prepare next container
                     gsap.set(data.next.container, {
                         opacity: 0,
-                        filter: 'blur(15px)',
-                        scale: 1.04
+                        scale: 1.02
                     });
 
                     window.scrollTo(0, 0);
@@ -62,9 +60,8 @@
 
                     // Snappy fade and focus
                     return gsap.to(data.next.container, {
-                        duration: 0.5,
+                        duration: 0.4,
                         opacity: 1,
-                        filter: 'blur(0px)',
                         scale: 1,
                         ease: 'power3.out',
                         clearProps: 'all'

@@ -1,6 +1,7 @@
 <%- include('partials/header') %>
 <div data-barba="container" data-barba-namespace="home">
     <link rel="stylesheet" href="/css/Home.css">
+    <link rel="stylesheet" href="/css/BirthdayCountdown.css">
     <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <div class="home-body">
         <div class="animated-bg"></div>
@@ -14,6 +15,9 @@
                 <span class="badge-text">A Love Story</span>
                 <span class="badge-heart">❤️</span>
             </div>
+
+            <!-- BIRTHDAY FEATURE CONTAINER -->
+            <div id="birthday-feature-wrapper"></div>
 
             <div class="heading-wrapper">
                 <h1 class="home-h1" id="typing-heading"></h1>
@@ -109,6 +113,14 @@
             const cursor = document.getElementById('typing-cursor');
             const subtitle = document.getElementById('subtitle');
 
+            window.startHomeAnimations = function() {
+                // Show the container
+                const homeContainer = document.querySelector('.home-container');
+                if (homeContainer) homeContainer.style.opacity = '1';
+                
+                typeWriter();
+            };
+
             function typeWriter() {
                 if (i < text.length) {
                     if (heading) heading.innerText = text.substring(0, i + 1);
@@ -120,7 +132,8 @@
                     initParticles();
                 }
             }
-            setTimeout(typeWriter, 500);
+            // Will be triggered after birthday check if not birthday
+            // setTimeout(typeWriter, 500); 
 
             // ========== PARTICLES ==========
             function initParticles() {
@@ -177,6 +190,186 @@
             function updateHomeStatus(isOnline) {
                 // Feature removed
             }
+
+            // ========== BIRTHDAY COUNTDOWN & CELEBRATION ==========
+            const BIRTHDAY_DATE = new Date('2026-06-09T00:00:00');
+            const REMOVAL_DATE = new Date('2026-06-10T00:00:00');
+            const wrapper = document.getElementById('birthday-feature-wrapper');
+
+            function checkBirthdayStatus() {
+                const now = new Date();
+                
+                if (now >= REMOVAL_DATE) {
+                    wrapper.innerHTML = '';
+                    return;
+                }
+
+                if (now >= BIRTHDAY_DATE && now < REMOVAL_DATE) {
+                    // Hide main container during craze
+                    const homeContainer = document.querySelector('.home-container');
+                    if (homeContainer) homeContainer.style.opacity = '0';
+                    showBirthdayCelebration();
+                } else {
+                    if (now < BIRTHDAY_DATE) showCountdown();
+                    if (window.startHomeAnimations) window.startHomeAnimations();
+                }
+            }
+
+            function showCountdown() {
+                wrapper.innerHTML = `
+                    <div class="birthday-countdown-container">
+                        <div class="countdown-birthday-vibe">
+                            <h2 class="birthday-title-vibe">Bhondu's Birthday</h2>
+                            
+                            <div class="vibe-icon vibe-icon-cake">🎂</div>
+                            <div class="vibe-icon vibe-icon-balloon">🎈</div>
+                            <div class="vibe-icon vibe-icon-popper">🎉</div>
+                            <div class="vibe-icon vibe-icon-gift">🎁</div>
+
+                            <div class="countdown-label-vibe">Countdown to the craze</div>
+                            <div class="countdown-timer-vibe" id="timer-display">
+                                <div class="time-segment-vibe">
+                                    <span class="time-value-vibe" id="days">00</span>
+                                    <span class="time-label-vibe">Days</span>
+                                </div>
+                                <div class="time-segment-vibe">
+                                    <span class="time-value-vibe" id="hours">00</span>
+                                    <span class="time-label-vibe">Hours</span>
+                                </div>
+                                <div class="time-segment-vibe">
+                                    <span class="time-value-vibe" id="minutes">00</span>
+                                    <span class="time-label-vibe">Mins</span>
+                                </div>
+                                <div class="time-segment-vibe">
+                                    <span class="time-value-vibe" id="seconds">00</span>
+                                    <span class="time-label-vibe">Secs</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                function updateTimer() {
+                    const now = new Date().getTime();
+                    const distance = BIRTHDAY_DATE.getTime() - now;
+
+                    if (distance < 0) {
+                        checkBirthdayStatus();
+                        return;
+                    }
+
+                    const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+                    const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                    const s = Math.floor((distance % (1000 * 60)) / 1000);
+
+                    document.getElementById('days').innerText = d.toString().padStart(2, '0');
+                    document.getElementById('hours').innerText = h.toString().padStart(2, '0');
+                    document.getElementById('minutes').innerText = m.toString().padStart(2, '0');
+                    document.getElementById('seconds').innerText = s.toString().padStart(2, '0');
+                }
+
+                updateTimer();
+                setInterval(updateTimer, 1000);
+            }
+
+            function showBirthdayCelebration() {
+                const celebrationHtml = `
+                    <div class="birthday-celebration-overlay" id="birthday-overlay">
+                        <div class="celebration-bg"></div>
+                        <div class="confetti-container" id="confetti-container"></div>
+                        <div class="birthday-text-container">
+                            <h1 class="birthday-h1">Happy Birthday Bhondu! 🎂</h1>
+                            <h2 class="birthday-h2">You are my whole world ❤️</h2>
+                        </div>
+                        <audio id="birthday-audio" loop>
+                            <source src="https://www.chosic.com/wp-content/uploads/2021/04/Happy-Birthday-To-You.mp3" type="audio/mpeg">
+                        </audio>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', celebrationHtml);
+                
+                const overlay = document.getElementById('birthday-overlay');
+                const confettiContainer = document.getElementById('confetti-container');
+                const bdayAudio = document.getElementById('birthday-audio');
+
+                // Handle Music: Pause global, play birthday
+                const globalAudio = document.getElementById('global-audio');
+                let wasGlobalPlaying = false;
+                if (globalAudio && !globalAudio.paused) {
+                    wasGlobalPlaying = true;
+                    globalAudio.pause();
+                }
+
+                if (bdayAudio) {
+                    bdayAudio.volume = 0.6;
+                    bdayAudio.play().catch(e => console.log("Autoplay blocked, waiting for interaction..."));
+                }
+
+                // Create Confetti
+                for (let j = 0; j < 100; j++) {
+                    setTimeout(() => {
+                        const confetti = document.createElement('div');
+                        confetti.className = 'confetti';
+                        confetti.style.left = Math.random() * 100 + 'vw';
+                        confetti.style.backgroundColor = ['#ff4d6d', '#ffccd5', '#ff1e4d', '#ffffff'][Math.floor(Math.random() * 4)];
+                        confetti.style.width = Math.random() * 10 + 5 + 'px';
+                        confetti.style.height = Math.random() * 10 + 5 + 'px';
+                        confetti.style.animationDuration = Math.random() * 3 + 2 + 's';
+                        confettiContainer.appendChild(confetti);
+                        setTimeout(() => confetti.remove(), 5000);
+                    }, j * 100);
+                }
+
+                // Create Balloons
+                for (let j = 0; j < 12; j++) {
+                    setTimeout(() => {
+                        const balloon = document.createElement('div');
+                        balloon.className = 'balloon';
+                        balloon.innerHTML = ['🎈', '✨', '💖'][Math.floor(Math.random() * 3)];
+                        balloon.style.fontSize = Math.random() * 20 + 30 + 'px';
+                        balloon.style.left = Math.random() * 100 + 'vw';
+                        balloon.style.animationDuration = Math.random() * 5 + 7 + 's';
+                        balloon.style.opacity = Math.random() * 0.5 + 0.5;
+                        document.body.appendChild(balloon);
+                        setTimeout(() => balloon.remove(), 12000);
+                    }, j * 800);
+                }
+
+                // Create Floating Hearts
+                for (let j = 0; j < 20; j++) {
+                    setTimeout(() => {
+                        const heart = document.createElement('div');
+                        heart.className = 'celebration-heart';
+                        heart.innerHTML = '❤️';
+                        heart.style.left = Math.random() * 100 + 'vw';
+                        heart.style.fontSize = Math.random() * 15 + 10 + 'px';
+                        heart.style.animationDuration = Math.random() * 3 + 4 + 's';
+                        document.body.appendChild(heart);
+                        setTimeout(() => heart.remove(), 7000);
+                    }, j * 500);
+                }
+
+                // Remove overlay after 15 seconds
+                setTimeout(() => {
+                    overlay.classList.add('fade-out');
+                    if (bdayAudio) {
+                        gsap.to(bdayAudio, { volume: 0, duration: 2, onComplete: () => bdayAudio.pause() });
+                    }
+                    setTimeout(() => {
+                        overlay.remove();
+                        // Resume global music if it was playing
+                        if (wasGlobalPlaying && globalAudio) {
+                            globalAudio.play().catch(() => {});
+                            if (window.syncMusicUI) window.syncMusicUI();
+                        }
+                        // START THE HOME APP
+                        if (window.startHomeAnimations) window.startHomeAnimations();
+                    }, 1000);
+                }, 15000);
+            }
+
+            checkBirthdayStatus();
         })();
     </script>
 

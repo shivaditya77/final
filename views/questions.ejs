@@ -41,12 +41,21 @@
                     <div class="question-card">
                         <div class="question-number"><%= q.icon %> QUESTION <%= q.num %> / 9</div>
                         <div class="question-text"><%= q.text %></div>
-                        <textarea
-                            class="answer-input"
-                            id="<%= q.id %>"
-                            placeholder="Type your heartfelt answer here..."
-                            rows="2"
-                        ></textarea>
+                        
+                        <div class="answer-wrapper">
+                            <label class="input-label">My Heart:</label>
+                            <textarea
+                                class="answer-input"
+                                id="<%= q.id %>"
+                                placeholder="Type your heartfelt answer here..."
+                                rows="2"
+                            ></textarea>
+                        </div>
+
+                        <div class="partner-answer-container" id="partner-<%= q.id %>-container" style="display: none;">
+                            <label class="input-label partner-label"><span id="partner-name-label">Soulmate</span>'s Heart:</label>
+                            <div class="partner-answer-text" id="partner-<%= q.id %>"></div>
+                        </div>
                     </div>
                 <% }) %>
             </form>
@@ -100,21 +109,57 @@
                 saveTimeout = setTimeout(() => saveAnswers(false), 2000); 
             }));
 
+            const currentUsername = '<%= (username || "Bhondu").toLowerCase() %>';
+            const otherUsername = currentUsername === 'vishu' ? 'bhondu' : 'vishu';
+            const otherDisplayName = otherUsername === 'vishu' ? 'Vishu' : 'Bhondu';
+
             async function fetchAnswers() {
                 try {
                     const res = await fetch('/api/questions');
                     const data = await res.json();
-                    if (data && Object.keys(data).length > 0) {
-                        Object.keys(data).forEach(id => {
-                            const input = document.getElementById(id);
-                            if (input) input.value = data[id];
-                        });
-                        updateProgress();
-                        if (saveStatus) saveStatus.innerText = 'Saved to database ✅';
-                    } else {
-                        if (saveStatus) saveStatus.innerText = 'Ready to start ❤️';
+                    
+                    // Helper to get data regardless of case
+                    const getCaseInsensitive = (obj, key) => {
+                        const foundKey = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+                        return foundKey ? obj[foundKey] : null;
+                    };
+
+                    // Populate My Answers
+                    let myData = getCaseInsensitive(data, currentUsername) || {};
+                    // Handle rare case of double nesting from old save bug
+                    if (myData.answers) myData = myData.answers;
+
+                    Object.keys(myData).forEach(id => {
+                        const input = document.getElementById(id);
+                        if (input && myData[id]) input.value = myData[id];
+                    });
+
+                    // Populate Partner's Answers
+                    let partnerData = getCaseInsensitive(data, otherUsername) || {};
+                    if (partnerData.answers) partnerData = partnerData.answers;
+
+                    Object.keys(partnerData).forEach(id => {
+                        const partnerText = partnerData[id];
+                        if (partnerText && partnerText.trim() !== '') {
+                            const partnerDiv = document.getElementById(`partner-${id}`);
+                            const partnerContainer = document.getElementById(`partner-${id}-container`);
+                            if (partnerDiv && partnerContainer) {
+                                partnerDiv.innerText = partnerText;
+                                partnerContainer.style.display = 'block';
+                            }
+                        }
+                    });
+
+                    const partnerLabels = document.querySelectorAll('#partner-name-label');
+                    partnerLabels.forEach(l => l.innerText = otherDisplayName);
+
+                    updateProgress();
+                    if (saveStatus) {
+                        if (Object.keys(myData).length > 0) saveStatus.innerText = 'Saved to database ✅';
+                        else saveStatus.innerText = 'Ready to start ❤️';
                     }
                 } catch (err) {
+                    console.error("Fetch Error:", err);
                     if (saveStatus) saveStatus.innerText = 'Offline ❌';
                 }
             }
@@ -211,6 +256,48 @@
     @keyframes floatHeartEffect {
         0% { transform: translateY(0); opacity: 1; }
         100% { transform: translateY(-50px); opacity: 0; }
+    }
+
+    .answer-wrapper {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .input-label {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+
+    .partner-answer-container {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 77, 109, 0.05);
+        border-left: 3px solid #ff4d6d;
+        border-radius: 0 15px 15px 0;
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    .partner-label {
+        color: #ffb3c1;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .partner-answer-text {
+        font-style: italic;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-10px); }
+        to { opacity: 1; transform: translateX(0); }
     }
     </style>
 </div>
