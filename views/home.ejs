@@ -79,35 +79,35 @@
                 <a href="/reels" class="section-card card-reels">
                     <span class="card-tag">🔥 Trending</span>
                     <span class="card-icon">📽️</span>
-                    <div class="card-label">Soul Feed</div>
-                    <h2 class="card-title">Soul Feed</h2>
-                    <p class="card-desc">A curated feed of reels that remind me of us. Swipe up to feel the soul connection. ❤️</p>
+                    <div class="card-label">Bhondu Feed</div>
+                    <h2 class="card-title">Bhondu Feed</h2>
+                    <p class="card-desc">A curated feed of reels that remind me of us. Swipe up to feel the connection. ❤️</p>
                     <button class="card-btn">
                         Watch <span class="card-btn-arrow">→</span>
                     </button>
                 </a>
 
-                <!-- Card 5: Watch Together -->
-                <a href="/watch-together" class="section-card card-watch" style="background: linear-gradient(145deg, rgba(255, 0, 0, 0.15) 0%, rgba(5, 15, 26, 0.9) 100%); box-shadow: 0 8px 32px rgba(255, 0, 0, 0.15);">
+                <!-- Card 5: BhonduTube -->
+                <a href="/watch-together" class="section-card card-watch">
                     <span class="card-tag">🎬 Cinema</span>
                     <span class="card-icon">📺</span>
                     <div class="card-label">Watch Together</div>
-                    <h2 class="card-title">Soul Cinema</h2>
+                    <h2 class="card-title">BhonduTube</h2>
                     <p class="card-desc">Watch your favorite YouTube videos together in real-time. Control the player for both! 🍿</p>
-                    <button class="card-btn" style="background: linear-gradient(135deg, #ff0000, #cc0000); box-shadow: 0 4px 20px rgba(255, 0, 0, 0.4);">
+                    <button class="card-btn">
                         Enter <span class="card-btn-arrow">→</span>
                     </button>
                 </a>
 
 
                 <!-- Card 6: Bhondu Games -->
-                <a href="/games" class="section-card card-games" style="background: linear-gradient(145deg, rgba(0, 153, 255, 0.15) 0%, rgba(5, 15, 26, 0.9) 100%); box-shadow: 0 8px 32px rgba(0, 153, 255, 0.15);">
+                <a href="/games" class="section-card card-games">
                     <span class="card-tag">🎮 Fun</span>
                     <span class="card-icon">🎮</span>
                     <div class="card-label">Interactive</div>
                     <h2 class="card-title">Bhondu Games</h2>
                     <p class="card-desc">Play Tic-Tac-Toe, Heart Seeker & more together. Let's see who wins! 🏆</p>
-                    <button class="card-btn" style="background: linear-gradient(135deg, #0099ff, #0066cc); box-shadow: 0 4px 20px rgba(0, 153, 255, 0.4);">
+                    <button class="card-btn">
                         Play <span class="card-btn-arrow">→</span>
                     </button>
                 </a>
@@ -203,31 +203,38 @@
                 // Feature removed
             }
 
-            // ========== BIRTHDAY COUNTDOWN & CELEBRATION ==========
-            const BIRTHDAY_DATE = new Date('2026-06-09T00:00:00');
-            const REMOVAL_DATE = new Date('2026-06-10T00:00:00');
+            // ========== DYNAMIC BIRTHDAY LOGIC ==========
+            function getNextBirthday() {
+                const now = new Date();
+                let year = now.getFullYear();
+                let birthday = new Date(`${year}-06-09T00:00:00`);
+                
+                // If today is after June 9th, the next birthday is next year
+                if (now > new Date(`${year}-06-09T23:59:59`)) {
+                    birthday.setFullYear(year + 1);
+                }
+                return birthday;
+            }
+
             const wrapper = document.getElementById('birthday-feature-wrapper');
 
             function checkBirthdayStatus() {
                 const now = new Date();
+                const birthday = getNextBirthday();
+                const isBirthday = now.getMonth() === 5 && now.getDate() === 9; // June is index 5
                 
-                if (now >= REMOVAL_DATE) {
-                    wrapper.innerHTML = '';
-                    return;
-                }
-
-                if (now >= BIRTHDAY_DATE && now < REMOVAL_DATE) {
-                    // Hide main container during craze
+                if (isBirthday) {
+                    // Hide main container during celebration
                     const homeContainer = document.querySelector('.home-container');
                     if (homeContainer) homeContainer.style.opacity = '0';
                     showBirthdayCelebration();
                 } else {
-                    if (now < BIRTHDAY_DATE) showCountdown();
+                    showCountdown(birthday);
                     if (window.startHomeAnimations) window.startHomeAnimations();
                 }
             }
 
-            function showCountdown() {
+            function showCountdown(targetDate) {
                 wrapper.innerHTML = `
                     <div class="birthday-countdown-container">
                         <div class="countdown-birthday-vibe">
@@ -263,7 +270,7 @@
 
                 function updateTimer() {
                     const now = new Date().getTime();
-                    const distance = BIRTHDAY_DATE.getTime() - now;
+                    const distance = targetDate.getTime() - now;
 
                     if (distance < 0) {
                         checkBirthdayStatus();

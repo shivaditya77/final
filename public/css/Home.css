@@ -193,6 +193,36 @@
 .card-reels .card-icon { margin-bottom: 0; margin-right: 15px; font-size: 2.5rem; }
 .card-reels-text { flex-grow: 1; text-align: left; }
 
+/* Soul Cinema card */
+.card-watch {
+  background: linear-gradient(145deg, rgba(255, 0, 0, 0.15) 0%, rgba(26, 5, 5, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(255, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.card-watch:hover {
+  transform: translate3d(0, -8px, 0) scale(1.02);
+  box-shadow: 0 20px 60px rgba(255, 0, 0, 0.4), 0 0 0 1px rgba(255, 0, 0, 0.3);
+  border-color: rgba(255, 0, 0, 0.5);
+}
+.card-watch .card-label { color: rgba(255, 0, 0, 0.8); }
+.card-watch .card-tag { background: rgba(255, 0, 0, 0.2); color: #ff0000; border: 1px solid rgba(255, 0, 0, 0.3); }
+.card-watch .card-btn { background: linear-gradient(135deg, #ff0000, #cc0000); color: white; box-shadow: 0 4px 20px rgba(255, 0, 0, 0.4); }
+
+/* Bhondu Games card */
+.card-games {
+  background: linear-gradient(145deg, rgba(0, 153, 255, 0.15) 0%, rgba(5, 15, 26, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 153, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.card-games:hover {
+  transform: translate3d(0, -8px, 0) scale(1.02);
+  box-shadow: 0 20px 60px rgba(0, 153, 255, 0.4), 0 0 0 1px rgba(0, 153, 255, 0.3);
+  border-color: rgba(0, 153, 255, 0.5);
+}
+.card-games .card-label { color: rgba(0, 153, 255, 0.8); }
+.card-games .card-tag { background: rgba(0, 153, 255, 0.2); color: #0099ff; border: 1px solid rgba(0, 153, 255, 0.3); }
+.card-games .card-btn { background: linear-gradient(135deg, #0099ff, #0066cc); color: white; box-shadow: 0 4px 20px rgba(0, 153, 255, 0.4); }
+
 /* Soul Connect card */
 .card-call {
   background: linear-gradient(145deg, rgba(0, 255, 204, 0.15) 0%, rgba(5, 26, 22, 0.9) 100%);
@@ -291,6 +321,22 @@
   transition: all 0.4s ease;
 }
 .card-chat:hover::before { transform: scale(1.5); opacity: 0.7; }
+
+.card-watch::before {
+  content: ''; position: absolute; width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255, 0, 0, 0.3) 0%, transparent 70%);
+  top: -50px; right: -50px; border-radius: 50%; pointer-events: none;
+  transition: all 0.4s ease;
+}
+.card-watch:hover::before { transform: scale(1.5); opacity: 0.7; }
+
+.card-games::before {
+  content: ''; position: absolute; width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(0, 153, 255, 0.3) 0%, transparent 70%);
+  top: -50px; right: -50px; border-radius: 50%; pointer-events: none;
+  transition: all 0.4s ease;
+}
+.card-games:hover::before { transform: scale(1.5); opacity: 0.7; }
 
 .card-icon { font-size: 3rem; margin-bottom: 20px; display: block; animation: floatIcon 3s ease-in-out infinite; }
 @keyframes floatIcon {
