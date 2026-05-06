@@ -654,6 +654,91 @@ app.post("/api/reels/invite", isAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// ========== YOUTUBE WATCH TOGETHER API ==========
+const CinemaItem = require('./models/CinemaItem');
+
+app.get("/watch-together", isAuth, async (req, res) => {
+    try {
+        const favorites = await CinemaItem.find({ type: 'favorite' }).sort({ createdAt: -1 }).limit(10);
+        const history = await CinemaItem.find({ type: 'history' }).sort({ createdAt: -1 }).limit(10);
+
+        res.render("watch-together", {
+            username: req.session.username,
+            pusherKey: process.env.PUSHER_KEY,
+            pusherCluster: process.env.PUSHER_CLUSTER,
+            youtubeApiKey: process.env.YOUTUBE_API_KEY || "",
+            savedFavorites: favorites,
+            savedHistory: history
+        });
+    } catch (err) {
+        res.render("watch-together", {
+            username: req.session.username,
+            pusherKey: process.env.PUSHER_KEY,
+            pusherCluster: process.env.PUSHER_CLUSTER,
+            youtubeApiKey: process.env.YOUTUBE_API_KEY || "",
+            savedFavorites: [],
+            savedHistory: []
+        });
+    }
+});
+
+app.post("/api/cinema/save", isAuth, async (req, res) => {
+    try {
+        const { videoId, title, thumbnail, type, playlistName } = req.body;
+
+        // If it's history, check if it already exists and update timestamp
+        if (type === 'history') {
+            await CinemaItem.findOneAndDelete({ videoId, type: 'history' });
+        }
+
+        const newItem = new CinemaItem({
+            videoId, title, thumbnail, type, playlistName,
+            addedBy: req.session.username
+        });
+        await newItem.save();
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/youtube/sync", isAuth, async (req, res) => {
+    try {
+        const { action, videoId, currentTime, state } = req.body;
+        const username = req.session.username || "Bhondu";
+
+        // Broadcast the action to the other user
+        await pusher.trigger("presence-soul-connect", "youtube-sync", {
+            username,
+            action, // 'play', 'pause', 'seek', 'load'
+            videoId,
+            currentTime,
+            state
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("YouTube Sync Error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post("/api/youtube/chat", isAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-soul-connect", "youtube-chat", { username, text });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/youtube/chat-message", isAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-soul-connect", "youtube-chat-message", { username, text });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // ========== OTHER JOURNEY ROUTES ==========
 const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
@@ -869,13 +954,13 @@ app.post("/api/games/cricket/toss", isAuth, async (req, res) => {
         const result = Math.floor(Math.random() * 2) + 1; // 1: Heads, 2: Tails
         const p1 = game.players[0];
         const p2 = game.players[1];
-        
+
         // P1 always calls in this version
         const winner = (choice === result) ? p1.username : p2.username;
 
         game.status = 'choosing';
         game.tossWinner = winner;
-        game.lastMove = { result: 'toss', bowlerRun: result }; 
+        game.lastMove = { result: 'toss', bowlerRun: result };
         await game.save();
 
         // Broadcast TO BOTH that the toss has started and give the result
@@ -944,10 +1029,10 @@ app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
         if (game.currentPicks.player1 && game.currentPicks.player2) {
             // 4. Atomic "claim" to process the ball - only one request will succeed here
             const processingGame = await CricketGame.findOneAndUpdate(
-                { 
-                    gameId, 
-                    'currentPicks.player1': { $gt: 0 }, 
-                    'currentPicks.player2': { $gt: 0 } 
+                {
+                    gameId,
+                    'currentPicks.player1': { $gt: 0 },
+                    'currentPicks.player2': { $gt: 0 }
                 },
                 { $set: { 'currentPicks.player1': null, 'currentPicks.player2': null } },
                 { new: false } // return state BEFORE clearing picks
@@ -1000,13 +1085,13 @@ app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
 
                 const finalGame = await CricketGame.findOneAndUpdate(
                     { gameId },
-                    { 
-                        $set: { 
+                    {
+                        $set: {
                             players: [p1, p2],
                             lastMove: { batsmanRun, bowlerRun, result: moveResult },
                             inning, target, status,
                             lastUpdated: Date.now()
-                        } 
+                        }
                     },
                     { new: true }
                 );
@@ -1026,9 +1111,9 @@ app.post("/api/games/cricket/pick", isAuth, async (req, res) => {
         }
 
         res.json({ success: true, waiting: true });
-    } catch (err) { 
+    } catch (err) {
         console.error("Cricket Pick Error:", err);
-        res.status(500).json({ success: false }); 
+        res.status(500).json({ success: false });
     }
 });
 
@@ -1217,18 +1302,18 @@ app.get("/api/questions", isAuth, async (req, res) => {
 app.post("/api/questions/save", isAuth, async (req, res) => {
     try {
         const username = (req.session.username || "Bhondu").toLowerCase();
-        const answers = req.body.answers || req.body; 
-        
+        const answers = req.body.answers || req.body;
+
         // Find existing record case-insensitively to avoid duplicates like 'Bhondu' and 'bhondu'
         await Question.findOneAndUpdate(
-            { username: { $regex: new RegExp(`^${username}$`, 'i') } }, 
-            { username, answers, updatedAt: new Date() }, 
+            { username: { $regex: new RegExp(`^${username}$`, 'i') } },
+            { username, answers, updatedAt: new Date() },
             { upsert: true, new: true }
         );
         res.json({ success: true });
-    } catch (err) { 
+    } catch (err) {
         console.error("Save Error:", err);
-        res.status(500).json({ success: false }); 
+        res.status(500).json({ success: false });
     }
 });
 
@@ -1256,7 +1341,7 @@ app.get("/api/games/ludo/state", isAuth, (req, res) => {
     const from = (req.session.username || "Bhondu").toLowerCase();
     const to = req.query.otherUser.toLowerCase();
     const gameId = [from, to].sort().join('-');
-    
+
     if (!ludoStates[gameId]) {
         ludoStates[gameId] = {
             phase: 'setup', // 'setup' or 'playing'
@@ -1287,7 +1372,7 @@ app.post("/api/games/ludo/setup", isAuth, async (req, res) => {
             if (mode) ludoStates[gameId].mode = mode;
             if (assignments) ludoStates[gameId].assignments = assignments;
             if (phase) ludoStates[gameId].phase = phase;
-            
+
             // If starting game, determine first turn color from assignments
             if (phase === 'playing') {
                 const assignedColors = Object.keys(ludoStates[gameId].assignments);
@@ -1305,9 +1390,9 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
         const { to } = req.body;
         const from = req.session.username || "Bhondu";
         const gameId = [from.toLowerCase(), to.toLowerCase()].sort().join('-');
-        
+
         const roll = Math.floor(Math.random() * 6) + 1;
-        
+
         // Update server state
         if (ludoStates[gameId]) {
             if (roll === 6) {
@@ -1321,7 +1406,7 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
                 ludoStates[gameId].roll = 0;
                 ludoStates[gameId].consecutiveSixes = 0;
                 ludoStates[gameId].waitingForMove = false;
-                
+
                 // Switch Turn
                 const order = ['red', 'blue', 'yellow', 'green'];
                 const assignedColors = Object.keys(ludoStates[gameId].assignments);
@@ -1333,7 +1418,7 @@ app.post("/api/games/ludo/roll", isAuth, async (req, res) => {
                         break;
                     }
                 }
-                
+
                 await pusher.trigger(`private-notifications-${to.toLowerCase()}`, "ludo-rolled", { from, roll: 6, cancelled: true, nextTurn: ludoStates[gameId].turn });
                 return res.json({ success: true, roll: 6, cancelled: true, nextTurn: ludoStates[gameId].turn });
             }
@@ -1356,7 +1441,7 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
         if (ludoStates[gameId]) {
             if (!isSkip) {
                 ludoStates[gameId].tokens[color][tokenId] = { status, pos };
-                
+
                 // Win detection
                 const tokens = ludoStates[gameId].tokens[color];
                 const finishedCount = tokens.filter(t => t && t.status === 'finished').length;
@@ -1367,9 +1452,9 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
                     return res.json({ success: true, winner: from });
                 }
             }
-            
+
             ludoStates[gameId].waitingForMove = false;
-            
+
             // Turn switching logic: Skip unassigned colors
             // If it's a 6, or a bonus turn (capture/home), stay on current turn
             if ((ludoStates[gameId].roll !== 6 && !bonusTurn) || isSkip) {
@@ -1377,7 +1462,7 @@ app.post("/api/games/ludo/move", isAuth, async (req, res) => {
                 const order = ['red', 'blue', 'yellow', 'green'];
                 const assignedColors = Object.keys(ludoStates[gameId].assignments);
                 let currentIdx = order.indexOf(ludoStates[gameId].turn);
-                
+
                 // Find the next color that is actually assigned
                 let foundNext = false;
                 for (let i = 1; i <= 4; i++) {
