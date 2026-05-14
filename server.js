@@ -764,6 +764,24 @@ app.get("/movies", isAuth, (req, res) => {
     });
 });
 
+app.post("/api/movie/chat", isAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-soul-connect", "movie-chat-message", { username, text });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.post("/api/movie/reaction", isAuth, async (req, res) => {
+    try {
+        const { emoji } = req.body;
+        const username = req.session.username || "Bhondu";
+        await pusher.trigger("presence-soul-connect", "movie-reaction", { username, emoji });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
 // ========== OTHER JOURNEY ROUTES ==========
 const reelsRouter = require('./routes/reels');
 app.use('/', reelsRouter);
