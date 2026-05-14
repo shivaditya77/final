@@ -75,10 +75,27 @@ function connectDB() {
         console.error("❌ CRITICAL ERROR: MONGODB_URI is missing!");
         return;
     }
-    mongoose.connect(MONGODB_URI)
+    
+    const options = {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+    };
+
+    mongoose.connect(MONGODB_URI, options)
         .then(() => console.log("🍃 Connected to MongoDB"))
-        .catch(err => console.error("❌ MongoDB connection error:", err.message));
+        .catch(err => {
+            console.error("❌ MongoDB connection error:", err.message);
+            // Retry after 5 seconds
+            setTimeout(connectDB, 5000);
+        });
 }
+
+// Handle connection loss after initial connect
+mongoose.connection.on('disconnected', () => {
+    console.log('📡 MongoDB Disconnected. Attempting to reconnect...');
+    setTimeout(connectDB, 5000);
+});
+
 connectDB();
 
 // ========== MIDDLEWARE ==========
@@ -737,6 +754,14 @@ app.post("/api/youtube/chat-message", isAuth, async (req, res) => {
         await pusher.trigger("presence-soul-connect", "youtube-chat-message", { username, text });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get("/movies", isAuth, (req, res) => {
+    res.render("movies", {
+        username: req.session.username,
+        pusherKey: process.env.PUSHER_KEY,
+        pusherCluster: process.env.PUSHER_CLUSTER
+    });
 });
 
 // ========== OTHER JOURNEY ROUTES ==========
